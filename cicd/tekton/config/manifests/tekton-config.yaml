@@ -9,10 +9,3 @@ spec:
   pipeline:
     enable-api-fields: beta
     disable-inline-spec: ""
-  pruner:
-    disabled: false
-    schedule: "0 8 * * *"
-    resources:
-      - taskrun
-      - pipelinerun
-    keep: 100
