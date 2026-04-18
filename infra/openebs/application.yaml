@@ -9,10 +9,12 @@ spec:
   source:
     repoURL: https://openebs.github.io/openebs
     chart: openebs
-    targetRevision: 4.2.0
+    targetRevision: 4.4.0
     helm:
       releaseName: openebs
       valuesObject:
+        preUpgradeHook:
+          enabled: false
         openebs-crds:
           csi:
             volumeSnapshots:
