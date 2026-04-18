@@ -15,6 +15,10 @@ spec:
       valuesObject:
         preUpgradeHook:
           enabled: false
+        loki:
+          enabled: false
+        alloy:
+          enabled: false
         openebs-crds:
           csi:
             volumeSnapshots:
