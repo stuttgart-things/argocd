@@ -1,60 +1,233 @@
 # argocd
 
-ArgoCD app catalog for `stuttgart-things` — reusable `Application` / App-of-Apps definitions consumed by cluster repos.
+Platform catalog for **Argo CD**. Curated, versioned `Application` building blocks that cluster repos compose into their own GitOps stack via Kustomize remote bases.
 
-Complements [`stuttgart-things/flux`](https://github.com/stuttgart-things/flux): `flux` hosts Flux CD `HelmRelease` / `Kustomization` definitions, this repo hosts their ArgoCD equivalents.
+One reviewed source of truth for WHAT each app is (chart pin, sensible defaults, sync policy, CRD handling). Clusters bring WHERE and HOW (target cluster, environment values, overrides).
 
-## Pattern
-
-```
-argocd repo (this)                 cluster consumer repo (e.g. stuttgart-things)
------------------------------      -----------------------------------------
-infra/<app>/                       clusters/<site>/<cluster>/argocd/
-  kustomization.yaml                 <app>.yaml            # root Application
-  application.yaml        <────      <app>/                # optional overlay
-  README.md                            kustomization.yaml  #   patches base
-                                       values.yaml         #   cluster values
-```
-
-- **This repo** defines WHAT each app is: upstream chart / source, default values, sync policy, in-cluster destination placeholder.
-- **Consumer cluster repo** defines WHERE and HOW it runs: target cluster, cluster-specific Helm values, per-cluster overrides. The consumer's root `Application` (or `ApplicationSet`) points at a path in this repo and kustomize-overlays it.
-
-## Layout
+## What's inside
 
 ```
-infra/      # Infrastructure components (cert-manager, cilium, openebs, …)
-apps/       # Application releases
-cicd/       # CI/CD tooling
+apps/     user-facing applications            (kro, …)
+cicd/     CI/CD tooling                       (tekton, …)
+infra/    platform infrastructure             (cert-manager, cilium, nfs-csi, openebs, …)
 ```
 
-## Consuming an entry from a cluster repo
+Every catalog entry is a self-contained Kustomize base producing one or more `Application` manifests. Larger apps (cert-manager, tekton, cilium) are split into independent sub-entries so consumers can pick exactly what they need (e.g. `infra/cert-manager/chart` + `infra/cert-manager/selfsigned`, skipping the full `cluster-ca` chain).
 
-A consumer cluster repo typically has a root `Application` per app:
+## How consumers use it
+
+```
+┌──────────────────────────────────┐       ┌───────────────────────────────────┐
+│  this repo  (catalog)            │       │  cluster consumer repo            │
+│                                  │       │                                   │
+│  <bucket>/<app>/                 │◀─────▶│  clusters/<cluster>/argocd/       │
+│    kustomization.yaml            │       │    infra.yaml   (root app)        │
+│    application.yaml              │       │    apps.yaml    (root app)        │
+│    README.md                     │       │    cicd.yaml    (root app)        │
+│                                  │       │    infra/                         │
+│                                  │       │      kustomization.yaml ← aggr.   │
+│                                  │       │      <app>/                       │
+│                                  │       │        kustomization.yaml ← base  │
+│                                  │       │                            + patch│
+└──────────────────────────────────┘       └───────────────────────────────────┘
+```
+
+Consumer flow per cluster:
+
+1. One `AppProject` scoping what this cluster is allowed to do.
+2. One root `Application` per bucket (`<cluster>-infra`, `<cluster>-apps`, `<cluster>-cicd`) pointing at an aggregator directory in the consumer repo.
+3. Each aggregator directory lists the catalog sub-paths the cluster wants.
+4. Per app, a tiny overlay Kustomization pulls the catalog path as a remote base and patches `project` + `destination` (and anything cluster-specific).
+
+## Prerequisites
+
+- **Argo CD 2.8+** with OCI Helm support (default in recent versions).
+- **Kustomize available to the repo-server.** This is the non-obvious one. The consumer overlays use **Kustomize remote bases** (`resources: - https://github.com/…/<bucket>/<app>?ref=main`). Argo CD's repo-server renders these through Kustomize — either the built-in renderer or a ConfigManagementPlugin sidecar. **CMP sidecar images do not ship Kustomize by default** (the `argocd-vault-plugin-kustomize` CMP invokes `sh -c "kustomize build . | argocd-vault-plugin generate -"` and silently returns empty if the binary isn't present). Make sure the `kustomize` binary is on `$PATH` in the sidecar, or all remote-base overlays will render to zero resources while reporting Synced.
+- **Git read access** to this repo from the Argo CD repo-server. If consumer cluster repos are private, Argo CD also needs a repo credential for those — see "Private consumer repo" below.
+
+## Consumer patterns
+
+<details>
+<summary><b>AppProject per cluster</b></summary>
+
+Each cluster gets its own AppProject that whitelists its target API endpoint **and** the in-cluster Argo CD endpoint (so the root app-of-apps Applications — which live in the `argocd` namespace on the control plane — don't get rejected).
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: AppProject
 metadata:
-  name: openebs-root
+  name: my-cluster
   namespace: argocd
 spec:
-  project: <cluster-project>
+  description: my-cluster
+  destinations:
+    # workload destination
+    - name: my-cluster
+      namespace: '*'
+      server: https://<cluster-api>:<port>
+    # root app-of-apps destination (the control plane)
+    - name: in-cluster
+      namespace: argocd
+      server: https://kubernetes.default.svc
+  sourceRepos:
+    - '*'
+  clusterResourceWhitelist:
+    - { group: '*', kind: '*' }
+  namespaceResourceWhitelist:
+    - { group: '*', kind: '*' }
+  clusterResourceBlacklist:
+    - { group: '',  kind: ''  }
+  namespaceResourceBlacklist:
+    - { group: '',  kind: ''  }
+```
+
+</details>
+
+<details>
+<summary><b>Root Applications and aggregators (<code>infra</code>, <code>apps</code>, <code>cicd</code>)</b></summary>
+
+One root `Application` per bucket. The root points at an aggregator directory in the consumer repo; the aggregator is a Kustomization that lists catalog sub-paths.
+
+**Root Application** (apply once via `kubectl`, not via Argo CD itself — it's the bootstrap):
+
+```yaml
+# clusters/my-cluster/argocd/infra.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-cluster-infra
+  namespace: argocd
+spec:
+  project: my-cluster
   source:
-    repoURL: https://github.com/stuttgart-things/argocd.git
+    repoURL: https://github.com/my-org/my-cluster-repo.git
     targetRevision: HEAD
-    path: infra/openebs
+    path: clusters/my-cluster/argocd/infra
+    plugin:
+      name: argocd-vault-plugin-kustomize   # pin if multiple CMPs are registered
   destination:
-    server: https://kubernetes.default.svc   # argocd control-plane cluster
+    server: https://kubernetes.default.svc
     namespace: argocd
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     syncOptions: [CreateNamespace=true]
 ```
 
-The root Application renders manifests from `infra/openebs` — which includes a child `Application` targeting the real workload cluster. To inject cluster-specific values, use a consumer-side kustomize overlay that patches the child Application.
+**Aggregator Kustomization** — collects multiple catalog entries into one bucket:
 
-See each `infra/<app>/README.md` for per-app details.
+```yaml
+# clusters/my-cluster/argocd/infra/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cert-manager   # pulls clusters/my-cluster/argocd/infra/cert-manager/kustomization.yaml
+  - cilium
+  - nfs-csi
+  - openebs
+```
 
-## Branching
+Repeat for `apps` (e.g. `[kro]`) and `cicd` (e.g. `[tekton]`). Adding a new app at some future point means one new overlay directory plus one new line in the relevant aggregator — no new root Application needed.
 
-`main` is the default and only branch. Tag releases with `v<semver>` when the catalog shape stabilises.
+**Overlay per app** — a Kustomization that uses the catalog path as a remote base and patches what the catalog left as placeholders (`project`, `destination.server`, sometimes values):
+
+```yaml
+# clusters/my-cluster/argocd/infra/cert-manager/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://github.com/stuttgart-things/argocd.git/infra/cert-manager/chart?ref=main
+  - https://github.com/stuttgart-things/argocd.git/infra/cert-manager/selfsigned?ref=main
+
+patches:
+  - target: { kind: Application, name: cert-manager }
+    patch: |-
+      - op: replace
+        path: /spec/project
+        value: my-cluster
+      - op: replace
+        path: /spec/destination/server
+        value: https://<cluster-api>:<port>
+  - target: { kind: Application, name: cert-manager-selfsigned }
+    patch: |-
+      - op: replace
+        path: /spec/project
+        value: my-cluster
+      - op: replace
+        path: /spec/destination/server
+        value: https://<cluster-api>:<port>
+```
+
+Pin the catalog version via `?ref=v1.2.3` (tag) once the catalog stabilises; use `?ref=main` while iterating.
+
+</details>
+
+<details>
+<summary><b>Private consumer repo — declarative credential for Argo CD</b></summary>
+
+If the consumer cluster repo is private, Argo CD's repo-server needs credentials to fetch it. Credentials are declared as a labelled `Secret` in the `argocd` namespace.
+
+**PAT (simplest)** — encrypt with SOPS before committing:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-my-org
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  type: git
+  url: https://github.com/my-org/my-cluster-repo
+  username: <github-user-or-bot>
+  password: <GitHub PAT, repo:read scope>
+```
+
+**Encrypt + apply** (matches the stuttgart-things SOPS + age pattern):
+
+```bash
+export AGE_PUBLIC_KEY="age1..."
+dagger call -m github.com/stuttgart-things/dagger/sops encrypt \
+  --age-key="env:AGE_PUBLIC_KEY" \
+  --plaintext-file="./repo-my-org.yaml" \
+  --file-extension="yaml" \
+  export --path="./repo-my-org.enc.yaml"
+
+# Apply via Flux SOPS-decryption or argocd-vault-plugin, never commit the plaintext.
+```
+
+Alternatives:
+- **SSH deploy key** — per-repo read-only key; use `sshPrivateKey` + `url: git@github.com:...`.
+- **GitHub App** — centrally rotatable, best at scale; use `githubAppID` / `githubAppInstallationID` / `githubAppPrivateKey` keys on the secret.
+
+For the catalog repo itself (this repo — public): no credential needed.
+
+</details>
+
+<details>
+<summary><b>Upstream-chart values overrides</b></summary>
+
+For Helm-backed catalog entries (most of them), the child `Application` in the catalog sets sensible defaults under `spec.source.helm.valuesObject`. Consumers override via a strategic-merge patch in their overlay:
+
+```yaml
+patches:
+  - target: { kind: Application, name: cilium }
+    patch: |-
+      - op: add
+        path: /spec/source/helm/valuesObject/operator/replicas
+        value: 2
+```
+
+For deeper overrides (long values trees), splitting out a dedicated `values.yaml` referenced via a multi-source `Application` with `$values` is usually easier — but costs you one extra Git source per app. Start with inline patches; migrate to multi-source only if the overlay gets unwieldy.
+
+</details>
+
+## Versioning
+
+`main` is the default and only branch. Tag releases with `v<semver>` when the catalog shape stabilises; consumers pin their remote-base URLs to those tags (`?ref=v1.2.3`). Between tags, `?ref=main` follows HEAD — fine for exploration, noisy for production.
+
+## Related
+
+Flux-based sibling: [`stuttgart-things/flux`](https://github.com/stuttgart-things/flux). The `cicd/tekton/operator` entry here still pulls vendored operator manifests from the Flux repo (`cicd/tekton/components/operator`) via a `directory:` source — those ~1500 lines of upstream YAML are shared between the Flux and Argo CD install paths rather than duplicated.
