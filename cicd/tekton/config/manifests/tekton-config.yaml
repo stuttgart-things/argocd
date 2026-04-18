@@ -1,0 +1,18 @@
+---
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: config
+spec:
+  targetNamespace: tekton-pipelines
+  profile: all
+  pipeline:
+    enable-api-fields: beta
+    disable-inline-spec: ""
+  pruner:
+    disabled: false
+    schedule: "0 8 * * *"
+    resources:
+      - taskrun
+      - pipelinerun
+    keep-since: 1440
