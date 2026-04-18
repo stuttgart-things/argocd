@@ -15,4 +15,4 @@ spec:
     resources:
       - taskrun
       - pipelinerun
-    keep-since: 1440
+    keep: 100
