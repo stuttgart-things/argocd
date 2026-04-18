@@ -1,4 +1,4 @@
-# apps/kro
+# cicd/kro
 
 Catalog entry for [kro](https://kro.run/) (Kube Resource Orchestrator) — installs the upstream OCI Helm chart from `registry.k8s.io/kro/charts`.
 
@@ -35,7 +35,7 @@ spec:
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
     targetRevision: HEAD
-    path: apps/kro
+    path: cicd/kro
 ```
 
 ### Overriding destination cluster
@@ -46,7 +46,7 @@ Consumer cluster repo creates an overlay dir (e.g. `clusters/<cluster>/argocd/kr
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - https://github.com/stuttgart-things/argocd.git/apps/kro?ref=main
+  - https://github.com/stuttgart-things/argocd.git/cicd/kro?ref=main
 patches:
   - target: { kind: Application, name: kro }
     patch: |-
