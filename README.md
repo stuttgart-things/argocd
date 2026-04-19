@@ -7,12 +7,42 @@ One reviewed source of truth for WHAT each app is (chart pin, sensible defaults,
 ## What's inside
 
 ```
-apps/     user-facing applications            (kro, …)
-cicd/     CI/CD tooling                       (tekton, …)
-infra/    platform infrastructure             (cert-manager, cilium, nfs-csi, openebs, …)
+apps/     user-facing applications
+cicd/     CI/CD tooling
+infra/    platform infrastructure
 ```
 
-Every catalog entry is a self-contained Kustomize base producing one or more `Application` manifests. Larger apps (cert-manager, tekton, cilium) are split into independent sub-entries so consumers can pick exactly what they need (e.g. `infra/cert-manager/chart` + `infra/cert-manager/selfsigned`, skipping the full `cluster-ca` chain).
+Every catalog entry is a self-contained Kustomize base producing one or more `Application` manifests. Larger apps (cert-manager, tekton, cilium, minio, …) are split into independent sub-entries so consumers can pick exactly what they need (e.g. `infra/cert-manager/chart` + `infra/cert-manager/selfsigned`, skipping the full `cluster-ca` chain).
+
+## Catalog index
+
+Version columns show what the child `Application` currently pins. `—` in the Version column means the sub-entry ships plain manifests (no upstream chart). Each row links to its per-entry README.
+
+### `infra/` — platform infrastructure
+
+| Entry | Sub-entries | Version | Purpose |
+|---|---|---|---|
+| [`cert-manager`](./infra/cert-manager/) | `chart` / `selfsigned` / `cluster-ca` | `v1.19.2` + — + — | cert-manager chart, self-signed `ClusterIssuer`, full CA chain (`cluster-ca` Certificate + ClusterIssuer + wildcard) |
+| [`cilium`](./infra/cilium/) | `chart` / `lb` / `gateway` | `1.18.5` + — + — | CNI with kube-proxy replacement, L2 LoadBalancer IP pool, Gateway API `Gateway` |
+| [`nfs-csi`](./infra/nfs-csi/) | `chart` / `storageclasses` | `v4.13.1` + — | kubernetes-csi NFS driver + opinionated `StorageClass` set |
+| [`openebs`](./infra/openebs/) | — (single) | `4.4.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
+| [`trust-manager`](./infra/trust-manager/) | `chart` / `bundle` | `0.22.0` + — | trust-manager chart, cluster-wide `Bundle` merging default CAs + cluster CA + Vault PKI CA |
+
+### `cicd/` — CI/CD tooling
+
+| Entry | Sub-entries | Version | Purpose |
+|---|---|---|---|
+| [`argo-rollouts`](./cicd/argo-rollouts/) | `chart` / `httproute` | `2.40.9` + — | Argo Rollouts controller + dashboard, Gateway API `HTTPRoute` for the dashboard |
+| [`crossplane`](./cicd/crossplane/) | `install` / `functions` / `configs` | `2.2.0` + — + — | Crossplane core + 3 providers (helm / kubernetes / opentofu), 4 composition Functions, 6 stuttgart-things Configurations |
+| [`kro`](./cicd/kro/) | — (single) | `0.9.1` | Kube Resource Orchestrator (OCI Helm, CRDs replaced on sync) |
+| [`tekton`](./cicd/tekton/) | `operator` / `config` / `ci-namespace` / `dashboard-httproute` | — (vendored) + — + — + — | Tekton Operator + `TektonConfig` (pruner), shared `ci` namespace, dashboard `HTTPRoute` |
+
+### `apps/` — user-facing applications
+
+| Entry | Sub-entries | Version | Purpose |
+|---|---|---|---|
+| [`headlamp`](./apps/headlamp/) | `chart` / `rbac` | `0.40.0` + — | Headlamp Kubernetes dashboard + ClusterRoleBinding for SSO group |
+| [`minio`](./apps/minio/) | `chart` / `certs` / `httproute` | `16.0.10` (OCI) + — + — | MinIO object storage (stuttgart-things mirrored image), cert-manager Certificates for console + API, Gateway API HTTPRoutes |
 
 ## How consumers use it
 
