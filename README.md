@@ -18,7 +18,8 @@ Every catalog entry is a self-contained Kustomize base producing one or more `Ap
 
 Version columns show what the child `Application` currently pins. `—` in the Version column means the sub-entry ships plain manifests (no upstream chart). Each row links to its per-entry README.
 
-### `infra/` — platform infrastructure
+<details>
+<summary><b><code>infra/</code> — platform infrastructure</b> (5 entries)</summary>
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
@@ -28,21 +29,31 @@ Version columns show what the child `Application` currently pins. `—` in the V
 | [`openebs`](./infra/openebs/) | — (single) | `4.4.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
 | [`trust-manager`](./infra/trust-manager/) | `chart` / `bundle` | `0.22.0` + — | trust-manager chart, cluster-wide `Bundle` merging default CAs + cluster CA + Vault PKI CA |
 
-### `cicd/` — CI/CD tooling
+</details>
+
+<details>
+<summary><b><code>cicd/</code> — CI/CD tooling</b> (6 entries)</summary>
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
 | [`argo-rollouts`](./cicd/argo-rollouts/) | `chart` / `httproute` | `2.40.9` + — | Argo Rollouts controller + dashboard, Gateway API `HTTPRoute` for the dashboard |
 | [`crossplane`](./cicd/crossplane/) | `install` / `functions` / `configs` | `2.2.0` + — + — | Crossplane core + 3 providers (helm / kubernetes / opentofu), 4 composition Functions, 6 stuttgart-things Configurations |
+| [`dapr`](./cicd/dapr/) | — (single) | `1.17.4` | Dapr control-plane (operator, placement, scheduler, sentry, sidecar injector); HA off, JSON logs |
+| [`kargo`](./cicd/kargo/) | `chart` / `certs` / `httproute` | `1.9.6` (OCI) + — + — | Akuity Kargo (multi-stage GitOps promotion orchestrator), cert-manager Certificate for the API hostname, Gateway API HTTPRoute |
 | [`kro`](./cicd/kro/) | — (single) | `0.9.1` | Kube Resource Orchestrator (OCI Helm, CRDs replaced on sync) |
 | [`tekton`](./cicd/tekton/) | `operator` / `config` / `ci-namespace` / `dashboard-httproute` | — (vendored) + — + — + — | Tekton Operator + `TektonConfig` (pruner), shared `ci` namespace, dashboard `HTTPRoute` |
 
-### `apps/` — user-facing applications
+</details>
+
+<details>
+<summary><b><code>apps/</code> — user-facing applications</b> (2 entries)</summary>
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
 | [`headlamp`](./apps/headlamp/) | `chart` / `rbac` | `0.40.0` + — | Headlamp Kubernetes dashboard + ClusterRoleBinding for SSO group |
 | [`minio`](./apps/minio/) | `chart` / `certs` / `httproute` | `16.0.10` (OCI) + — + — | MinIO object storage (stuttgart-things mirrored image), cert-manager Certificates for console + API, Gateway API HTTPRoutes |
+
+</details>
 
 ## How consumers use it
 
