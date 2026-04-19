@@ -1,0 +1,120 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cert-manager
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            install/cert-manager: "true"
+  template:
+    metadata:
+      name: 'cert-manager-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: cert-manager
+      source:
+        repoURL: https://charts.jetstack.io
+        chart: cert-manager
+        targetRevision: v1.19.2
+        helm:
+          releaseName: cert-manager
+          valuesObject:
+            crds:
+              enabled: true
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cert-manager-selfsigned
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            install/cert-manager: "true"
+  template:
+    metadata:
+      name: 'cert-manager-selfsigned-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: cert-manager
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: HEAD
+        path: infra/cert-manager/selfsigned/manifests
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cert-manager-cluster-ca
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            install/cert-manager: "true"
+  template:
+    metadata:
+      name: 'cert-manager-cluster-ca-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: cert-manager
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: HEAD
+        path: infra/cert-manager/cluster-ca/manifests
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
