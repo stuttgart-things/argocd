@@ -9,6 +9,7 @@ One reviewed source of truth for WHAT each app is (chart pin, sensible defaults,
 ```
 apps/     user-facing applications
 cicd/     CI/CD tooling
+config/   ArgoCD-side configuration (projects, etc.) consumed by ApplicationSets on the management cluster
 infra/    platform infrastructure
 ```
 
@@ -55,6 +56,17 @@ Version columns show what the child `Application` currently pins. `—` in the V
 
 </details>
 
+<details>
+<summary><b><code>config/</code> — ArgoCD-side configuration</b> (1 entry)</summary>
+
+Catalog entries that configure Argo CD itself rather than installing workloads. Consumed by an `ApplicationSet` on the **management cluster** (the cluster running Argo CD), not by the per-cluster aggregator pattern used elsewhere.
+
+| Entry | Sub-entries | Version | Purpose |
+|---|---|---|---|
+| [`cluster-project`](./config/cluster-project/) | `chart` | — | Helm chart that renders one `AppProject` per registered cluster, label-driven (`auto-project=true`, `tier=dev\|prod`, `allow-all=true`). Sourced by a `clusters`-generator `ApplicationSet`. |
+
+</details>
+
 ## How consumers use it
 
 ```
@@ -75,7 +87,7 @@ Version columns show what the child `Application` currently pins. `—` in the V
 
 Consumer flow per cluster:
 
-1. One `AppProject` scoping what this cluster is allowed to do.
+1. One `AppProject` scoping what this cluster is allowed to do. Either hand-authored (see [Consumer patterns → AppProject per cluster](#consumer-patterns)) or rendered automatically by the [`config/cluster-project`](./config/cluster-project/) chart driven by an `ApplicationSet` (label the cluster Secret with `auto-project=true`).
 2. One root `Application` per bucket (`<cluster>-infra`, `<cluster>-apps`, `<cluster>-cicd`) pointing at an aggregator directory in the consumer repo.
 3. Each aggregator directory lists the catalog sub-paths the cluster wants.
 4. Per app, a tiny overlay Kustomization pulls the catalog path as a remote base and patches `project` + `destination` (and anything cluster-specific).
