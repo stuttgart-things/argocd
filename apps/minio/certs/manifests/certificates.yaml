@@ -1,0 +1,28 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: minio-ingress-console
+  namespace: minio
+spec:
+  commonName: artifacts-console.example.com
+  dnsNames:
+    - artifacts-console.example.com
+  issuerRef:
+    name: cluster-ca
+    kind: ClusterIssuer
+  secretName: artifacts-console-ingress-tls
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: minio-ingress-api
+  namespace: minio
+spec:
+  commonName: artifacts.example.com
+  dnsNames:
+    - artifacts.example.com
+  issuerRef:
+    name: cluster-ca
+    kind: ClusterIssuer
+  secretName: artifacts-ingress-tls
