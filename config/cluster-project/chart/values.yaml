@@ -1,0 +1,32 @@
+---
+# Required: cluster identity (passed in by the ApplicationSet generator)
+cluster:
+  name: ""           # ArgoCD cluster secret name, e.g. "kind-dev2"
+  server: ""         # Cluster API server URL, e.g. "https://10.0.0.1:6443"
+
+# Project metadata
+project:
+  description: ""    # Defaults to "Apps deployed to the <cluster.name> cluster"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+
+# What repos this project may pull from
+sourceRepos:
+  - 'https://github.com/stuttgart-things/*'
+  - 'oci://ghcr.io/stuttgart-things/*'
+
+# Extra destinations beyond the cluster itself + in-cluster argocd ns
+extraDestinations: []
+# - name: other-cluster
+#   namespace: '*'
+
+# Resource whitelists (group/kind)
+clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+
+orphanedResources:
+  warn: true

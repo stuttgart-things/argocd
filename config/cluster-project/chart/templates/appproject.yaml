@@ -1,0 +1,39 @@
+{{- $name := required "cluster.name is required" .Values.cluster.name -}}
+{{- $server := required "cluster.server is required" .Values.cluster.server -}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ $name }}
+  namespace: argocd
+  {{- with .Values.project.finalizers }}
+  finalizers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  description: {{ .Values.project.description | default (printf "Apps deployed to the %s cluster" $name) | quote }}
+
+  sourceRepos:
+    {{- toYaml .Values.sourceRepos | nindent 4 }}
+
+  destinations:
+    - name: {{ $name }}
+      namespace: '*'
+      server: {{ $server | quote }}
+    - name: in-cluster
+      namespace: '*'
+      server: https://kubernetes.default.svc
+    {{- with .Values.extraDestinations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+
+  clusterResourceWhitelist:
+    {{- toYaml .Values.clusterResourceWhitelist | nindent 4 }}
+
+  namespaceResourceWhitelist:
+    {{- toYaml .Values.namespaceResourceWhitelist | nindent 4 }}
+
+  {{- with .Values.orphanedResources }}
+  orphanedResources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
