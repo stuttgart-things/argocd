@@ -1,5 +1,6 @@
 {{- $name := required "cluster.name is required" .Values.cluster.name -}}
 {{- $server := required "cluster.server is required" .Values.cluster.server -}}
+{{- $permissive := or .Values.allowAll (eq .Values.tier "dev") -}}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -14,7 +15,11 @@ spec:
   description: {{ .Values.project.description | default (printf "Apps deployed to the %s cluster" $name) | quote }}
 
   sourceRepos:
+  {{- if $permissive }}
+    - '*'
+  {{- else }}
     {{- toYaml .Values.sourceRepos | nindent 4 }}
+  {{- end }}
 
   destinations:
     - name: {{ $name }}
@@ -23,9 +28,15 @@ spec:
     - name: in-cluster
       namespace: '*'
       server: https://kubernetes.default.svc
+  {{- if $permissive }}
+    - name: '*'
+      namespace: '*'
+      server: '*'
+  {{- else }}
     {{- with .Values.extraDestinations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- end }}
 
   clusterResourceWhitelist:
     {{- toYaml .Values.clusterResourceWhitelist | nindent 4 }}

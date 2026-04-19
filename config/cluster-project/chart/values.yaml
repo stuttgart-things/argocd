@@ -4,18 +4,32 @@ cluster:
   name: ""           # ArgoCD cluster secret name, e.g. "kind-dev2"
   server: ""         # Cluster API server URL, e.g. "https://10.0.0.1:6443"
 
+# Permissive mode: when true, sourceRepos = ["*"] and a wildcard
+# destination ('*'/'*') is added so the project can deploy anything
+# from any repo to any cluster/namespace. Intended for dev clusters.
+# Implicitly enabled when `tier == "dev"`.
+allowAll: false
+
+# Optional cluster tier label forwarded by the ApplicationSet.
+# Recognized values:
+#   dev  -> implies allowAll=true
+#   prod -> strict (default behavior)
+# Anything else is treated as strict.
+tier: ""
+
 # Project metadata
 project:
   description: ""    # Defaults to "Apps deployed to the <cluster.name> cluster"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 
-# What repos this project may pull from
+# Strict-mode source repos (ignored when allowAll/dev)
 sourceRepos:
   - 'https://github.com/stuttgart-things/*'
   - 'oci://ghcr.io/stuttgart-things/*'
 
 # Extra destinations beyond the cluster itself + in-cluster argocd ns
+# (ignored when allowAll/dev — wildcard destination supersedes)
 extraDestinations: []
 # - name: other-cluster
 #   namespace: '*'
