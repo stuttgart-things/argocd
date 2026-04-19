@@ -150,6 +150,85 @@ Each with `spec.project=kind-dev2` and
 `spec.destination.server=https://10.100.136.190:33972` — i.e. exactly what
 the kustomize overlay used to produce, minus the overlay file.
 
+## End-to-end example
+
+Full walk-through from "empty Argo CD" to "cert-manager running on
+`kind-dev2`", assuming you have a kubeconfig context for the target cluster
+and `argocd` + `kubectl` logged in to the Argo CD control plane.
+
+```bash
+# --- variables ---
+CLUSTER_NAME=kind-dev2
+CLUSTER_CONTEXT=kind-kind-dev2          # kubeconfig context for the target
+CLUSTER_SERVER=https://10.100.136.190:33972
+
+# 1. Register the workload cluster with Argo CD
+argocd cluster add "${CLUSTER_CONTEXT}" \
+  --name "${CLUSTER_NAME}" \
+  --yes
+
+# 2. Opt this cluster in to cert-manager via the selector label
+#    (argocd cluster set --labels REPLACES all labels - see config/cluster-project)
+kubectl -n argocd label secret "${CLUSTER_NAME}" \
+  install/cert-manager=true --overwrite
+
+# 3. (Optional) AppProject per cluster - only if spec.project: '{{ .name }}'
+#    is kept. Skip if you hard-code spec.project: default.
+kubectl apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ${CLUSTER_NAME}
+  namespace: argocd
+spec:
+  sourceRepos:
+    - https://charts.jetstack.io
+    - https://github.com/stuttgart-things/argocd.git
+  destinations:
+    - server: ${CLUSTER_SERVER}
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+EOF
+
+# 4. Apply the ApplicationSets (one-time, cluster-agnostic)
+kubectl apply -k tests/cert-manager/
+
+# 5. Verify the three Applications were generated for this cluster
+argocd app list | grep "${CLUSTER_NAME}"
+# cert-manager-kind-dev2
+# cert-manager-selfsigned-kind-dev2
+# cert-manager-cluster-ca-kind-dev2
+
+# 6. Verify they sync and the workload lands on the target cluster
+argocd app wait "cert-manager-${CLUSTER_NAME}" --health --timeout 300
+kubectl --context "${CLUSTER_CONTEXT}" -n cert-manager get pods
+```
+
+### Adding a second cluster
+
+After onboarding one cluster, adding another is just steps 1-3 with new
+variables - the ApplicationSets from step 4 are already running and pick
+up the new Cluster secret automatically:
+
+```bash
+argocd cluster add kind-prod --name kind-prod --yes
+kubectl -n argocd label secret kind-prod install/cert-manager=true --overwrite
+# AppProject for kind-prod (if per-cluster projects are used)
+# ... no other changes, no new files in git
+```
+
+### Removing cert-manager from a cluster
+
+Drop the opt-in label; the ApplicationSet controller deletes the three
+generated Applications (and, with `prune: true` in `syncPolicy`, their
+workload):
+
+```bash
+kubectl -n argocd label secret kind-dev2 install/cert-manager-
+```
+
 ## Rollback
 
 `kubectl delete -k tests/cert-manager/` removes the ApplicationSets; the
