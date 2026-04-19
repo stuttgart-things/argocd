@@ -120,12 +120,45 @@ kubectl config rename-context default <cluster-name>
 argocd cluster add <cluster-name> --yes \
   --label auto-project=true \
   --label tier=dev          # or omit / use tier=prod for strict mode
-
-# 6. Verify
-argocd cluster list -o wide
+# Combine more labels by repeating --label, e.g.:
+#   --label auto-project=true --label tier=dev --label allow-all=true --label env=lab
 ```
 
-The ApplicationSet on the management cluster will pick up the new label within ~30s and render `proj-<cluster-name>` → AppProject `<cluster-name>`.
+**Listing clusters**
+
+```bash
+# Compact view (name, server, version, status)
+argocd cluster list
+
+# Wider view including labels (recommended for verifying the appset selector)
+argocd cluster list -o wide
+
+# Full detail for a single cluster, including its label set
+argocd cluster get <cluster-name> -o yaml | grep -A6 labels
+
+# Cross-check from the kubectl side (run against the management cluster)
+kubectl get secret -n argocd \
+  -l argocd.argoproj.io/secret-type=cluster \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"  "}{.metadata.labels}{"\n"}{end}'
+```
+
+**Adding/changing a label *after* the cluster is registered**
+
+⚠️ `argocd cluster set --label` **replaces the entire label set** — it is not a merge. To avoid silently dropping `auto-project=true` (which would prune the generated Application + AppProject), pass *every* label you want to keep:
+
+```bash
+# Safe: re-state all labels in one invocation
+argocd cluster set <cluster-name> \
+  --label auto-project=true \
+  --label tier=dev \
+  --label allow-all=true
+
+# Surgical alternative: kubectl --overwrite against the management cluster's
+# Secret (only touches the one label, leaves the rest alone)
+kubectl label secret <cluster-secret> -n argocd allow-all=true --overwrite
+```
+
+The ApplicationSet on the management cluster picks up label changes within ~30s and re-renders `proj-<cluster-name>` → AppProject `<cluster-name>` accordingly.
 
 **Notes**
 - The container is ephemeral — when you exit the Dagger shell, the kubeconfig and any cached argocd creds are gone.
