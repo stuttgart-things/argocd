@@ -87,36 +87,42 @@ argocd cluster list -o wide
 <details>
 <summary><b>Onboard a new cluster end-to-end via Dagger shell</b> (ephemeral container, no local tool installs)</summary>
 
-Spin up a throwaway Wolfi container with `kubectl` + the `argocd` CLI, mount the **target cluster's** kubeconfig, and run the registration from inside.
+Spin up a throwaway Wolfi container with `kubectl` + the `argocd` CLI baked in, mount the **target cluster's** kubeconfig, rename the context, and log in to ArgoCD — all in one pipeline. The terminal opens already prepared, so you can go straight to `argocd cluster add`.
 
 ```bash
-# 1. Open a Dagger shell with kubectl + argocd available
+# Pass the ArgoCD admin password as a Dagger secret (not on the CLI of any
+# tool inside the container — Dagger redacts secret values from logs/output).
+export ARGOCD_PW='<argocd-admin-password>'
+
 dagger -c 'container |
   from cgr.dev/chainguard/wolfi-base:latest |
-  with-mounted-file /kubeconfig <path-to-target-kubeconfig> |
+  with-exec apk add argo-cd kubectl curl git |
+  with-file /kubeconfig <path-to-target-kubeconfig> |
   with-env-variable KUBECONFIG /kubeconfig |
-  with-env-variable PATH /tmp:/usr/sbin:/usr/bin:/sbin:/bin |
-  with-exec apk add curl git kubectl |
-  with-exec -- curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 |
-  with-exec chmod +x /tmp/argocd |
+  with-secret-variable ARGOCD_PW env:ARGOCD_PW |
+  with-exec -- kubectl config rename-context default <cluster-name> |
+  with-exec -- sh -c "argocd login <argocd-server> --username admin --password \$ARGOCD_PW --plaintext" |
   terminal'
 ```
 
-```bash
-# 2. Inside the Dagger shell — log into ArgoCD (interactive prompts admin user + password)
-argocd login <argocd-server>          # add --plaintext if the server has no TLS
+What each step does:
 
-# 3. Sanity-check kubectl can talk to the target cluster
+| Step | Purpose |
+|---|---|
+| `apk add argo-cd kubectl curl git` | Install both CLIs from the Wolfi package repo (no curl-and-chmod dance) |
+| `with-file /kubeconfig …` | Bake the target cluster's kubeconfig into the container at a fixed path |
+| `with-env-variable KUBECONFIG /kubeconfig` | Make every subsequent step (and the terminal) use it |
+| `with-secret-variable ARGOCD_PW env:ARGOCD_PW` | Pull the password from your shell env into a Dagger **Secret** — never written to plain layers, redacted in logs |
+| `kubectl config rename-context default <cluster-name>` | Many minimal kubeconfigs ship a `default` context; ArgoCD registers a cluster under the *current context name*, so rename it to something meaningful first |
+| `argocd login … --plaintext` | Drop `--plaintext` if the ArgoCD server has TLS |
+| `terminal` | Drop into an interactive shell with everything ready |
+
+```bash
+# Inside the Dagger terminal — sanity check + register
+
 kubectl get nodes
 
-# 4. argocd cluster add reads the *current kubeconfig context* by name and
-#    registers it under that same name. Many minimal kubeconfigs ship the
-#    context as "default" — rename it first so the ArgoCD cluster Secret
-#    gets a meaningful name.
-kubectl config get-contexts
-kubectl config rename-context default <cluster-name>
-
-# 5. Register + label in one shot (avoids the cluster set --label replace footgun)
+# Register + label in one shot (avoids the cluster set --label replace footgun)
 argocd cluster add <cluster-name> --yes \
   --label auto-project=true \
   --label tier=dev          # or omit / use tier=prod for strict mode
@@ -162,8 +168,9 @@ The ApplicationSet on the management cluster picks up label changes within ~30s 
 
 **Notes**
 - The container is ephemeral — when you exit the Dagger shell, the kubeconfig and any cached argocd creds are gone.
-- Avoid `--username admin --password <plaintext>` on the command line; it lands in shell history. Use the interactive prompt or an SSO flow instead.
-- If `argocd cluster add` errors with `context X does not exist in kubeconfig`, you forgot step 4 (rename the context).
+- The password is delivered via `with-secret-variable env:ARGOCD_PW`, so it's a Dagger Secret (redacted in logs, not baked into image layers). Don't switch to `with-env-variable ARGOCD_PW=…` — that would write it to a layer in clear.
+- If you'd rather not put the password in your shell env at all, drop the `with-secret-variable` and `with-exec sh -c "argocd login …"` lines and run `argocd login <argocd-server> --plaintext` interactively after the terminal opens.
+- If `argocd cluster add` errors with `context X does not exist in kubeconfig`, the rename step didn't happen — check that your kubeconfig's existing context really was named `default` (otherwise adjust the rename source).
 
 </details>
 
