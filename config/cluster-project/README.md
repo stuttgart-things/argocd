@@ -62,13 +62,22 @@ argocd cluster add <kubeconfig-context> \
   --label tier=dev
 
 # Update labels on an existing cluster (requires argocd ≥ 2.8)
-argocd cluster set <name-or-server> --label auto-project=true
-argocd cluster set <name-or-server> --label tier=dev
-argocd cluster set <name-or-server> --label allow-all=true
+# ⚠️ REPLACE semantics — see warning below; pass ALL labels you want to keep
+argocd cluster set <name-or-server> --label auto-project=true --label tier=dev
 
 # Verify
 argocd cluster list -o wide
 ```
+
+> ⚠️ **`argocd cluster set --label` replaces the entire label set.**
+> Running `argocd cluster set foo --label tier=dev` on a cluster that already
+> has `auto-project=true` will *drop* `auto-project`, the ApplicationSet
+> selector stops matching, and the generated Application + AppProject get
+> pruned. Always pass every label you want to keep in a single invocation.
+>
+> If you only want to add/change one label without touching the rest, use
+> `kubectl label secret <cluster-secret> -n argocd <key>=<value> --overwrite`
+> against the management cluster instead.
 
 > Equivalent kubectl path (when working directly against the management cluster):
 > ```bash
