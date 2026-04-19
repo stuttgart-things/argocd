@@ -1,0 +1,17 @@
+---
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: cluster-trust-bundle
+spec:
+  sources:
+    - useDefaultCAs: true
+    - secret:
+        name: cluster-ca-secret
+        key: ca.crt
+    - secret:
+        name: vault-pki-ca
+        key: ca.crt
+  target:
+    configMap:
+      key: trust-bundle.pem
