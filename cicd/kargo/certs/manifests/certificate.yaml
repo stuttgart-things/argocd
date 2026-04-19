@@ -1,0 +1,14 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kargo-ingress
+  namespace: kargo
+spec:
+  commonName: kargo.example.com
+  dnsNames:
+    - kargo.example.com
+  issuerRef:
+    name: cluster-ca
+    kind: ClusterIssuer
+  secretName: kargo.example.com-tls
