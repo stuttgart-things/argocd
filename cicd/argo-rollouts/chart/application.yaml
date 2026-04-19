@@ -1,0 +1,54 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.40.9
+    helm:
+      releaseName: argo-rollouts
+      valuesObject:
+        installCRDs: true
+        keepCRDs: true
+        clusterInstall: true
+        createClusterAggregateRoles: true
+        controller:
+          replicas: 2
+          logging:
+            level: info
+            format: text
+          metrics:
+            enabled: false
+            serviceMonitor:
+              enabled: false
+        providerRBAC:
+          enabled: true
+          providers:
+            gatewayAPI: true
+        dashboard:
+          enabled: true
+          readonly: false
+          replicas: 1
+          service:
+            type: ClusterIP
+            port: 3100
+            targetPort: 3100
+          ingress:
+            enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
