@@ -84,6 +84,56 @@ argocd cluster list -o wide
 > kubectl label secret <cluster-secret> -n argocd auto-project=true tier=dev
 > ```
 
+<details>
+<summary><b>Onboard a new cluster end-to-end via Dagger shell</b> (ephemeral container, no local tool installs)</summary>
+
+Spin up a throwaway Wolfi container with `kubectl` + the `argocd` CLI, mount the **target cluster's** kubeconfig, and run the registration from inside.
+
+```bash
+# 1. Open a Dagger shell with kubectl + argocd available
+dagger -c 'container |
+  from cgr.dev/chainguard/wolfi-base:latest |
+  with-mounted-file /kubeconfig <path-to-target-kubeconfig> |
+  with-env-variable KUBECONFIG /kubeconfig |
+  with-env-variable PATH /tmp:/usr/sbin:/usr/bin:/sbin:/bin |
+  with-exec apk add curl git kubectl |
+  with-exec -- curl -sSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 |
+  with-exec chmod +x /tmp/argocd |
+  terminal'
+```
+
+```bash
+# 2. Inside the Dagger shell — log into ArgoCD (interactive prompts admin user + password)
+argocd login <argocd-server>          # add --plaintext if the server has no TLS
+
+# 3. Sanity-check kubectl can talk to the target cluster
+kubectl get nodes
+
+# 4. argocd cluster add reads the *current kubeconfig context* by name and
+#    registers it under that same name. Many minimal kubeconfigs ship the
+#    context as "default" — rename it first so the ArgoCD cluster Secret
+#    gets a meaningful name.
+kubectl config get-contexts
+kubectl config rename-context default <cluster-name>
+
+# 5. Register + label in one shot (avoids the cluster set --label replace footgun)
+argocd cluster add <cluster-name> --yes \
+  --label auto-project=true \
+  --label tier=dev          # or omit / use tier=prod for strict mode
+
+# 6. Verify
+argocd cluster list -o wide
+```
+
+The ApplicationSet on the management cluster will pick up the new label within ~30s and render `proj-<cluster-name>` → AppProject `<cluster-name>`.
+
+**Notes**
+- The container is ephemeral — when you exit the Dagger shell, the kubeconfig and any cached argocd creds are gone.
+- Avoid `--username admin --password <plaintext>` on the command line; it lands in shell history. Use the interactive prompt or an SSO flow instead.
+- If `argocd cluster add` errors with `context X does not exist in kubeconfig`, you forgot step 4 (rename the context).
+
+</details>
+
 ## Consumer usage
 
 Drop an `ApplicationSet` like the following onto your management cluster (i.e. the cluster running ArgoCD). It will iterate every cluster Secret carrying `auto-project=true` and produce one `proj-<cluster>` Application that renders this chart.
