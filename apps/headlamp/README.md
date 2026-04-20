@@ -1,28 +1,142 @@
 # apps/headlamp
 
-Catalog entry for [Headlamp](https://headlamp.dev/), a general-purpose Kubernetes web UI. Ships the chart with the Prometheus plugin pre-loaded and an optional `cluster-admin` ClusterRoleBinding for the Headlamp ServiceAccount.
+Catalog entry for [Headlamp](https://headlamp.dev/) — a general-purpose Kubernetes web UI. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/headlamp/chart`, pass overrides via `helm.valuesObject`, and the chart renders the real child `Application`s that install Headlamp and optionally its RBAC.
+
+Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this entry requires **zero files** in the consumer repo — everything is driven by values on the consumer-side Argo CR.
 
 ## Layout
 
 ```
 apps/headlamp/
-├── chart/    Headlamp Helm chart 0.40.0 with Prometheus plugin + HTTPRoute (sync-wave 0)
-└── rbac/     ClusterRoleBinding "headlamp-cluster-admin" (sync-wave 10, opt-in)
+├── chart/                          app-of-apps Helm chart (what consumers point at)
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── values.schema.json          schema-validated overrides
+│   └── templates/
+│       ├── chart.yaml              renders Application "headlamp"      (sync-wave 0)
+│       └── rbac.yaml               renders Application "headlamp-rbac" (sync-wave 10, gated by rbac.enabled)
+└── manifests/
+    └── rbac/clusterrolebinding.yaml   loaded by the headlamp-rbac Application from this repo
 ```
 
-## Components
+## What gets deployed
 
-### chart/
-Installs Headlamp `0.40.0` from `https://kubernetes-sigs.github.io/headlamp/` into the `headlamp` namespace. Values:
+### `headlamp` Application (always)
+Installs Headlamp `0.40.0` from `https://kubernetes-sigs.github.io/headlamp/` into the configured namespace. The chart constructs the upstream `valuesObject` from first-class values:
 
 - `config.watchPlugins: true` — hot-reload plugins on disk changes
-- `pluginsManager` — pre-installs the Prometheus plugin (`prometheus-0.8.2`)
-- `httpRoute` — chart-native Gateway API `HTTPRoute` attached to `cilium-gateway` on `headlamp.example.com` (placeholder — consumers patch)
+- `pluginsManager` — enabled when `.Values.plugins` is non-empty, pre-installs each plugin
+- `httpRoute` — Gateway API `HTTPRoute` built from `.Values.httpRoute.{hostname,gateway.name,gateway.namespace}`
+- `.Values.extraValues` — deep-merged on top as an escape hatch for any upstream key not exposed above
 
-Consumers **must** patch `httpRoute.parentRefs` and `httpRoute.hostnames` to match their cluster's Gateway and DNS.
+### `headlamp-rbac` Application (opt-in, `rbac.enabled: true`)
+A single `ClusterRoleBinding` binding `cluster-admin` to the Headlamp ServiceAccount. **Only enable** if you intend to let Headlamp act as a cluster admin — for multi-tenant or scoped access, leave it off and bind a narrower Role yourself.
 
-### rbac/
-A single `ClusterRoleBinding` binding `cluster-admin` to the `headlamp` ServiceAccount. **Opt-in** — only include if you intend to let Headlamp act as a cluster admin. For multi-tenant or scoped access, skip this sub-entry and bind a narrower Role yourself.
+## Consumer usage
+
+### Single cluster — one `Application`
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: headlamp
+  namespace: argocd
+spec:
+  project: my-cluster
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: apps/headlamp/chart
+    helm:
+      valuesObject:
+        project: my-cluster
+        destination:
+          server: https://<cluster-api>:6443
+          namespace: headlamp
+        httpRoute:
+          enabled: true
+          hostname: headlamp.my-cluster.example.com
+          gateway:
+            name: cilium-gateway
+            namespace: default
+        rbac:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+```
+
+Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` in `valuesObject` is the **workload cluster** where Headlamp itself runs.
+
+### Fleet — one `ApplicationSet` across many clusters
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: headlamp
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            headlamp: enabled
+  template:
+    metadata:
+      name: '{{name}}-headlamp'
+    spec:
+      project: '{{name}}'
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/headlamp/chart
+        helm:
+          valuesObject:
+            project: '{{name}}'
+            destination:
+              server: '{{server}}'
+              namespace: headlamp
+            httpRoute:
+              enabled: true
+              hostname: 'headlamp.{{metadata.labels.domain}}'
+              gateway:
+                name: cilium-gateway
+                namespace: default
+            rbac:
+              enabled: '{{metadata.labels.headlamp-admin}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions: [CreateNamespace=true, ServerSideApply=true]
+```
+
+Label the ArgoCD cluster Secrets with `headlamp: enabled`, `domain: <fqdn>`, and (optionally) `headlamp-admin: "true"`; add/remove clusters without touching this repo.
+
+## Values reference
+
+See `chart/values.yaml` for defaults and `chart/values.schema.json` for the full JSON Schema. Invalid overrides (unknown keys, wrong types, missing `hostname` when `httpRoute.enabled: true`) fail the sync loudly.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `project` | `default` | ArgoCD AppProject for both rendered Applications |
+| `destination.server` | `https://kubernetes.default.svc` | Target cluster API |
+| `destination.namespace` | `headlamp` | Namespace for Headlamp |
+| `chartVersion` | `0.40.0` | Upstream Headlamp chart version |
+| `httpRoute.enabled` | `true` | Render a Gateway API HTTPRoute |
+| `httpRoute.hostname` | `headlamp.example.com` | Public hostname (override per cluster) |
+| `httpRoute.gateway.name` / `namespace` | `cilium-gateway` / `default` | Gateway reference |
+| `plugins` | `[prometheus 0.8.2]` | Plugins pre-loaded by pluginsManager; `[]` disables it |
+| `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
+| `rbac.enabled` | `false` | Install the cluster-admin ClusterRoleBinding |
+| `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the rbac Application fetches manifests from |
+| `syncPolicy` | automated + retry | Applied to both rendered Applications |
 
 ## Login token
 
@@ -34,45 +148,18 @@ kubectl create token headlamp -n headlamp --duration=8760h
 
 Paste into the Headlamp login screen.
 
-## Consumer usage
+## Migrating from the previous kustomize layout
 
-Full stack (chart + rbac):
+If you were consuming the old `apps/headlamp/chart` + `apps/headlamp/rbac` paths via a Kustomize overlay with JSON-patches: replace that overlay with a single `Application` (example above). The overlay's patches map to values as follows:
 
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - https://github.com/stuttgart-things/argocd.git/apps/headlamp/chart?ref=main
-  - https://github.com/stuttgart-things/argocd.git/apps/headlamp/rbac?ref=main
-patches:
-  - target: { kind: Application, name: headlamp }
-    patch: |-
-      - op: replace
-        path: /spec/project
-        value: <cluster-project>
-      - op: replace
-        path: /spec/destination/server
-        value: https://<cluster-api>:<port>
-      - op: replace
-        path: /spec/source/helm/valuesObject/httpRoute/parentRefs/0/name
-        value: <cluster-gateway-name>
-      - op: replace
-        path: /spec/source/helm/valuesObject/httpRoute/parentRefs/0/namespace
-        value: <cluster-gateway-namespace>
-      - op: replace
-        path: /spec/source/helm/valuesObject/httpRoute/hostnames/0
-        value: headlamp.<cluster-domain>
-  - target: { kind: Application, name: headlamp-rbac }
-    patch: |-
-      - op: replace
-        path: /spec/project
-        value: <cluster-project>
-      - op: replace
-        path: /spec/destination/server
-        value: https://<cluster-api>:<port>
-```
-
-Chart-only (external access / bring-your-own RBAC): drop the rbac sub-entry from `resources`.
+| Old JSON patch | New value |
+|---|---|
+| `/spec/project` | `project` |
+| `/spec/destination/server` | `destination.server` |
+| `/spec/source/helm/valuesObject/httpRoute/parentRefs/0/name` | `httpRoute.gateway.name` |
+| `/spec/source/helm/valuesObject/httpRoute/parentRefs/0/namespace` | `httpRoute.gateway.namespace` |
+| `/spec/source/helm/valuesObject/httpRoute/hostnames/0` | `httpRoute.hostname` |
+| include/exclude the `rbac` resource | `rbac.enabled: true\|false` |
 
 ## Related
 
