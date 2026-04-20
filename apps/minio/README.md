@@ -1,6 +1,6 @@
 # apps/minio
 
-Catalog entry for [MinIO](https://min.io/) object storage via the stuttgart-things opinionated Bitnami-based chart, plus optional cert-manager Certificates and Gateway API HTTPRoutes for the console + S3 API. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/minio/chart`, pass overrides via `helm.valuesObject`, and the chart renders the three child `Application`s that install MinIO, the Certificates, and the HTTPRoutes.
+Catalog entry for [MinIO](https://min.io/) object storage via the stuttgart-things opinionated Bitnami-based chart, plus optional cert-manager Certificates and Gateway API HTTPRoutes for the console + S3 API. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/minio/chart`, pass overrides via `helm.values` (or `helm.valuesObject` on Argo CD 2.6+), and the chart renders the three child `Application`s that install MinIO, the Certificates, and the HTTPRoutes.
 
 Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this entry requires **zero files** in the consumer repo — everything is driven by values on the consumer-side Argo CR.
 
@@ -74,8 +74,10 @@ spec:
     targetRevision: main
     path: apps/minio/chart
     helm:
-      valuesObject:
-        catalog: { repoURL: https://github.com/stuttgart-things/argocd.git, targetRevision: main }
+      values: |
+        catalog:
+          repoURL: https://github.com/stuttgart-things/argocd.git
+          targetRevision: main
         project: my-cluster
         destination:
           server: https://<cluster-api>:6443
@@ -90,10 +92,14 @@ spec:
           tlsSecret: artifacts-ingress-tls
         certs:
           enabled: true
-          issuer: { name: cluster-ca, kind: ClusterIssuer }
+          issuer:
+            name: cluster-ca
+            kind: ClusterIssuer
         httpRoute:
           enabled: true
-          gateway: { name: cilium-gateway, namespace: default }
+          gateway:
+            name: cilium-gateway
+            namespace: default
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -102,7 +108,9 @@ spec:
     syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` in `valuesObject` is the **workload cluster** where MinIO itself runs.
+Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` under `helm.values` is the **workload cluster** where MinIO itself runs.
+
+> **Why `helm.values` (string) and not `helm.valuesObject` (object)?** Both work, but `values: |` (a YAML block string) is universally compatible across every Argo CD version since 2.0. `valuesObject:` needs Argo CD 2.6+ and has been observed to mis-serialize on some older patch versions, producing `cannot unmarshal string into Go value of type map[string]interface {}` from Helm. On a confirmed-modern Argo, `valuesObject:` is type-preserving and saves you an indentation level — swap freely.
 
 **Pin `catalog.targetRevision`** to the same git ref the outer Application is pinned to — the certs + httproute child Applications load their sub-charts from this repo at that revision.
 
@@ -130,19 +138,32 @@ spec:
         targetRevision: main
         path: apps/minio/chart
         helm:
-          valuesObject:
-            catalog: { repoURL: https://github.com/stuttgart-things/argocd.git, targetRevision: main }
-            project: '{{name}}'
-            destination: { server: '{{server}}', namespace: minio }
-            auth: { existingSecret: minio-auth }
+          values: |
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              targetRevision: main
+            project: {{name}}
+            destination:
+              server: {{server}}
+              namespace: minio
+            auth:
+              existingSecret: minio-auth
             console:
-              hostname: 'artifacts-console.{{metadata.labels.domain}}'
+              hostname: artifacts-console.{{metadata.labels.domain}}
               tlsSecret: artifacts-console-ingress-tls
             api:
-              hostname: 'artifacts.{{metadata.labels.domain}}'
+              hostname: artifacts.{{metadata.labels.domain}}
               tlsSecret: artifacts-ingress-tls
-            certs:     { enabled: true, issuer: { name: cluster-ca, kind: ClusterIssuer } }
-            httpRoute: { enabled: true, gateway: { name: cilium-gateway, namespace: default } }
+            certs:
+              enabled: true
+              issuer:
+                name: cluster-ca
+                kind: ClusterIssuer
+            httpRoute:
+              enabled: true
+              gateway:
+                name: cilium-gateway
+                namespace: default
       destination: { server: https://kubernetes.default.svc, namespace: argocd }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
