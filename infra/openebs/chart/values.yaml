@@ -1,0 +1,60 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: openebs
+
+# Upstream OpenEBS umbrella chart version (https://openebs.github.io/openebs).
+chartVersion: 4.4.0
+
+# Optional umbrella components — all off by default to keep the install minimal.
+# local-PV hostpath (the default engine) remains enabled upstream regardless.
+preUpgradeHook:
+  enabled: false
+loki:
+  enabled: false
+alloy:
+  enabled: false
+volumeSnapshots:
+  enabled: false
+
+# Extra storage engines. Each requires node-level prerequisites — opt in per cluster.
+#   local.lvm        — LVM on the node
+#   local.zfs        — ZFS on the node
+#   replicated.mayastor — hugepages + nvme-tcp kernel module on the node (handled outside ArgoCD)
+engines:
+  local:
+    lvm:
+      enabled: false
+    zfs:
+      enabled: false
+  replicated:
+    mayastor:
+      enabled: false
+
+# Mayastor CSI node initContainers — enable only when engines.replicated.mayastor.enabled=true
+# AND your nodes actually need the setup initContainers.
+mayastorInitContainers:
+  enabled: false
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
