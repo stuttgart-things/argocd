@@ -1,6 +1,6 @@
 # apps/headlamp
 
-Catalog entry for [Headlamp](https://headlamp.dev/) — a general-purpose Kubernetes web UI. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/headlamp/chart`, pass overrides via `helm.valuesObject`, and the chart renders the real child `Application`s that install Headlamp and optionally its RBAC.
+Catalog entry for [Headlamp](https://headlamp.dev/) — a general-purpose Kubernetes web UI. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/headlamp/chart`, pass overrides via `helm.values` (or `helm.valuesObject` on Argo CD 2.6+), and the chart renders the real child `Application`s that install Headlamp and optionally its RBAC.
 
 Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this entry requires **zero files** in the consumer repo — everything is driven by values on the consumer-side Argo CR.
 
@@ -49,7 +49,7 @@ spec:
     targetRevision: main
     path: apps/headlamp/chart
     helm:
-      valuesObject:
+      values: |
         project: my-cluster
         destination:
           server: https://<cluster-api>:6443
@@ -70,7 +70,9 @@ spec:
     syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` in `valuesObject` is the **workload cluster** where Headlamp itself runs.
+Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` under `helm.values` is the **workload cluster** where Headlamp itself runs.
+
+> **Why `helm.values` (string) and not `helm.valuesObject` (object)?** Both work, but `values: |` (a YAML block string) is universally compatible across every Argo CD version since 2.0. `valuesObject:` needs Argo CD 2.6+ and has been observed to mis-serialize on some older patch versions, producing `cannot unmarshal string into Go value of type map[string]interface {}` from Helm. On a confirmed-modern Argo, `valuesObject:` is type-preserving and saves you an indentation level — swap freely.
 
 ### Fleet — one `ApplicationSet` across many clusters
 
@@ -96,19 +98,22 @@ spec:
         targetRevision: main
         path: apps/headlamp/chart
         helm:
-          valuesObject:
-            project: '{{name}}'
+          values: |
+            project: {{name}}
             destination:
-              server: '{{server}}'
+              server: {{server}}
               namespace: headlamp
             httpRoute:
               enabled: true
-              hostname: 'headlamp.{{metadata.labels.domain}}'
+              hostname: headlamp.{{metadata.labels.domain}}
               gateway:
                 name: cilium-gateway
                 namespace: default
-            rbac:
-              enabled: '{{metadata.labels.headlamp-admin}}'
+            # rbac.enabled takes a boolean — you cannot drive it from a
+            # cluster-secret label via ApplicationSet templating (Go-template
+            # output is always a string; the chart's JSON Schema is strict about
+            # type: boolean). For per-cluster RBAC toggling, apply a dedicated
+            # Application per target cluster.
       destination:
         server: https://kubernetes.default.svc
         namespace: argocd
@@ -117,7 +122,7 @@ spec:
         syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Label the ArgoCD cluster Secrets with `headlamp: enabled`, `domain: <fqdn>`, and (optionally) `headlamp-admin: "true"`; add/remove clusters without touching this repo.
+Label the ArgoCD cluster Secrets with `headlamp: enabled` and `domain: <fqdn>`; add/remove clusters without touching this repo. Note: `rbac.enabled` (a boolean chart value) cannot be driven by a cluster-secret label — see the inline comment above for the reason and the dedicated-Application workaround.
 
 ## Values reference
 
