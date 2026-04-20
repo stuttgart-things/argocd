@@ -1,0 +1,36 @@
+---
+# Standalone test Application for the apps-of-apps chart at infra/openebs/chart.
+# Apply directly on the management cluster (the one running Argo CD):
+#   kubectl apply -f tests/catalog/openebs/application.yaml
+#
+# Outer destination = management cluster (where this Application CR lives).
+# Inner destination (in valuesObject) = target cluster where OpenEBS actually
+# deploys. Set them to the same value when testing in-cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openebs
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: HEAD
+    path: infra/openebs/chart
+    helm:
+      releaseName: openebs
+      valuesObject:
+        project: default
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: openebs
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
