@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: minio-httproute
+description: Gateway API HTTPRoutes for MinIO — driven by values from the parent apps/minio/chart
+type: application
+version: 0.1.0

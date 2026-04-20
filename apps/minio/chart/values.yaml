@@ -1,0 +1,89 @@
+---
+# Reference back to this catalog repo — used by the certs + httpRoute Applications
+# to load apps/minio/charts/{certs,httproute} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: minio
+
+# Upstream MinIO OCI chart version (ghcr.io/stuttgart-things/charts/minio).
+chartVersion: 16.0.10
+
+# Pinned MinIO image (stuttgart-things mirror). global.security.allowInsecureImages=true
+# is set because this overrides the chart's default image digest.
+image:
+  registry: ghcr.io
+  repository: stuttgart-things/minio
+  tag: 2025.4.22-debian-12-r1
+
+# Persistence — StorageClass and PVC size.
+storageClass: nfs4-csi
+storageSize: 10Gi
+
+# Credentials.
+# If `existingSecret` is non-empty, rootUser + rootPassword are omitted from the
+# rendered valuesObject (the chart reads credentials from the named Secret instead).
+# Otherwise, the root credentials are inlined — set them via consumer valuesObject or an
+# ArgoCD Vault Plugin / SOPS overlay. Defaults are empty placeholders — don't deploy as-is.
+auth:
+  rootUser: ""                      # pragma: allowlist secret
+  rootPassword: ""                  # pragma: allowlist secret
+  existingSecret: ""                # preferred — name of a pre-existing Secret with root-user / root-password keys
+
+# Pod resources.
+resources:
+  requests:
+    memory: 256Mi
+    cpu: 100m
+  limits:
+    memory: 1Gi
+
+# MinIO web console — shared between certs + httproute when both are enabled.
+console:
+  hostname: artifacts-console.example.com
+  tlsSecret: artifacts-console-ingress-tls
+
+# MinIO S3 API — shared between certs + httproute when both are enabled.
+api:
+  hostname: artifacts.example.com
+  tlsSecret: artifacts-ingress-tls
+
+# cert-manager Certificates sub-Application.
+certs:
+  enabled: true
+  issuer:
+    name: cluster-ca
+    kind: ClusterIssuer
+
+# Gateway API HTTPRoute sub-Application.
+httpRoute:
+  enabled: true
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream MinIO chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

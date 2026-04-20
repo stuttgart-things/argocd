@@ -1,0 +1,45 @@
+{{- $computed := dict }}
+{{- $_ := set $computed "global" (dict "imageRegistry" "ghcr.io" "security" (dict "allowInsecureImages" true)) }}
+{{- $_ := set $computed "image" (dict "registry" .Values.image.registry "repository" .Values.image.repository "tag" .Values.image.tag) }}
+{{- $_ := set $computed "networkPolicy" (dict "enabled" true "allowExternal" true) }}
+
+{{- $auth := dict }}
+{{- if .Values.auth.existingSecret }}
+  {{- $_ := set $auth "existingSecret" .Values.auth.existingSecret }}
+{{- else }}
+  {{- $_ := set $auth "rootUser" .Values.auth.rootUser }}
+  {{- $_ := set $auth "rootPassword" .Values.auth.rootPassword }}
+{{- end }}
+{{- $_ := set $computed "auth" $auth }}
+
+{{- $_ := set $computed "ingress" (dict "enabled" false) }}
+{{- $_ := set $computed "apiIngress" (dict "enabled" false) }}
+
+{{- $_ := set $computed "persistence" (dict "enabled" true "storageClass" .Values.storageClass "size" .Values.storageSize) }}
+{{- $_ := set $computed "resources" .Values.resources }}
+
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: ghcr.io/stuttgart-things/charts/minio
+    chart: minio
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: minio
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
