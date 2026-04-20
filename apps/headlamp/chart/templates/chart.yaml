@@ -1,0 +1,35 @@
+{{- $computed := dict "config" (dict "watchPlugins" true) }}
+{{- if .Values.plugins }}
+  {{- $pm := dict "enabled" true "configContent" (dict "plugins" .Values.plugins | toYaml) }}
+  {{- $_ := set $computed "pluginsManager" $pm }}
+{{- end }}
+{{- if .Values.httpRoute.enabled }}
+  {{- $ref := dict "name" .Values.httpRoute.gateway.name "namespace" .Values.httpRoute.gateway.namespace }}
+  {{- $hr := dict "enabled" true "parentRefs" (list $ref) "hostnames" (list .Values.httpRoute.hostname) }}
+  {{- $_ := set $computed "httpRoute" $hr }}
+{{- end }}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: headlamp
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://kubernetes-sigs.github.io/headlamp/
+    chart: headlamp
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: headlamp
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

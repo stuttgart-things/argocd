@@ -1,0 +1,53 @@
+---
+# Reference back to this catalog repo — used by the optional rbac Application
+# to load apps/headlamp/manifests/rbac from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject both rendered Applications belong to.
+project: default
+
+# Where both rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: headlamp
+
+# Upstream Headlamp Helm chart (kubernetes-sigs/headlamp) version.
+chartVersion: 0.40.0
+
+# Gateway API HTTPRoute exposing Headlamp.
+httpRoute:
+  enabled: true
+  hostname: headlamp.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Plugins pre-loaded by Headlamp's pluginsManager. Empty list disables pluginsManager.
+plugins:
+  - name: prometheus
+    source: https://github.com/headlamp-k8s/plugins/releases/download/prometheus-0.8.2/prometheus-0.8.2.tar.gz
+
+# Escape hatch: deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream Headlamp value not exposed as a first-class key above.
+extraValues: {}
+
+# Opt-in ClusterRoleBinding granting cluster-admin to the headlamp ServiceAccount.
+rbac:
+  enabled: false
+
+# Sync policy shared by both rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

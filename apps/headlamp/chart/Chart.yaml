@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: headlamp
+description: App-of-apps chart packaging Headlamp (upstream chart + optional cluster-admin RBAC)
+type: application
+version: 0.1.0
+appVersion: "0.40.0"
