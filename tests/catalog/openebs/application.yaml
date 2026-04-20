@@ -4,8 +4,12 @@
 #   kubectl apply -f tests/catalog/openebs/application.yaml
 #
 # Outer destination = management cluster (where this Application CR lives).
-# Inner destination (in valuesObject) = target cluster where OpenEBS actually
+# Inner destination (in helm.values) = target cluster where OpenEBS actually
 # deploys. Set them to the same value when testing in-cluster.
+#
+# Uses helm.values (YAML block string) rather than helm.valuesObject for
+# maximum Argo CD version compatibility. On Argo CD 2.6+ you can swap to
+# valuesObject: { ... } — same semantics, type-preserving, no string escaping.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -19,7 +23,7 @@ spec:
     path: infra/openebs/chart
     helm:
       releaseName: openebs
-      valuesObject:
+      values: |
         project: default
         destination:
           server: https://kubernetes.default.svc

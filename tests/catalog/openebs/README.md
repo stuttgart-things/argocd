@@ -13,13 +13,17 @@ Both point at `infra/openebs/chart` at `HEAD`, so updates to the chart on `main`
 kubectl apply -f tests/catalog/openebs/application.yaml
 ```
 
-Edits to make for a non-in-cluster target:
+Edits to make for a non-in-cluster target (all inside `spec.source.helm.values`):
 
-- `spec.source.helm.valuesObject.project` — per-cluster AppProject name
-- `spec.source.helm.valuesObject.destination.server` — target cluster API
-- `spec.project` — matching AppProject (the outer Application also needs it)
+- `project` — per-cluster AppProject name
+- `destination.server` — target cluster API
+- `destination.namespace` — leave as `openebs` unless you have a reason to move it
+
+Also set `spec.project` on the outer Application to match.
 
 The outer `destination.server` stays `https://kubernetes.default.svc` — the rendered child `Application` CR lives in the management cluster's `argocd` namespace regardless of where OpenEBS actually runs.
+
+> The manifest uses `helm.values` (YAML block string) rather than `helm.valuesObject` (object) — universally compatible across every Argo CD version. On Argo CD 2.6+ you can swap to `valuesObject: { ... }` if you prefer; same semantics, type-preserving.
 
 Watch it roll in:
 
@@ -69,7 +73,7 @@ spec:
     targetRevision: HEAD
     path: infra/openebs/chart
     helm:
-      valuesObject:
+      values: |
         project: my-cluster
         destination:
           server: https://<cluster-api>:6443
@@ -97,9 +101,9 @@ Mayastor additionally needs hugepages and the `nvme-tcp` kernel module on the no
 | Aspect | How this test covers it |
 |---|---|
 | Chart renders | Rendered child `Application` CR matches the previous static `application.yaml` valuesObject (verified in #32) |
-| Schema enforces consumer overrides | Any typo in the valuesObject (e.g. `destnation:`) fails the sync with a clear JSON-Schema error instead of silently being ignored |
+| Schema enforces consumer overrides | Any typo under `helm.values` (e.g. `destnation:`) fails the sync with a clear JSON-Schema error instead of silently being ignored |
 | Cluster-generator shape | ApplicationSet stamps out one `Application` per labeled cluster; removing the label prunes it |
-| In-cluster vs workload destination | Outer Application on management cluster, rendered child Application destination-patched via inner valuesObject |
+| In-cluster vs workload destination | Outer Application on management cluster, rendered child Application destination-patched via inner `helm.values` |
 
 ## Conventions
 
