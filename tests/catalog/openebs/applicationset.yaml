@@ -1,0 +1,49 @@
+---
+# Fleet test — installs OpenEBS on every registered cluster whose Secret has:
+#   labels:
+#     install/openebs: "true"
+#
+# Only local-PV engines (hostpath default) are installed. Mayastor / LVM / ZFS
+# are NOT enabled by the ApplicationSet — ApplicationSet Go-template output is
+# always a string, which would fail the chart's JSON Schema (type: boolean) for
+# the engines.*.enabled keys. To enable mayastor on a single cluster, apply a
+# dedicated Application from this repo (see README.md).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: openebs
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            install/openebs: "true"
+  template:
+    metadata:
+      name: 'openebs-{{ .name }}'
+    spec:
+      project: '{{ .name }}'
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: HEAD
+        path: infra/openebs/chart
+        helm:
+          releaseName: openebs
+          valuesObject:
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: openebs
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
