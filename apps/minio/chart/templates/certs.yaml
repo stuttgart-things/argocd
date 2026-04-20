@@ -1,0 +1,33 @@
+{{- if .Values.certs.enabled }}
+{{- $certsValues := dict
+      "namespace" .Values.destination.namespace
+      "issuer" .Values.certs.issuer
+      "certificates" (list
+        (dict "name" "minio-ingress-console" "commonName" .Values.console.hostname "dnsNames" (list .Values.console.hostname) "secretName" .Values.console.tlsSecret)
+        (dict "name" "minio-ingress-api"     "commonName" .Values.api.hostname     "dnsNames" (list .Values.api.hostname)     "secretName" .Values.api.tlsSecret)
+      )
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio-certs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/minio/charts/certs
+    helm:
+      releaseName: minio-certs
+      valuesObject:
+        {{- toYaml $certsValues | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

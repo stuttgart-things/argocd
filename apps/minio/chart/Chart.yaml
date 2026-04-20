@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: minio
+description: App-of-apps chart packaging MinIO (OCI chart + optional cert-manager Certificates + optional Gateway API HTTPRoutes)
+type: application
+version: 0.1.0
+appVersion: "16.0.10"

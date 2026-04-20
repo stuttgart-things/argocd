@@ -1,0 +1,21 @@
+---
+# Namespace where Certificates (and their backing Secrets) land.
+namespace: minio
+
+# cert-manager issuer every Certificate points at.
+issuer:
+  name: cluster-ca
+  kind: ClusterIssuer
+
+# Certificates to render. Each item becomes one cert-manager Certificate.
+certificates:
+  - name: minio-ingress-console
+    commonName: artifacts-console.example.com
+    dnsNames:
+      - artifacts-console.example.com
+    secretName: artifacts-console-ingress-tls
+  - name: minio-ingress-api
+    commonName: artifacts.example.com
+    dnsNames:
+      - artifacts.example.com
+    secretName: artifacts-ingress-tls

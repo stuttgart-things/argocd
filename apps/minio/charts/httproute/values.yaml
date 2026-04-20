@@ -1,0 +1,21 @@
+---
+# Namespace where HTTPRoutes land.
+namespace: minio
+
+# Gateway every route parents onto.
+gateway:
+  name: cilium-gateway
+  namespace: default
+
+# Routes to render. Each item becomes one Gateway API HTTPRoute.
+routes:
+  - name: minio-console
+    hostname: artifacts-console.example.com
+    backend:
+      name: minio
+      port: 9001
+  - name: minio-api
+    hostname: artifacts.example.com
+    backend:
+      name: minio
+      port: 9000

@@ -1,34 +1,213 @@
 # apps/minio
 
-Catalog entry for [MinIO](https://min.io/) object storage via the stuttgart-things opinionated Bitnami-based chart, plus optional cert-manager Certificates and Gateway API HTTPRoutes for the console + S3 API.
+Catalog entry for [MinIO](https://min.io/) object storage via the stuttgart-things opinionated Bitnami-based chart, plus optional cert-manager Certificates and Gateway API HTTPRoutes for the console + S3 API. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/minio/chart`, pass overrides via `helm.valuesObject`, and the chart renders the three child `Application`s that install MinIO, the Certificates, and the HTTPRoutes.
+
+Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this entry requires **zero files** in the consumer repo — everything is driven by values on the consumer-side Argo CR.
 
 ## Layout
 
 ```
 apps/minio/
-├── chart/             # MinIO Helm chart (OCI, charts/minio v16.0.10, sync-wave 0)
-├── certs/             # cert-manager Certificates for console + API hostnames (sync-wave -5)
-└── httproute/         # Gateway API HTTPRoutes for console + API (sync-wave 10)
+├── chart/                       app-of-apps Helm chart (what consumers point at)
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── values.schema.json
+│   └── templates/
+│       ├── minio.yaml           renders Application "minio"            (sync-wave 0)
+│       ├── certs.yaml           renders Application "minio-certs"      (sync-wave -5, gated by certs.enabled)
+│       └── httproute.yaml       renders Application "minio-httproute"  (sync-wave 10, gated by httpRoute.enabled)
+└── charts/                      internal sub-charts rendered by the certs + httproute Applications
+    ├── certs/                   cert-manager Certificates (list-shaped input from parent)
+    └── httproute/               Gateway API HTTPRoutes     (list-shaped input from parent)
 ```
 
-Each sub-entry is a self-contained Kustomize base producing exactly one `Application`.
+The two hostnames (`console` + `api`) are first-class values on the parent chart and flow automatically into both the Certificate list and the HTTPRoute list — set them once, get TLS + routing coherent across both Applications.
 
-## Components
+## What gets deployed
 
-### chart/
-Installs the stuttgart-things `minio` chart (`16.0.10`) from the OCI registry `ghcr.io/stuttgart-things/charts/minio` into the `minio` namespace.
+### `minio` Application (always, sync-wave 0)
+Installs the stuttgart-things `minio` chart (`16.0.10` by default) from the OCI registry `ghcr.io/stuttgart-things/charts/minio` into the configured namespace. The chart constructs the upstream `valuesObject` from first-class values and allows deep-merge overrides via `extraValues`.
 
-Opinionated defaults:
+Opinionated baked-in values (not currently exposed as first-class keys, override via `extraValues` if needed):
 
-- `global.security.allowInsecureImages: true` — required because the image registry override pulls from `ghcr.io/stuttgart-things/minio` (mirror, not Bitnami's chart-pinned digest)
-- `image.registry: ghcr.io`, `image.repository: stuttgart-things/minio`, `image.tag: 2025.4.22-debian-12-r1` — pinned mirrored MinIO image
+- `global.imageRegistry: ghcr.io`, `global.security.allowInsecureImages: true` — the latter is required because `image.*` overrides the chart's pinned digest
 - `networkPolicy.enabled: true` + `allowExternal: true`
-- `auth.rootUser` / `auth.rootPassword` — **empty placeholders** (see *Credentials* below)
-- `ingress.enabled: false` + `apiIngress.enabled: false` — chart Ingress disabled in favor of the `httproute/` sub-entry
-- `persistence.storageClass: nfs4-csi`, `size: 10Gi`
-- resources: 100m/256Mi requests, 1Gi memory limit
+- `ingress.enabled: false` + `apiIngress.enabled: false` — chart Ingress disabled in favor of the `httpRoute` sub-Application
+- `persistence.enabled: true`
 
-#### OCI Helm source
+### `minio-certs` Application (opt-in, `certs.enabled: true`, sync-wave -5)
+Two cert-manager `Certificate` resources, one per hostname:
+
+| Certificate | CN / DNS (values key) | Secret (values key) |
+|---|---|---|
+| `minio-ingress-console` | `console.hostname` | `console.tlsSecret` |
+| `minio-ingress-api` | `api.hostname` | `api.tlsSecret` |
+
+Both issued by `certs.issuer` (default `ClusterIssuer/cluster-ca`, pairs with [`infra/cert-manager/cluster-ca/`](../../infra/cert-manager/cluster-ca/)). `sync-wave: -5` so Secrets exist before the HTTPRoutes reference them.
+
+### `minio-httproute` Application (opt-in, `httpRoute.enabled: true`, sync-wave 10)
+Two Gateway API `HTTPRoute` resources, one per hostname:
+
+| Route | Hostname (values key) | Backend |
+|---|---|---|
+| `minio-console` | `console.hostname` | `minio:9001` |
+| `minio-api` | `api.hostname` | `minio:9000` |
+
+Both parent onto `httpRoute.gateway` (default `Gateway/cilium-gateway` in `default`). `sync-wave: 10` so the chart's Service exists first.
+
+> **Backend Service name.** The chart release name (`minio`) determines the Service names. If you override the release via the upstream chart's `fullnameOverride`, keep the httproute backend names aligned.
+
+## Consumer usage
+
+### Single cluster — one `Application`
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+spec:
+  project: my-cluster
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: apps/minio/chart
+    helm:
+      valuesObject:
+        catalog: { repoURL: https://github.com/stuttgart-things/argocd.git, targetRevision: main }
+        project: my-cluster
+        destination:
+          server: https://<cluster-api>:6443
+          namespace: minio
+        auth:
+          existingSecret: minio-auth           # pre-provisioned via ESO / Vault
+        console:
+          hostname: artifacts-console.my-cluster.example.com
+          tlsSecret: artifacts-console-ingress-tls
+        api:
+          hostname: artifacts.my-cluster.example.com
+          tlsSecret: artifacts-ingress-tls
+        certs:
+          enabled: true
+          issuer: { name: cluster-ca, kind: ClusterIssuer }
+        httpRoute:
+          enabled: true
+          gateway: { name: cilium-gateway, namespace: default }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+```
+
+Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` in `valuesObject` is the **workload cluster** where MinIO itself runs.
+
+**Pin `catalog.targetRevision`** to the same git ref the outer Application is pinned to — the certs + httproute child Applications load their sub-charts from this repo at that revision.
+
+### Fleet — one `ApplicationSet` across many clusters
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: minio
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            minio: enabled
+  template:
+    metadata:
+      name: '{{name}}-minio'
+    spec:
+      project: '{{name}}'
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/minio/chart
+        helm:
+          valuesObject:
+            catalog: { repoURL: https://github.com/stuttgart-things/argocd.git, targetRevision: main }
+            project: '{{name}}'
+            destination: { server: '{{server}}', namespace: minio }
+            auth: { existingSecret: minio-auth }
+            console:
+              hostname: 'artifacts-console.{{metadata.labels.domain}}'
+              tlsSecret: artifacts-console-ingress-tls
+            api:
+              hostname: 'artifacts.{{metadata.labels.domain}}'
+              tlsSecret: artifacts-ingress-tls
+            certs:     { enabled: true, issuer: { name: cluster-ca, kind: ClusterIssuer } }
+            httpRoute: { enabled: true, gateway: { name: cilium-gateway, namespace: default } }
+      destination: { server: https://kubernetes.default.svc, namespace: argocd }
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions: [CreateNamespace=true, ServerSideApply=true]
+```
+
+Label ArgoCD cluster Secrets with `minio: enabled` and `domain: <fqdn>`; add/remove clusters without touching this repo.
+
+### Chart-only (no TLS, no Gateway API)
+
+```yaml
+certs:     { enabled: false }
+httpRoute: { enabled: false }
+```
+
+### nginx Ingress instead of Gateway API
+
+Disable the `httpRoute` sub-Application and re-enable the upstream chart's built-in Ingress via `extraValues`:
+
+```yaml
+httpRoute: { enabled: false }
+extraValues:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: artifacts-console.my-cluster.example.com
+  apiIngress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: artifacts.my-cluster.example.com
+```
+
+## Values reference
+
+See `chart/values.yaml` for defaults and `chart/values.schema.json` for the full JSON Schema. Invalid overrides fail the sync loudly.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `project` | `default` | ArgoCD AppProject for all three rendered Applications |
+| `destination.server` / `namespace` | `https://kubernetes.default.svc` / `minio` | Target cluster API + namespace |
+| `chartVersion` | `16.0.10` | Upstream MinIO OCI chart version |
+| `image.registry` / `repository` / `tag` | `ghcr.io` / `stuttgart-things/minio` / `2025.4.22-debian-12-r1` | Pinned MinIO image (mirror) |
+| `storageClass` / `storageSize` | `nfs4-csi` / `10Gi` | PVC StorageClass + size |
+| `auth.rootUser` / `rootPassword` | `""` / `""` | Inlined credentials (use only via ArgoCD Vault Plugin or SOPS-decrypted overlay) |
+| `auth.existingSecret` | `""` | **Preferred** — Secret name containing `root-user` / `root-password` keys |
+| `resources.requests` / `limits` | 100m/256Mi / 1Gi | Pod resources |
+| `console.hostname` / `tlsSecret` | `artifacts-console.example.com` / `artifacts-console-ingress-tls` | Console hostname + TLS secret name (flows into certs + httproute) |
+| `api.hostname` / `tlsSecret` | `artifacts.example.com` / `artifacts-ingress-tls` | S3 API hostname + TLS secret name |
+| `certs.enabled` | `true` | Render the Certificates sub-Application |
+| `certs.issuer.name` / `kind` | `cluster-ca` / `ClusterIssuer` | cert-manager issuer reference |
+| `httpRoute.enabled` | `true` | Render the HTTPRoutes sub-Application |
+| `httpRoute.gateway.name` / `namespace` | `cilium-gateway` / `default` | Gateway API `Gateway` reference |
+| `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
+| `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the certs + httpRoute child Applications fetch their sub-charts |
+| `syncPolicy` | automated + retry | Applied to all three rendered Applications |
+
+## Credentials
+
+Defaults ship `auth.rootUser` / `auth.rootPassword` as empty placeholders — **don't deploy as-is**. Three patterns in order of preference:
+
+1. **External Secrets / Vault** — an operator writes a Secret named e.g. `minio-auth` into the namespace with keys `root-user` + `root-password`; set `auth.existingSecret: minio-auth`. The chart reads credentials from the Secret and ignores the inline fields.
+2. **ArgoCD Vault Plugin** — wrap the consumer `Application` with a Vault-plugin CMP so `auth.rootPassword` is templated from `<path:vault/data/minio#root-password>` at sync time.
+3. **SOPS-encrypted overlay** — commit an encrypted values file in the consumer repo and decrypt in a pre-render hook.
+
+## OCI Helm source
 
 stuttgart-things publishes the MinIO chart to OCI only. Argo CD expresses this as:
 
@@ -41,106 +220,27 @@ source:
 
 Argo CD 2.8+ with `helm.enableOciSupport: true` (default) is required. The registry is anonymous, no pull credentials needed.
 
-#### Credentials
-
-The catalog ships `auth.rootUser` / `auth.rootPassword` as empty placeholders — **don't deploy as-is**. Consumers inject real credentials one of three ways:
-
-1. **External Secrets / Vault**: a secret-management operator writes `minio-auth` into the namespace, then a consumer overlay patches the Application's `valuesObject.auth.existingSecret: minio-auth` (and removes the `rootUser` / `rootPassword` keys).
-2. **Argo CD Vault Plugin**: wrap the `chart/` Application source in a plugin overlay that templates `<path:vault/data/minio#root-password>` placeholders.
-3. **SOPS-encrypted overlay**: a consumer overlay patches `valuesObject.auth` from a decrypted values file.
-
-### certs/
-Two cert-manager `Certificate` resources in the `minio` namespace:
-
-| Certificate | Hostname (default) | Secret |
-|---|---|---|
-| `minio-ingress-console` | `artifacts-console.example.com` | `artifacts-console-ingress-tls` |
-| `minio-ingress-api` | `artifacts.example.com` | `artifacts-ingress-tls` |
-
-Both issued by `ClusterIssuer/cluster-ca` (pairs with [`infra/cert-manager/cluster-ca/`](../../infra/cert-manager/cluster-ca/)). `sync-wave: -5` so Secrets exist before the HTTPRoutes / chart reference them.
-
-Consumers must patch `commonName`, `dnsNames`, `secretName`, and `issuerRef.name` in a cluster overlay.
-
-### httproute/
-Two Gateway API `HTTPRoute` resources in the `minio` namespace:
-
-| Route | Hostname (default) | Backend |
-|---|---|---|
-| `minio-console` | `artifacts-console.example.com` | `minio:9001` |
-| `minio-api` | `artifacts.example.com` | `minio:9000` |
-
-Both parent onto `Gateway/cilium-gateway` in the `default` namespace. `sync-wave: 10` so the chart's Service exists first. Consumers override `hostnames`, `parentRefs.name`, `parentRefs.namespace` per cluster.
-
-> **Backend Service name.** The chart release name determines the Service names: with `releaseName: minio` the console Service is `minio` (port 9001) and the S3 API is served from the same Service (port 9000). Keep the Application's `releaseName` aligned if you rename.
-
-## Consumer usage
-
-Full stack (chart + certs + httproute):
-
-```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - https://github.com/stuttgart-things/argocd.git/apps/minio/chart?ref=main
-  - https://github.com/stuttgart-things/argocd.git/apps/minio/certs?ref=main
-  - https://github.com/stuttgart-things/argocd.git/apps/minio/httproute?ref=main
-patches:
-  - target: { kind: Application, name: minio }
-    patch: |-
-      - op: replace
-        path: /spec/project
-        value: <cluster-project>
-      - op: replace
-        path: /spec/destination/server
-        value: https://<cluster-api>:<port>
-  - target: { kind: Application, name: minio-certs }
-    patch: |-
-      - op: replace
-        path: /spec/project
-        value: <cluster-project>
-      - op: replace
-        path: /spec/destination/server
-        value: https://<cluster-api>:<port>
-  - target: { kind: Application, name: minio-httproute }
-    patch: |-
-      - op: replace
-        path: /spec/project
-        value: <cluster-project>
-      - op: replace
-        path: /spec/destination/server
-        value: https://<cluster-api>:<port>
-```
-
-Chart-only clusters (no TLS, no Gateway API) omit `certs/` and `httproute/`.
-
-### nginx Ingress instead of Gateway API
-
-Skip `httproute/`. In a consumer overlay, patch the chart Application to enable the built-in chart Ingress:
-
-```yaml
-- target: { kind: Application, name: minio }
-  patch: |-
-    - op: replace
-      path: /spec/source/helm/valuesObject/ingress/enabled
-      value: true
-    - op: replace
-      path: /spec/source/helm/valuesObject/apiIngress/enabled
-      value: true
-    - op: add
-      path: /spec/source/helm/valuesObject/ingress/ingressClassName
-      value: nginx
-    - op: add
-      path: /spec/source/helm/valuesObject/ingress/hostname
-      value: artifacts-console.<domain>
-    # ... etc.
-```
-
 ## Endpoints
 
 | Endpoint | Service port | Description |
 |---|---|---|
 | Console | 9001 | MinIO web console UI |
 | API (S3) | 9000 | S3-compatible API |
+
+## Migrating from the previous kustomize layout
+
+If you were consuming the old `apps/minio/{chart,certs,httproute}` paths via a Kustomize overlay with JSON patches: replace that overlay with a single `Application` (example above). The overlay's patches map to values as follows:
+
+| Old JSON patch | New value |
+|---|---|
+| `/spec/project` (on every Application) | `project` |
+| `/spec/destination/server` (on every Application) | `destination.server` |
+| Certificate `spec.commonName` + `dnsNames[0]` (manifests) | `console.hostname` / `api.hostname` |
+| Certificate `spec.secretName` (manifests) | `console.tlsSecret` / `api.tlsSecret` |
+| HTTPRoute `spec.hostnames[0]` (manifests) | same as certs |
+| HTTPRoute `spec.parentRefs[0].name` / `namespace` | `httpRoute.gateway.name` / `namespace` |
+| Include/exclude `certs` path | `certs.enabled: true\|false` |
+| Include/exclude `httproute` path | `httpRoute.enabled: true\|false` |
 
 ## Related
 
