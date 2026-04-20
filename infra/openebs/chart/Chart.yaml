@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: openebs
+description: App-of-apps chart packaging the OpenEBS umbrella chart with opinionated opt-in engines
+type: application
+version: 0.1.0
+appVersion: "4.4.0"
