@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: argo-rollouts-install
+description: App-of-apps chart packaging the upstream argoproj/argo-rollouts Helm chart
+type: application
+version: 0.1.0
+appVersion: "2.40.9"
