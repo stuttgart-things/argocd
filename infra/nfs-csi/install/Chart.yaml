@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: nfs-csi-install
+description: App-of-apps chart packaging the upstream kubernetes-csi/csi-driver-nfs Helm chart
+type: application
+version: 0.1.0
+appVersion: "4.13.1"

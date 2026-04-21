@@ -1,0 +1,23 @@
+{{- range .Values.storageClasses }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .name | quote }}
+provisioner: {{ $.Values.provisioner | quote }}
+parameters:
+  server: {{ .server | quote }}
+  share: {{ .share | quote }}
+  {{- with .subDir }}
+  subDir: {{ . | quote }}
+  {{- end }}
+  mountPermissions: {{ .mountPermissions | quote }}
+  {{- with .onDelete }}
+  onDelete: {{ . | quote }}
+  {{- end }}
+volumeBindingMode: {{ .volumeBindingMode | default "Immediate" }}
+reclaimPolicy: {{ .reclaimPolicy | default "Delete" }}
+allowVolumeExpansion: {{ .allowVolumeExpansion | default true }}
+mountOptions:
+  {{- toYaml .mountOptions | nindent 2 }}
+{{- end }}
