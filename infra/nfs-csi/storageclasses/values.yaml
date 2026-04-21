@@ -1,0 +1,23 @@
+---
+# Provisioner used by every rendered StorageClass. Must match the installed
+# csi-driver-nfs (install/ defaults to nfs.csi.k8s.io).
+provisioner: nfs.csi.k8s.io
+
+# List of StorageClasses to render. Empty by default — consumers must supply
+# their NFS server + share per cluster.
+#
+# Each entry:
+#   name:                 StorageClass name
+#   server:               NFS server hostname/IP
+#   share:                NFS export path on the server
+#   subDir:               (optional) subdirectory under share; often the cluster name
+#   mountPermissions:     quoted octal, e.g. "0" or "0777"
+#   onDelete:             (optional) "delete" or "archive"; controls what the driver
+#                         does with the backing directory on PVC delete
+#   volumeBindingMode:    (optional) default Immediate
+#   reclaimPolicy:        (optional) default Delete
+#   allowVolumeExpansion: (optional) default true
+#   mountOptions:         list of NFS mount options (include nfsvers=3 or nfsvers=4.1)
+#
+# See README.md for ready-to-copy nfs3 and nfs4 entries.
+storageClasses: []
