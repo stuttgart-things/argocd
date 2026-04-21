@@ -1,9 +1,11 @@
 {{- if .Values.rbac.enabled }}
+{{- $defaultName := printf "headlamp-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: headlamp-rbac
+  name: {{ printf "%s-rbac" $appName | quote }}
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "10"

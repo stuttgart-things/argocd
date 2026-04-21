@@ -5,6 +5,11 @@
   "additionalProperties": false,
   "required": ["project", "destination", "chartVersion", "image", "console", "api"],
   "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
     "catalog": {
       "type": "object",
       "additionalProperties": false,
