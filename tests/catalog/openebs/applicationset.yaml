@@ -8,6 +8,10 @@
 # always a string, which would fail the chart's JSON Schema (type: boolean) for
 # the engines.*.enabled keys. To enable mayastor on a single cluster, apply a
 # dedicated Application from this repo (see README.md).
+#
+# Uses helm.values (YAML block string) rather than helm.valuesObject for
+# maximum Argo CD version compatibility. On Argo CD 2.6+ you can swap to
+# valuesObject: { ... }.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -32,10 +36,10 @@ spec:
         path: infra/openebs/chart
         helm:
           releaseName: openebs
-          valuesObject:
-            project: '{{ .name }}'
+          values: |
+            project: {{ .name }}
             destination:
-              server: '{{ .server }}'
+              server: {{ .server }}
               namespace: openebs
       destination:
         server: https://kubernetes.default.svc

@@ -33,7 +33,7 @@ spec:
     targetRevision: main
     path: infra/openebs/chart
     helm:
-      valuesObject:
+      values: |
         project: my-cluster
         destination:
           server: https://<cluster-api>:6443
@@ -52,7 +52,9 @@ spec:
     syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Note: the outer `destination.server` is the **management cluster** (where the rendered child Application lives, in the `argocd` namespace). The inner `destination.server` in `valuesObject` is the **workload cluster** where OpenEBS itself runs.
+Note: the outer `destination.server` is the **management cluster** (where the rendered child Application lives, in the `argocd` namespace). The inner `destination.server` in `values` is the **workload cluster** where OpenEBS itself runs.
+
+> **Why `helm.values` (string) and not `helm.valuesObject` (object)?** Both work, but `values: |` (a YAML block string) is universally compatible across every Argo CD version since 2.0. `valuesObject:` needs Argo CD 2.6+ and has been observed to mis-serialize on some older patch versions, producing `cannot unmarshal string into Go value of type map[string]interface {}` from Helm. On a confirmed-modern Argo, `valuesObject:` is type-preserving and saves you an indentation level — swap freely.
 
 ### Fleet — one `ApplicationSet` across many clusters
 
@@ -78,22 +80,23 @@ spec:
         targetRevision: main
         path: infra/openebs/chart
         helm:
-          valuesObject:
-            project: '{{name}}'
-            destination: { server: '{{server}}', namespace: openebs }
-            engines:
-              replicated:
-                mayastor:
-                  enabled: '{{metadata.labels.openebs-mayastor}}'
-            mayastorInitContainers:
-              enabled: '{{metadata.labels.openebs-mayastor}}'
+          values: |
+            project: {{name}}
+            destination:
+              server: {{server}}
+              namespace: openebs
+            # engines.replicated.mayastor.enabled takes a boolean — you cannot
+            # drive it from a cluster-secret label via ApplicationSet templating
+            # (Go-template output is always a string and the chart's JSON Schema
+            # is strict about type: boolean). For Mayastor, apply a dedicated
+            # Application per target cluster instead.
       destination: { server: https://kubernetes.default.svc, namespace: argocd }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
         syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Label ArgoCD cluster Secrets with `openebs: enabled` and `openebs-mayastor: "true"` where applicable.
+Label ArgoCD cluster Secrets with `openebs: enabled`. Mayastor (a boolean chart value) cannot be driven by a cluster-secret label from an ApplicationSet — see the note in the example above and the dedicated-Application pattern under *Mayastor prerequisites*.
 
 ## Values reference
 
