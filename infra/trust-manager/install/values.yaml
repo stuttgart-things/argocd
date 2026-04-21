@@ -1,0 +1,37 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys. Pair with cert-manager
+# (infra/cert-manager/install/) — trust-manager depends on its CRDs + webhook.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: cert-manager
+
+# Upstream jetstack/trust-manager Helm chart version.
+chartVersion: "0.22.0"
+
+# Namespace trust-manager watches for its source Secrets/ConfigMaps.
+# Bundles can only reference sources in this namespace — keep it aligned
+# with where cluster-ca-secret and similar CA Secrets live.
+trustNamespace: cert-manager
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above
+# (replicaCount, resources, image pinning, etc.).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

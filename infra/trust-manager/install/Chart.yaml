@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: trust-manager-install
+description: App-of-apps chart packaging the upstream jetstack/trust-manager Helm chart
+type: application
+version: 0.1.0
+appVersion: "0.22.0"
