@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: cilium-gateway
+description: Gateway API Gateway (HTTPS terminate + HTTP) rendered from values
+type: application
+version: 0.1.0
+appVersion: "1.18.5"

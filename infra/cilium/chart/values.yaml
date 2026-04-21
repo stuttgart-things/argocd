@@ -1,0 +1,85 @@
+---
+# Reference back to this catalog repo — used by the optional lb and gateway
+# child Applications to load infra/cilium/lb-chart and infra/cilium/gateway-chart from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject the rendered Applications belong to.
+project: default
+
+# Where the rendered Applications deploy. The LB / Gateway children override
+# the namespace below (kube-system / default) — this is the Cilium install target.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: kube-system
+
+# Upstream Cilium Helm chart version (https://helm.cilium.io).
+chartVersion: 1.18.5
+
+# k8s API endpoint used by kubeProxyReplacement. Override per cluster when the
+# in-cluster default does not work (e.g. kubeadm with a non-default API VIP).
+k8s:
+  serviceHost: ""
+  servicePort: 6443
+
+# Cilium replaces kube-proxy.
+kubeProxyReplacement: true
+
+# Number of cilium-operator replicas.
+operatorReplicas: 1
+
+# Enables the `cilium` GatewayClass. Required for the optional gateway child below
+# and for any consumer that wants HTTPRoutes through Cilium.
+gatewayAPI:
+  enabled: true
+
+# L2 announcements + externalIPs — required for LoadBalancer service IPs
+# to be reachable on bare-metal / non-cloud clusters.
+l2announcements:
+  enabled: true
+externalIPs:
+  enabled: true
+
+# Deep-merged on top of the computed valuesObject passed to the upstream Cilium chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Opt-in CiliumLoadBalancerIPPool + CiliumL2AnnouncementPolicy.
+# Off by default — enable per cluster and set blocks to match your network.
+lb:
+  enabled: false
+  poolName: default-pool
+  blocks:
+    - start: 192.168.1.240
+      stop: 192.168.1.250
+  l2Policy:
+    name: default-l2-announcement-policy
+    namespace: kube-system
+    externalIPs: true
+    loadBalancerIPs: true
+
+# Opt-in Gateway API Gateway. Off by default — enable per cluster and set hostname
+# + tlsSecretName to match your ingress / DNS. Requires gatewayAPI.enabled: true.
+gateway:
+  enabled: false
+  name: cilium-gateway
+  namespace: default
+  gatewayClassName: cilium
+  hostname: "*.example.com"
+  tlsSecretName: cilium-gateway-tls
+
+# Sync policy shared by all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

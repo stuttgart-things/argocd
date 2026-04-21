@@ -1,0 +1,17 @@
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: {{ .Values.poolName | quote }}
+spec:
+  blocks:
+    {{- toYaml .Values.blocks | nindent 4 }}
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: {{ .Values.l2Policy.name | quote }}
+  namespace: {{ .Values.l2Policy.namespace | quote }}
+spec:
+  externalIPs: {{ .Values.l2Policy.externalIPs }}
+  loadBalancerIPs: {{ .Values.l2Policy.loadBalancerIPs }}
