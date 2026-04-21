@@ -7,11 +7,13 @@
         (dict "name" "minio-ingress-api"     "commonName" .Values.api.hostname     "dnsNames" (list .Values.api.hostname)     "secretName" .Values.api.tlsSecret)
       )
 }}
+{{- $defaultName := printf "minio-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: minio-certs
+  name: {{ printf "%s-certs" $appName | quote }}
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-5"

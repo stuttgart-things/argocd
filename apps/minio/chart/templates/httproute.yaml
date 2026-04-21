@@ -7,11 +7,13 @@
         (dict "name" "minio-api"     "hostname" .Values.api.hostname     "backend" (dict "name" "minio" "port" 9000))
       )
 }}
+{{- $defaultName := printf "minio-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: minio-httproute
+  name: {{ printf "%s-httproute" $appName | quote }}
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "10"

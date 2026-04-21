@@ -1,11 +1,13 @@
 {{- $computed := dict "crds" (dict "enabled" .Values.crds.enabled) }}
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+{{- $defaultName := printf "cert-manager-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cert-manager
+  name: {{ $appName | quote }}
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-10"

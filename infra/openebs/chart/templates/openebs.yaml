@@ -8,11 +8,13 @@
 
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+{{- $defaultName := printf "openebs-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: openebs
+  name: {{ $appName | quote }}
   namespace: argocd
 spec:
   project: {{ .Values.project | quote }}

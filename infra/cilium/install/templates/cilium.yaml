@@ -9,11 +9,13 @@
 
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+{{- $defaultName := printf "cilium-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cilium
+  name: {{ $appName | quote }}
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
