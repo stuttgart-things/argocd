@@ -1,0 +1,39 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.ca.name | quote }}
+  namespace: {{ .Values.ca.namespace | quote }}
+spec:
+  isCA: true
+  commonName: {{ .Values.ca.name | quote }}
+  secretName: {{ .Values.ca.secretName | quote }}
+  issuerRef:
+    name: {{ .Values.ca.issuerRef.name | quote }}
+    kind: {{ .Values.ca.issuerRef.kind | quote }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.ca.name | quote }}
+spec:
+  ca:
+    secretName: {{ .Values.ca.secretName | quote }}
+{{- if .Values.wildcard.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.wildcard.name | quote }}
+  namespace: {{ .Values.wildcard.namespace | quote }}
+spec:
+  secretName: {{ .Values.wildcard.secretName | quote }}
+  issuerRef:
+    name: {{ .Values.ca.name | quote }}
+    kind: ClusterIssuer
+  commonName: {{ .Values.wildcard.commonName | quote }}
+  dnsNames:
+    {{- toYaml .Values.wildcard.dnsNames | nindent 4 }}
+  duration: {{ .Values.wildcard.duration | quote }}
+  renewBefore: {{ .Values.wildcard.renewBefore | quote }}
+{{- end }}

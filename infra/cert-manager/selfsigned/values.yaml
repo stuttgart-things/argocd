@@ -1,0 +1,4 @@
+---
+# Name of the self-signed ClusterIssuer. Consumers referencing this issuer
+# (e.g. cluster-ca/) default to `selfsigned` — override here + there if you change it.
+name: selfsigned

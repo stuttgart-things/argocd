@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: cert-manager-cluster-ca
+description: Self-signed CA chain — CA Certificate, CA ClusterIssuer, and an optional wildcard Certificate
+type: application
+version: 0.1.0
+appVersion: "1.19.2"

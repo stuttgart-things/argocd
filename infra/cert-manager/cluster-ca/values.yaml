@@ -1,0 +1,26 @@
+---
+# Bootstrap CA certificate signed by the self-signed ClusterIssuer.
+# The chart renders: Certificate (ca.name in ca.namespace) →
+# ClusterIssuer (same ca.name) backed by the CA's Secret.
+ca:
+  name: cluster-ca
+  namespace: cert-manager
+  secretName: cluster-ca-secret
+  # ClusterIssuer used to sign the CA certificate. Matches the `selfsigned/`
+  # chart's default `name` value; override if you renamed it.
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+
+# Optional wildcard Certificate issued by the CA ClusterIssuer above.
+# Off by default — consumers opt in per cluster with their own hostname.
+wildcard:
+  enabled: false
+  name: wildcard-tls
+  namespace: default
+  secretName: wildcard-tls
+  commonName: "*.example.com"
+  dnsNames:
+    - "*.example.com"
+  duration: 2160h      # 90 days
+  renewBefore: 360h    # renew 15 days before expiry
