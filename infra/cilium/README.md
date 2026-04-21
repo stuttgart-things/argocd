@@ -47,10 +47,11 @@ spec:
         project: my-cluster
         destination:
           server: https://<cluster-api>:6443
-          namespace: kube-system
-        k8s:
-          serviceHost: <cluster-api>
-          servicePort: 6443
+        cilium:
+          enabled: true
+          k8s:
+            serviceHost: <cluster-api>
+            servicePort: 6443
         lb:
           enabled: true
           blocks:
@@ -69,6 +70,27 @@ spec:
 ```
 
 Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` in values is the **workload cluster** where Cilium itself runs.
+
+### Cilium already installed — just LB (or just Gateway)
+
+Set `cilium.enabled: false` to skip the Cilium Helm install and use this chart purely for the opt-in pieces:
+
+```yaml
+    helm:
+      values: |
+        project: my-cluster
+        destination:
+          server: https://<cluster-api>:6443
+        cilium:
+          enabled: false           # Cilium already running on this cluster
+        lb:
+          enabled: true
+          blocks:
+            - start: 10.0.42.10
+              stop: 10.0.42.30
+```
+
+Requirements on the pre-existing Cilium install: `l2announcements` and `externalIPs` enabled for `lb`; the `cilium` GatewayClass present for `gateway`. If those were not set at install time, apply them first (e.g. via `helm upgrade` on the existing Cilium release) — this chart won't flip them for you when `cilium.enabled: false`.
 
 ### Fleet — one `ApplicationSet` across many clusters
 
@@ -100,7 +122,6 @@ spec:
             project: {{ .name }}
             destination:
               server: {{ .server }}
-              namespace: kube-system
       destination: { server: https://kubernetes.default.svc, namespace: argocd }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
@@ -116,15 +137,17 @@ See `chart/values.yaml` for defaults and `chart/values.schema.json` for the full
 | Key | Default | Purpose |
 |---|---|---|
 | `project` | `default` | ArgoCD AppProject for the rendered Applications |
-| `destination.server` / `namespace` | `https://kubernetes.default.svc` / `kube-system` | Target cluster + namespace for Cilium |
-| `chartVersion` | `1.18.5` | Upstream Cilium Helm chart version |
-| `k8s.serviceHost` / `k8s.servicePort` | `""` / `6443` | Cluster API endpoint for `kubeProxyReplacement` |
-| `kubeProxyReplacement` | `true` | Cilium replaces kube-proxy |
-| `operatorReplicas` | `1` | `cilium-operator` replicas |
-| `gatewayAPI.enabled` | `true` | Enables the `cilium` GatewayClass |
-| `l2announcements.enabled` | `true` | L2 announcements for LoadBalancer IPs |
-| `externalIPs.enabled` | `true` | Allow externalIPs on Services |
-| `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
+| `destination.server` | `https://kubernetes.default.svc` | Target workload cluster — shared by all rendered Applications |
+| `cilium.enabled` | `true` | Install the upstream Cilium Helm chart. Set `false` when Cilium is already running |
+| `cilium.namespace` | `kube-system` | Namespace for the Cilium install |
+| `cilium.chartVersion` | `1.18.5` | Upstream Cilium Helm chart version |
+| `cilium.k8s.serviceHost` / `servicePort` | `""` / `6443` | Cluster API endpoint for `kubeProxyReplacement` |
+| `cilium.kubeProxyReplacement` | `true` | Cilium replaces kube-proxy |
+| `cilium.operatorReplicas` | `1` | `cilium-operator` replicas |
+| `cilium.gatewayAPI.enabled` | `true` | Enables the `cilium` GatewayClass |
+| `cilium.l2announcements.enabled` | `true` | L2 announcements for LoadBalancer IPs |
+| `cilium.externalIPs.enabled` | `true` | Allow externalIPs on Services |
+| `cilium.extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
 | `lb.enabled` | `false` | Render `CiliumLoadBalancerIPPool` + `CiliumL2AnnouncementPolicy` |
 | `lb.poolName` | `default-pool` | Pool name |
 | `lb.blocks` | `192.168.1.240`–`250` placeholder | IP blocks — **override per cluster** |
@@ -143,7 +166,7 @@ If you were consuming the old three-entry layout (`infra/cilium/chart`, `infra/c
 | Old target / patch | New value |
 |---|---|
 | `Application cilium` → `/spec/project` / `/spec/destination/server` | `project` / `destination.server` |
-| Inline `valuesObject` on the old cilium Application | first-class values (`kubeProxyReplacement`, `gatewayAPI.enabled`, `l2announcements.enabled`, `externalIPs.enabled`, `k8s.*`, `operatorReplicas`) or `extraValues.<path>` |
+| Inline `valuesObject` on the old cilium Application | first-class values under `cilium.*` (`cilium.kubeProxyReplacement`, `cilium.gatewayAPI.enabled`, `cilium.l2announcements.enabled`, `cilium.externalIPs.enabled`, `cilium.k8s.*`, `cilium.operatorReplicas`) or `cilium.extraValues.<path>` |
 | `infra/cilium/lb/manifests/cilium-config.yaml` (raw IP pool + L2 policy) | `lb.enabled: true` + `lb.blocks` / `lb.poolName` / `lb.l2Policy.*` |
 | `infra/cilium/gateway/manifests/gateway.yaml` (raw Gateway) | `gateway.enabled: true` + `gateway.hostname` / `gateway.tlsSecretName` / `gateway.name` / `gateway.namespace` |
 

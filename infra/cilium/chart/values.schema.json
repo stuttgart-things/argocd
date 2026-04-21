@@ -3,7 +3,7 @@
   "title": "cilium app-of-apps chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["project", "destination", "chartVersion"],
+  "required": ["project", "destination"],
   "properties": {
     "catalog": {
       "type": "object",
@@ -20,44 +20,58 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "server":    { "type": "string", "format": "uri" },
-        "namespace": { "type": "string", "minLength": 1 }
+        "server": { "type": "string", "format": "uri" }
       },
-      "required": ["server", "namespace"]
+      "required": ["server"]
     },
-    "chartVersion": { "type": "string", "minLength": 1 },
-    "k8s": {
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "cilium": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "serviceHost": { "type": "string" },
-        "servicePort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        "enabled": { "type": "boolean" },
+        "namespace": { "type": "string", "minLength": 1 },
+        "chartVersion": { "type": "string", "minLength": 1 },
+        "k8s": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "serviceHost": { "type": "string" },
+            "servicePort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          },
+          "required": ["serviceHost", "servicePort"]
+        },
+        "kubeProxyReplacement": { "type": "boolean" },
+        "operatorReplicas": { "type": "integer", "minimum": 0 },
+        "gatewayAPI": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } },
+          "required": ["enabled"]
+        },
+        "l2announcements": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } },
+          "required": ["enabled"]
+        },
+        "externalIPs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } },
+          "required": ["enabled"]
+        },
+        "extraValues": {
+          "type": "object",
+          "additionalProperties": true
+        }
       },
-      "required": ["serviceHost", "servicePort"]
-    },
-    "kubeProxyReplacement": { "type": "boolean" },
-    "operatorReplicas": { "type": "integer", "minimum": 0 },
-    "gatewayAPI": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": { "enabled": { "type": "boolean" } },
-      "required": ["enabled"]
-    },
-    "l2announcements": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": { "enabled": { "type": "boolean" } },
-      "required": ["enabled"]
-    },
-    "externalIPs": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": { "enabled": { "type": "boolean" } },
-      "required": ["enabled"]
-    },
-    "extraValues": {
-      "type": "object",
-      "additionalProperties": true
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": { "required": ["namespace", "chartVersion"] }
     },
     "lb": {
       "type": "object",
@@ -108,10 +122,6 @@
       "required": ["enabled"],
       "if": { "properties": { "enabled": { "const": true } } },
       "then": { "required": ["name", "namespace", "gatewayClassName", "hostname", "tlsSecretName"] }
-    },
-    "syncPolicy": {
-      "type": "object",
-      "additionalProperties": true
     }
   }
 }
