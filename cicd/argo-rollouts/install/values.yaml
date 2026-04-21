@@ -1,0 +1,65 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: argo-rollouts
+
+# Upstream argoproj/argo-rollouts Helm chart version.
+chartVersion: "2.40.9"
+
+# CRD install + retention. Keep CRDs on uninstall so in-flight Rollouts
+# aren't cascaded away.
+installCRDs: true
+keepCRDs: true
+
+# Cluster-wide controller + aggregate RBAC.
+clusterInstall: true
+createClusterAggregateRoles: true
+
+# Controller runtime.
+controller:
+  replicas: 2
+  logging:
+    level: info      # debug / info / warn / error
+    format: text     # text / json
+  metrics:
+    enabled: false
+    serviceMonitor:
+      enabled: false
+
+# Dashboard pod + Service. The chart's built-in Ingress is force-disabled —
+# pair with the httproutes/ entry to expose the dashboard via Gateway API.
+dashboard:
+  enabled: true
+  readonly: false
+  replicas: 1
+
+# Grants the controller RBAC to mutate Gateway API HTTPRoutes for traffic
+# shaping. Kept on by default since this is the main reason to run
+# argo-rollouts alongside a Cilium/Envoy/etc Gateway.
+providerRBAC:
+  enabled: true
+  gatewayAPI: true
+
+# Deep-merged on top of the computed valuesObject. Escape hatch for any
+# upstream key not exposed above (resources, nodeSelector, image pinning,
+# extra dashboard env, analysis providers…).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

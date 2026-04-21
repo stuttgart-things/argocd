@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "argo-rollouts install app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion"],
+  "properties": {
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion":                { "type": "string", "minLength": 1 },
+    "installCRDs":                 { "type": "boolean" },
+    "keepCRDs":                    { "type": "boolean" },
+    "clusterInstall":              { "type": "boolean" },
+    "createClusterAggregateRoles": { "type": "boolean" },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1 },
+        "logging": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "level":  { "type": "string", "enum": ["debug", "info", "warn", "error"] },
+            "format": { "type": "string", "enum": ["text", "json"] }
+          },
+          "required": ["level", "format"]
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "serviceMonitor": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "enabled": { "type": "boolean" } },
+              "required": ["enabled"]
+            }
+          },
+          "required": ["enabled", "serviceMonitor"]
+        }
+      },
+      "required": ["replicas", "logging", "metrics"]
+    },
+    "dashboard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "readonly": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "providerRBAC": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":    { "type": "boolean" },
+        "gatewayAPI": { "type": "boolean" }
+      },
+      "required": ["enabled", "gatewayAPI"]
+    },
+    "extraValues": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

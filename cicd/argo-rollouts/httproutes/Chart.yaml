@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: argo-rollouts-httproutes
+description: Renders one or more Gateway API HTTPRoute resources from a values list
+type: application
+version: 0.1.0
+appVersion: "2.40.9"
