@@ -1,0 +1,6 @@
+---
+name: cilium-gateway
+namespace: default
+gatewayClassName: cilium
+hostname: "*.example.com"
+tlsSecretName: cilium-gateway-tls

@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cilium-lb chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["poolName", "blocks", "l2Policy"],
+  "properties": {
+    "poolName": { "type": "string", "minLength": 1 },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "start": { "type": "string", "minLength": 1 },
+          "stop":  { "type": "string", "minLength": 1 },
+          "cidr":  { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "l2Policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 },
+        "externalIPs": { "type": "boolean" },
+        "loadBalancerIPs": { "type": "boolean" }
+      },
+      "required": ["name", "namespace", "externalIPs", "loadBalancerIPs"]
+    }
+  }
+}
