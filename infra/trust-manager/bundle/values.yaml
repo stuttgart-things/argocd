@@ -1,0 +1,18 @@
+---
+# List of trust-manager Bundles to render. Empty by default — consumers
+# define whichever Bundles their cluster needs.
+#
+# Each entry:
+#   name:  Bundle name (cluster-scoped)
+#   spec:  raw trust.cert-manager.io/v1alpha1 Bundle spec. See
+#          https://cert-manager.io/docs/trust/trust-manager/api-reference/
+#          for source types (useDefaultCAs / secret / configMap / inLine)
+#          and target types (configMap / secret / additionalFormats).
+#
+# Source Secrets/ConfigMaps must live in the trust namespace configured
+# on the trust-manager install (install/trustNamespace, default
+# `cert-manager`).
+#
+# See README.md for a copy-paste cluster-trust-bundle example combining
+# Mozilla's default CAs + the internal cluster CA.
+bundles: []
