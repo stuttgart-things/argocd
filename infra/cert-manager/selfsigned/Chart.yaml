@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: cert-manager-selfsigned
+description: Self-signed ClusterIssuer for cert-manager — the bootstrap issuer behind a CA chain
+type: application
+version: 0.1.0
+appVersion: "1.19.2"
