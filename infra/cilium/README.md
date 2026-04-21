@@ -1,34 +1,31 @@
 # infra/cilium
 
-Catalog entry for [Cilium](https://cilium.io/) with opt-in LoadBalancer IP pool and Gateway API Gateway. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `infra/cilium/chart`, pass overrides via `helm.values` / `helm.valuesObject`, and the chart renders up to three child Applications — Cilium itself, plus the LB pool and the Gateway when opted in.
+Catalog entries for [Cilium](https://cilium.io/) plus its optional LoadBalancer IP pool and Gateway API Gateway. Modelled after the Flux layout (`stuttgart-things/flux` → `infra/cilium/components/{install,lb,gateway}`) — three independently deployable pieces you can mix and match. Consumers create one ArgoCD `Application` per piece they need.
 
 ## Layout
 
 ```
 infra/cilium/
-├── chart/                         app-of-apps Helm chart (what consumers point at)
-│   ├── Chart.yaml
-│   ├── values.yaml
-│   ├── values.schema.json
-│   └── templates/
-│       ├── cilium.yaml            renders Application "cilium"         (sync-wave -10)
-│       ├── cilium-lb.yaml         renders Application "cilium-lb"      (sync-wave 0,  lb.enabled)
-│       └── cilium-gateway.yaml    renders Application "cilium-gateway" (sync-wave 10, gateway.enabled)
-├── lb-chart/                      sub-chart — CiliumLoadBalancerIPPool + CiliumL2AnnouncementPolicy
-└── gateway-chart/                 sub-chart — Gateway API Gateway (HTTPS terminate + HTTP)
+├── install/    app-of-apps — renders Application "cilium" → helm.cilium.io
+├── lb/         plain Helm chart — renders CiliumLoadBalancerIPPool + CiliumL2AnnouncementPolicy
+├── gateway/    plain Helm chart — renders Gateway API Gateway (HTTPS terminate + HTTP)
+└── README.md
 ```
 
-## Components
+Matrix of typical consumer shapes:
 
-- **`chart/templates/cilium.yaml`** — installs Cilium `v1.18.5` into `kube-system` with `kubeProxyReplacement`, Gateway API controller, L2 announcements and external IPs on by default. All of those are exposed as first-class values; `extraValues` is the escape hatch for any upstream key not surfaced directly.
-- **`chart/templates/cilium-lb.yaml`** — gated on `lb.enabled`. Child Application points at `infra/cilium/lb-chart` and passes the pool name, IP blocks, and L2 policy through values. **Consumers set `lb.blocks` to match their network** — the shipped `192.168.1.240`–`192.168.1.250` is a placeholder.
-- **`chart/templates/cilium-gateway.yaml`** — gated on `gateway.enabled`. Child Application points at `infra/cilium/gateway-chart` and passes the Gateway name / namespace / hostname / TLS Secret through values. Required by anything that wants an HTTPRoute through Cilium. Needs `gatewayAPI.enabled: true` (default).
+| Want | Applications to create |
+|---|---|
+| Cilium only | `install` |
+| Cilium + LB | `install`, `lb` |
+| Cilium + LB + Gateway | `install`, `lb`, `gateway` |
+| LB only (Cilium already running) | `lb` |
+| LB + Gateway (Cilium already running) | `lb`, `gateway` |
+| Gateway only (Cilium already running) | `gateway` |
 
-## Consumer usage
+## install/
 
-Lead examples use `helm.values` as a string (per the repo convention) so the outer `valuesObject` stays boolean-safe from ApplicationSet Go-template output.
-
-### Single cluster — one `Application`
+App-of-apps Helm chart packaging the upstream Cilium Helm chart. Consumer `Application` points at `infra/cilium/install`; chart renders a child `Application` targeting `https://helm.cilium.io` with a computed `valuesObject`. Mirrors the openebs / headlamp / minio pattern.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -41,26 +38,16 @@ spec:
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
     targetRevision: main
-    path: infra/cilium/chart
+    path: infra/cilium/install
     helm:
       values: |
         project: my-cluster
         destination:
           server: https://<cluster-api>:6443
-        cilium:
-          enabled: true
-          k8s:
-            serviceHost: <cluster-api>
-            servicePort: 6443
-        lb:
-          enabled: true
-          blocks:
-            - start: 10.0.42.10
-              stop: 10.0.42.30
-        gateway:
-          enabled: true
-          hostname: "*.my-cluster.example.com"
-          tlsSecretName: my-cluster-gateway-tls
+          namespace: kube-system
+        k8s:
+          serviceHost: <cluster-api>
+          servicePort: 6443
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -69,30 +56,122 @@ spec:
     syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Note: the outer `destination.server` is the **management cluster** (where the rendered child Applications live, in the `argocd` namespace). The inner `destination.server` in values is the **workload cluster** where Cilium itself runs.
+The outer `destination.server` is the **management cluster** (where the child Application CR lives). The inner `destination.server` in values is the **workload cluster** where Cilium actually installs.
 
-### Cilium already installed — just LB (or just Gateway)
+### install values reference
 
-Set `cilium.enabled: false` to skip the Cilium Helm install and use this chart purely for the opt-in pieces:
+See `install/values.yaml` / `install/values.schema.json` for the full contract.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `project` | `default` | ArgoCD AppProject for the rendered Application |
+| `destination.server` / `namespace` | `https://kubernetes.default.svc` / `kube-system` | Target workload cluster + namespace |
+| `chartVersion` | `1.18.5` | Upstream Cilium Helm chart version |
+| `k8s.serviceHost` / `servicePort` | `""` / `6443` | Cluster API endpoint for `kubeProxyReplacement` |
+| `kubeProxyReplacement` | `true` | Cilium replaces kube-proxy |
+| `operatorReplicas` | `1` | `cilium-operator` replicas |
+| `gatewayAPI.enabled` | `true` | Enables the `cilium` GatewayClass (required by `gateway/`) |
+| `l2announcements.enabled` | `true` | L2 announcements (required by `lb/`) |
+| `externalIPs.enabled` | `true` | Allow externalIPs on Services (required by `lb/`) |
+| `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
+| `syncPolicy` | automated + retry | Applied to the rendered child Application |
+
+## lb/
+
+Plain Helm chart that renders `CiliumLoadBalancerIPPool` + `CiliumL2AnnouncementPolicy` directly. Consumer `Application` points at `infra/cilium/lb` with values describing the IP blocks — no app-of-apps wrapper, because there's no upstream Helm chart involved; the consumer-owned `Application` IS the outer wrapper.
 
 ```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium-lb
+  namespace: argocd
+spec:
+  project: my-cluster
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: infra/cilium/lb
     helm:
       values: |
-        project: my-cluster
-        destination:
-          server: https://<cluster-api>:6443
-        cilium:
-          enabled: false           # Cilium already running on this cluster
-        lb:
-          enabled: true
-          blocks:
-            - start: 10.0.42.10
-              stop: 10.0.42.30
+        poolName: my-cluster-pool
+        blocks:
+          - start: 10.0.42.10
+            stop: 10.0.42.30
+        l2Policy:
+          name: default-l2-announcement-policy
+          namespace: kube-system
+          externalIPs: true
+          loadBalancerIPs: true
+  destination:
+    server: https://<cluster-api>:6443
+    namespace: kube-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
 ```
 
-Requirements on the pre-existing Cilium install: `l2announcements` and `externalIPs` enabled for `lb`; the `cilium` GatewayClass present for `gateway`. If those were not set at install time, apply them first (e.g. via `helm upgrade` on the existing Cilium release) — this chart won't flip them for you when `cilium.enabled: false`.
+Prerequisite (whether you installed Cilium via `install/` or out-of-band): `l2announcements.enabled: true` and `externalIPs.enabled: true` on the running Cilium. Defaults in `install/` already set those.
 
-### Fleet — one `ApplicationSet` across many clusters
+### lb values reference
+
+See `lb/values.yaml` / `lb/values.schema.json` for the full contract.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `poolName` | `default-pool` | `CiliumLoadBalancerIPPool` name |
+| `blocks` | `192.168.1.240`–`250` placeholder | IP blocks — **override per cluster**; each entry supports `start`/`stop` or `cidr` |
+| `l2Policy.name` / `namespace` | `default-l2-announcement-policy` / `kube-system` | `CiliumL2AnnouncementPolicy` identity |
+| `l2Policy.externalIPs` / `loadBalancerIPs` | `true` / `true` | L2 announcement flags |
+
+## gateway/
+
+Plain Helm chart that renders a Gateway API `Gateway` (HTTPS terminate + HTTP listener). Same shape as `lb/` — consumer `Application` IS the outer wrapper.
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium-gateway
+  namespace: argocd
+spec:
+  project: my-cluster
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: infra/cilium/gateway
+    helm:
+      values: |
+        name: cilium-gateway
+        namespace: default
+        gatewayClassName: cilium
+        hostname: "*.my-cluster.example.com"
+        tlsSecretName: my-cluster-gateway-tls
+  destination:
+    server: https://<cluster-api>:6443
+    namespace: default
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+```
+
+Prerequisite: the `cilium` GatewayClass must exist (`gatewayAPI.enabled: true` in `install/`, or the equivalent on your out-of-band Cilium install).
+
+### gateway values reference
+
+See `gateway/values.yaml` / `gateway/values.schema.json` for the full contract.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `name` | `cilium-gateway` | `Gateway` name |
+| `namespace` | `default` | `Gateway` namespace |
+| `gatewayClassName` | `cilium` | `GatewayClass` to bind |
+| `hostname` | `*.example.com` | Listener hostname — **override per cluster** |
+| `tlsSecretName` | `cilium-gateway-tls` | TLS Secret for the HTTPS listener |
+
+## Fleet — one `ApplicationSet` per piece
+
+Because each entry is a self-contained chart, fleet mode is one `ApplicationSet` per piece. Install Cilium everywhere a cluster has `install/cilium: "true"`, and layer `lb`/`gateway` with their own label selectors — the pieces are orthogonal.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -116,62 +195,33 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
-        path: infra/cilium/chart
+        path: infra/cilium/install
         helm:
           values: |
             project: {{ .name }}
             destination:
               server: {{ .server }}
+              namespace: kube-system
       destination: { server: https://kubernetes.default.svc, namespace: argocd }
       syncPolicy:
         automated: { prune: true, selfHeal: true }
         syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Label ArgoCD cluster Secrets with `install/cilium: "true"`. Fleet-wide opt-ins (`lb.enabled`, `gateway.enabled`) stay off — flip them per cluster with a dedicated Application (as above), because ApplicationSet Go-template output is always a string and would fail the schema's `boolean` type on those keys.
-
-## Values reference
-
-See `chart/values.yaml` for defaults and `chart/values.schema.json` for the full JSON Schema. Invalid overrides (unknown keys, wrong types, missing required fields when a feature is enabled) fail the sync loudly.
-
-| Key | Default | Purpose |
-|---|---|---|
-| `project` | `default` | ArgoCD AppProject for the rendered Applications |
-| `destination.server` | `https://kubernetes.default.svc` | Target workload cluster — shared by all rendered Applications |
-| `cilium.enabled` | `true` | Install the upstream Cilium Helm chart. Set `false` when Cilium is already running |
-| `cilium.namespace` | `kube-system` | Namespace for the Cilium install |
-| `cilium.chartVersion` | `1.18.5` | Upstream Cilium Helm chart version |
-| `cilium.k8s.serviceHost` / `servicePort` | `""` / `6443` | Cluster API endpoint for `kubeProxyReplacement` |
-| `cilium.kubeProxyReplacement` | `true` | Cilium replaces kube-proxy |
-| `cilium.operatorReplicas` | `1` | `cilium-operator` replicas |
-| `cilium.gatewayAPI.enabled` | `true` | Enables the `cilium` GatewayClass |
-| `cilium.l2announcements.enabled` | `true` | L2 announcements for LoadBalancer IPs |
-| `cilium.externalIPs.enabled` | `true` | Allow externalIPs on Services |
-| `cilium.extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
-| `lb.enabled` | `false` | Render `CiliumLoadBalancerIPPool` + `CiliumL2AnnouncementPolicy` |
-| `lb.poolName` | `default-pool` | Pool name |
-| `lb.blocks` | `192.168.1.240`–`250` placeholder | IP blocks — **override per cluster** |
-| `lb.l2Policy.*` | `default-l2-announcement-policy` in `kube-system`, both enabled | L2 policy config |
-| `gateway.enabled` | `false` | Render Gateway API `Gateway` |
-| `gateway.name` / `namespace` | `cilium-gateway` / `default` | Gateway identity |
-| `gateway.gatewayClassName` | `cilium` | GatewayClass to bind |
-| `gateway.hostname` | `*.example.com` | Listener hostname — **override per cluster** |
-| `gateway.tlsSecretName` | `cilium-gateway-tls` | TLS Secret for the HTTPS listener |
-| `syncPolicy` | automated + retry | Applied to every rendered Application |
+Analogous `ApplicationSet`s can target `path: infra/cilium/lb` with selector `install/cilium-lb: "true"` and `path: infra/cilium/gateway` with `install/cilium-gateway: "true"` — each takes its own cluster-specific values (IP blocks, hostname, TLS secret) and doesn't know or care about the others.
 
 ## Migrating from the previous kustomize layout
 
-If you were consuming the old three-entry layout (`infra/cilium/chart`, `infra/cilium/lb`, `infra/cilium/gateway`) via a Kustomize overlay with JSON patches: replace all three with a single `Application` (example above). The overlay's patches map to values as follows:
+If you were consuming the old three-entry kustomize layout (`infra/cilium/chart`, `infra/cilium/lb`, `infra/cilium/gateway` each with `application.yaml` + `kustomization.yaml`) via an overlay with JSON patches: replace each patched Application with one `Application` pointing at the new chart. Mapping:
 
-| Old target / patch | New value |
+| Old | New |
 |---|---|
-| `Application cilium` → `/spec/project` / `/spec/destination/server` | `project` / `destination.server` |
-| Inline `valuesObject` on the old cilium Application | first-class values under `cilium.*` (`cilium.kubeProxyReplacement`, `cilium.gatewayAPI.enabled`, `cilium.l2announcements.enabled`, `cilium.externalIPs.enabled`, `cilium.k8s.*`, `cilium.operatorReplicas`) or `cilium.extraValues.<path>` |
-| `infra/cilium/lb/manifests/cilium-config.yaml` (raw IP pool + L2 policy) | `lb.enabled: true` + `lb.blocks` / `lb.poolName` / `lb.l2Policy.*` |
-| `infra/cilium/gateway/manifests/gateway.yaml` (raw Gateway) | `gateway.enabled: true` + `gateway.hostname` / `gateway.tlsSecretName` / `gateway.name` / `gateway.namespace` |
+| `infra/cilium/chart` (kustomize dir, Application inlined) | `infra/cilium/install` (Helm chart; consumer Application passes `helm.values`) |
+| `infra/cilium/lb` (raw manifests, patched per cluster) | `infra/cilium/lb` (Helm chart; blocks / pool / policy are values) |
+| `infra/cilium/gateway` (raw manifests, patched per cluster) | `infra/cilium/gateway` (Helm chart; hostname / TLS secret / name / namespace are values) |
 
-No more raw-manifest patching for the IP range or the Gateway hostname — both are values now.
+No more raw-manifest patching — every per-cluster knob is a value, enforced by each chart's `values.schema.json`.
 
 ## Related
 
-- Flux equivalent: [`stuttgart-things/flux` — `infra/cilium`](https://github.com/stuttgart-things/flux/tree/main/infra/cilium)
+- Flux equivalent: [`stuttgart-things/flux` — `infra/cilium`](https://github.com/stuttgart-things/flux/tree/main/infra/cilium) — this catalog's `install/` `lb/` `gateway/` are the ArgoCD analogs of Flux's `components/install`, `components/lb`, `components/gateway`.
