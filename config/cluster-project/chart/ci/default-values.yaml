@@ -1,0 +1,9 @@
+---
+# CI fixture for `dagger call helm kubeconform` / helm template rendering.
+# Provides fake-but-schema-valid values for the `required` fields so the
+# chart renders without an ApplicationSet generator supplying them.
+# Not used at deploy time.
+cluster:
+  name: ci-fixture
+  server: https://kubernetes.default.svc
+tier: dev

@@ -1,0 +1,34 @@
+---
+name: Verify Helm Charts
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        chart:
+          - apps/headlamp/chart
+          - apps/minio/chart
+          - cicd/argo-rollouts/httproutes
+          - cicd/argo-rollouts/install
+          - config/cluster-project/chart
+          - infra/cert-manager/cluster-ca
+          - infra/cert-manager/install
+          - infra/cert-manager/selfsigned
+          - infra/cilium/gateway
+          - infra/cilium/install
+          - infra/cilium/lb
+          - infra/nfs-csi/install
+          - infra/nfs-csi/storageclasses
+          - infra/openebs/chart
+          - infra/trust-manager/bundle
+          - infra/trust-manager/install
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-helm-verify.yaml@main
+    with:
+      chart-path: ${{ matrix.chart }}
+    secrets: inherit
