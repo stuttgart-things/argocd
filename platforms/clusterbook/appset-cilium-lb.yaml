@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cilium-lb-clusterbook
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+  template:
+    metadata:
+      name: cilium-lb-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        name: '{{ .name }}'
+        namespace: kube-system
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/cilium/lb
+        helm:
+          valuesObject:
+            poolName: '{{ .name }}-pool'
+            blocks:
+              - start: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/ip" }}'
+                stop: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/ip" }}'
+            l2Policy:
+              name: default-l2-announcement-policy
+              namespace: kube-system
+              externalIPs: true
+              loadBalancerIPs: true
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true

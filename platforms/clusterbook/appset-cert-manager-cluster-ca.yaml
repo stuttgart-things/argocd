@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cert-manager-cluster-ca-clusterbook
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+  template:
+    metadata:
+      name: cert-manager-cluster-ca-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        name: '{{ .name }}'
+        namespace: cert-manager
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/cert-manager/cluster-ca
+        helm:
+          valuesObject:
+            ca:
+              name: cluster-ca
+              namespace: cert-manager
+              secretName: cluster-ca-secret
+              issuerRef:
+                kind: ClusterIssuer
+                name: selfsigned
+            wildcard:
+              enabled: true
+              name: '{{ .name }}-gateway-tls'
+              namespace: default
+              secretName: '{{ .name }}-gateway-tls'
+              commonName: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" }}'
+              dnsNames:
+                - '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" }}'
+              duration: 2160h
+              renewBefore: 360h
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true
