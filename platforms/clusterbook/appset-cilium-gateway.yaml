@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cilium-gateway-clusterbook
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchExpressions:
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+  template:
+    metadata:
+      name: cilium-gateway-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "3"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        name: '{{ .name }}'
+        namespace: default
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/cilium/gateway
+        helm:
+          valuesObject:
+            name: '{{ .name }}-gateway'
+            namespace: default
+            gatewayClassName: cilium
+            hostname: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" }}'
+            tlsSecretName: '{{ .name }}-gateway-tls'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true
