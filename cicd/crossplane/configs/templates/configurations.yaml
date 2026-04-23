@@ -1,0 +1,9 @@
+{{- range .Values.configurations }}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: {{ .name | quote }}
+spec:
+  package: {{ .package | quote }}
+{{- end }}

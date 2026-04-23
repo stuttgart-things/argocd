@@ -1,0 +1,45 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: crossplane-system
+
+# Upstream crossplane/crossplane Helm chart version.
+chartVersion: "2.2.0"
+
+# Crossplane runtime args. `--enable-usages` exposes the Usage API.
+args:
+  - "--debug"
+  - "--enable-usages"
+
+# Provider packages installed alongside Crossplane. Each entry is a full
+# xpkg reference including tag.
+providerPackages:
+  - xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
+  - xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1
+  - xpkg.upbound.io/upbound/provider-opentofu:v1.1.0
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed above (resources, nodeSelector, image
+# pinning, registryCaBundleConfig, etc.).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+# sync-wave: -10 so Crossplane CRDs (Provider, Function, Configuration, etc.)
+# land before dependent CRs in functions/ and configs/.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

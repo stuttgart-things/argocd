@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "crossplane-configs chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["configurations"],
+  "properties": {
+    "configurations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "package"],
+        "properties": {
+          "name":    { "type": "string", "minLength": 1 },
+          "package": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

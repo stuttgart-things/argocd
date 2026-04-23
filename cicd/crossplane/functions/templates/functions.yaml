@@ -1,0 +1,9 @@
+{{- range .Values.functions }}
+---
+apiVersion: {{ .apiVersion | default "pkg.crossplane.io/v1beta1" }}
+kind: Function
+metadata:
+  name: {{ .name | quote }}
+spec:
+  package: {{ .package | quote }}
+{{- end }}

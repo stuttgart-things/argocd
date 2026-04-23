@@ -1,0 +1,22 @@
+---
+# Crossplane Configuration packages to install.
+#
+# Each entry:
+#   name:    Configuration resource name
+#   package: full xpkg reference including tag
+#
+# Defaults cover the stuttgart-things Configuration stack published to
+# ghcr.io/stuttgart-things/crossplane.
+configurations:
+  - name: cloud-config
+    package: ghcr.io/stuttgart-things/crossplane/cloud-config:v0.5.1
+  - name: volume-claim
+    package: ghcr.io/stuttgart-things/crossplane/volume-claim:v0.1.1
+  - name: storage-platform
+    package: ghcr.io/stuttgart-things/crossplane/storage-platform:v0.6.0
+  - name: ansible-run
+    package: ghcr.io/stuttgart-things/crossplane/ansible-run:v12.0.0
+  - name: pipeline-integration
+    package: ghcr.io/stuttgart-things/crossplane/pipeline-integration:v0.1.2
+  - name: harvester-vm
+    package: ghcr.io/stuttgart-things/crossplane/harvester-vm:v0.3.3
