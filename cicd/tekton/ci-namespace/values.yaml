@@ -1,0 +1,13 @@
+---
+# List of namespaces to render. Each gets the
+# `operator.tekton.dev/prune.skip: "true"` annotation so PipelineRuns in
+# the namespace are exempt from the global Operator pruner (useful when
+# runs are managed externally, e.g. by Crossplane's provider-kubernetes,
+# to avoid a delete/recreate loop).
+#
+# Each entry:
+#   name:        Namespace name
+#   annotations: optional extra annotations (merged with the prune.skip default)
+#   labels:      optional labels
+namespaces:
+  - name: tekton-ci

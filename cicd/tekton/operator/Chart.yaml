@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: tekton-operator
+description: App-of-apps chart packaging the upstream Tekton Operator manifests (directory source)
+type: application
+version: 0.1.0

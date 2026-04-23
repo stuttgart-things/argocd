@@ -1,0 +1,16 @@
+{{- $computed := dict
+    "targetNamespace" .Values.targetNamespace
+    "profile" .Values.profile
+    "pipeline" (dict
+        "enable-api-fields"   .Values.pipeline.enableApiFields
+        "disable-inline-spec" .Values.pipeline.disableInlineSpec)
+}}
+{{- $extra := .Values.extraSpec | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+  {{- toYaml $merged | nindent 2 }}

@@ -1,0 +1,15 @@
+{{- range .Values.namespaces }}
+{{- $defaultAnnotations := dict "operator.tekton.dev/prune.skip" "true" }}
+{{- $merged := mergeOverwrite $defaultAnnotations (deepCopy (.annotations | default dict)) }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name | quote }}
+  annotations:
+    {{- toYaml $merged | nindent 4 }}
+  {{- with .labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

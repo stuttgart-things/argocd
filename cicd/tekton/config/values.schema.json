@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "tekton-config chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "profile", "targetNamespace", "pipeline"],
+  "properties": {
+    "name":            { "type": "string", "minLength": 1 },
+    "profile":         { "type": "string", "enum": ["lite", "basic", "all"] },
+    "targetNamespace": { "type": "string", "minLength": 1 },
+    "pipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enableApiFields":   { "type": "string", "enum": ["alpha", "beta", "stable"] },
+        "disableInlineSpec": { "type": "string" }
+      },
+      "required": ["enableApiFields", "disableInlineSpec"]
+    },
+    "extraSpec": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,25 @@
+---
+# TektonConfig resource name. `config` is the Operator's expected singleton name.
+name: config
+
+# Which Tekton components the Operator installs. `all` covers Pipelines,
+# Triggers, Dashboard, Chains, Results, etc. See:
+# https://tekton.dev/docs/operator/tektonconfig/#profile
+profile: all
+
+# Namespace where the Operator installs the Tekton components.
+targetNamespace: tekton-pipelines
+
+# Pipeline runtime flags.
+pipeline:
+  # alpha / beta / stable — `beta` enables stable + beta API fields
+  # (e.g. StepActions, v1 TaskRun inline specs).
+  enableApiFields: beta
+  # Blocks `spec.taskSpec` / `pipelineSpec` inline usage when set to
+  # "false" or "true". Empty string ("") = operator default.
+  disableInlineSpec: ""
+
+# Deep-merged onto the rendered TektonConfig.spec. Use for any Operator
+# setting not exposed as a first-class value above (addon params, pruner,
+# dashboard, hub, chains config, etc.).
+extraSpec: {}
