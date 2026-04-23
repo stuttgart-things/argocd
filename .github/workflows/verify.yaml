@@ -7,27 +7,28 @@ on:
       - main
 
 jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      charts: ${{ steps.find.outputs.charts }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        name: Find all Chart.yaml directories
+        run: |
+          charts=$(find apps cicd config infra -name Chart.yaml -printf '%h\n' \
+            | sort \
+            | jq -R -s -c 'split("\n") | map(select(length>0))')
+          echo "charts=${charts}" >> "$GITHUB_OUTPUT"
+          echo "Discovered charts:"
+          echo "${charts}" | jq -r '.[]'
+
   verify:
+    needs: discover
     strategy:
       fail-fast: false
       matrix:
-        chart:
-          - apps/headlamp/chart
-          - apps/minio/chart
-          - cicd/argo-rollouts/httproutes
-          - cicd/argo-rollouts/install
-          - config/cluster-project/chart
-          - infra/cert-manager/cluster-ca
-          - infra/cert-manager/install
-          - infra/cert-manager/selfsigned
-          - infra/cilium/gateway
-          - infra/cilium/install
-          - infra/cilium/lb
-          - infra/nfs-csi/install
-          - infra/nfs-csi/storageclasses
-          - infra/openebs/chart
-          - infra/trust-manager/bundle
-          - infra/trust-manager/install
+        chart: ${{ fromJson(needs.discover.outputs.charts) }}
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-helm-verify.yaml@main
     with:
       chart-path: ${{ matrix.chart }}
