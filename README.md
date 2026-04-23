@@ -1,4 +1,4 @@
-# argocd
+# stuttgart-things/argocd
 
 Platform catalog for **Argo CD**. Curated, versioned `Application` building blocks that cluster repos compose into their own GitOps stack via Kustomize remote bases.
 
