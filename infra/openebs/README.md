@@ -1,6 +1,6 @@
 # infra/openebs
 
-Catalog entry for the [OpenEBS](https://openebs.io/) storage stack. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `infra/openebs/chart`, pass overrides via `helm.valuesObject`, and the chart renders the child `Application` that installs the OpenEBS umbrella chart with an opinionated minimal configuration.
+Catalog entry for the [OpenEBS](https://openebs.io/) storage stack. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `infra/openebs/install`, pass overrides via `helm.valuesObject`, and the chart renders the child `Application` that installs the OpenEBS umbrella chart with an opinionated minimal configuration.
 
 local-PV hostpath (the default engine) is on out-of-the-box via the upstream chart. Optional components (`loki`, `alloy`, `volumeSnapshots`, `preUpgradeHook`) and the extra storage engines (`local.lvm`, `local.zfs`, `replicated.mayastor`) are **off** by default — opt in per cluster via values.
 
@@ -8,7 +8,7 @@ local-PV hostpath (the default engine) is on out-of-the-box via the upstream cha
 
 ```
 infra/openebs/
-└── chart/                          app-of-apps Helm chart (what consumers point at)
+└── install/                        app-of-apps Helm chart (what consumers point at)
     ├── Chart.yaml
     ├── values.yaml
     ├── values.schema.json
@@ -31,7 +31,7 @@ spec:
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
     targetRevision: main
-    path: infra/openebs/chart
+    path: infra/openebs/install
     helm:
       values: |
         project: my-cluster
@@ -78,7 +78,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
-        path: infra/openebs/chart
+        path: infra/openebs/install
         helm:
           values: |
             project: {{name}}
@@ -100,7 +100,7 @@ Label ArgoCD cluster Secrets with `openebs: enabled`. Mayastor (a boolean chart 
 
 ## Values reference
 
-See `chart/values.yaml` for defaults and `chart/values.schema.json` for the full JSON Schema. Invalid overrides (unknown keys, wrong types, missing required fields) fail the sync loudly.
+See `install/values.yaml` for defaults and `install/values.schema.json` for the full JSON Schema. Invalid overrides (unknown keys, wrong types, missing required fields) fail the sync loudly.
 
 | Key | Default | Purpose |
 |---|---|---|

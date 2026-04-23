@@ -1,11 +1,11 @@
 # openebs (catalog entry test)
 
-End-to-end test for [`infra/openebs/chart`](../../../infra/openebs/) — the app-of-apps Helm chart that wraps the upstream OpenEBS umbrella chart. Two ways to exercise it:
+End-to-end test for [`infra/openebs/install`](../../../infra/openebs/) — the app-of-apps Helm chart that wraps the upstream OpenEBS umbrella chart. Two ways to exercise it:
 
 - **`application.yaml`** — standalone `Application` for a single cluster (quick in-cluster smoke test)
 - **`applicationset.yaml`** — fleet `ApplicationSet` driven by the `install/openebs: "true"` cluster-secret label
 
-Both point at `infra/openebs/chart` at `HEAD`, so updates to the chart on `main` flow through automatically.
+Both point at `infra/openebs/install` at `HEAD`, so updates to the chart on `main` flow through automatically.
 
 ## Quick test — single cluster
 
@@ -71,7 +71,7 @@ spec:
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
     targetRevision: HEAD
-    path: infra/openebs/chart
+    path: infra/openebs/install
     helm:
       values: |
         project: my-cluster

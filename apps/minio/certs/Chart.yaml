@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: minio-certs
+description: cert-manager Certificates for MinIO — driven by values from the parent apps/minio/install
+type: application
+version: 0.1.0
