@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: kro-install
+description: App-of-apps chart packaging the upstream kro OCI Helm chart
+type: application
+version: 0.1.0
+appVersion: "0.9.1"
