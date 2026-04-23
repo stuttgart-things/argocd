@@ -33,3 +33,7 @@ jobs:
     with:
       chart-path: ${{ matrix.chart }}
     secrets: inherit
+
+  validate-schemas:
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-validate-json-schema.yaml@main
+    secrets: inherit
