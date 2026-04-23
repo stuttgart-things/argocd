@@ -33,7 +33,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: HEAD
-        path: infra/openebs/chart
+        path: infra/openebs/install
         helm:
           releaseName: openebs
           values: |

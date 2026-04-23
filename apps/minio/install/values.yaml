@@ -1,6 +1,6 @@
 ---
 # Reference back to this catalog repo — used by the certs + httpRoute Applications
-# to load apps/minio/charts/{certs,httproute} from git.
+# to load apps/minio/{certs,httproute} from git.
 catalog:
   repoURL: https://github.com/stuttgart-things/argocd.git
   targetRevision: HEAD

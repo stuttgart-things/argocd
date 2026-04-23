@@ -1,10 +1,10 @@
-{{- if .Values.httpRoute.enabled }}
-{{- $routesValues := dict
+{{- if .Values.certs.enabled }}
+{{- $certsValues := dict
       "namespace" .Values.destination.namespace
-      "gateway" .Values.httpRoute.gateway
-      "routes" (list
-        (dict "name" "minio-console" "hostname" .Values.console.hostname "backend" (dict "name" "minio" "port" 9001))
-        (dict "name" "minio-api"     "hostname" .Values.api.hostname     "backend" (dict "name" "minio" "port" 9000))
+      "issuer" .Values.certs.issuer
+      "certificates" (list
+        (dict "name" "minio-ingress-console" "commonName" .Values.console.hostname "dnsNames" (list .Values.console.hostname) "secretName" .Values.console.tlsSecret)
+        (dict "name" "minio-ingress-api"     "commonName" .Values.api.hostname     "dnsNames" (list .Values.api.hostname)     "secretName" .Values.api.tlsSecret)
       )
 }}
 {{- $defaultName := printf "minio-%s" (sha1sum .Values.destination.server | trunc 8) }}
@@ -13,20 +13,20 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ printf "%s-httproute" $appName | quote }}
+  name: {{ printf "%s-certs" $appName | quote }}
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   project: {{ .Values.project | quote }}
   source:
     repoURL: {{ .Values.catalog.repoURL | quote }}
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
-    path: apps/minio/charts/httproute
+    path: apps/minio/certs
     helm:
-      releaseName: minio-httproute
+      releaseName: minio-certs
       valuesObject:
-        {{- toYaml $routesValues | nindent 8 }}
+        {{- toYaml $certsValues | nindent 8 }}
   destination:
     server: {{ .Values.destination.server | quote }}
     namespace: {{ .Values.destination.namespace | quote }}

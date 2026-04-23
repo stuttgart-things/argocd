@@ -1,6 +1,6 @@
 # apps/minio
 
-Catalog entry for [MinIO](https://min.io/) object storage via the stuttgart-things opinionated Bitnami-based chart, plus optional cert-manager Certificates and Gateway API HTTPRoutes for the console + S3 API. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/minio/chart`, pass overrides via `helm.values` (or `helm.valuesObject` on Argo CD 2.6+), and the chart renders the three child `Application`s that install MinIO, the Certificates, and the HTTPRoutes.
+Catalog entry for [MinIO](https://min.io/) object storage via the stuttgart-things opinionated Bitnami-based chart, plus optional cert-manager Certificates and Gateway API HTTPRoutes for the console + S3 API. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/minio/install`, pass overrides via `helm.values` (or `helm.valuesObject` on Argo CD 2.6+), and the chart renders the three child `Application`s that install MinIO, the Certificates, and the HTTPRoutes.
 
 Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this entry requires **zero files** in the consumer repo — everything is driven by values on the consumer-side Argo CR.
 
@@ -8,7 +8,7 @@ Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this en
 
 ```
 apps/minio/
-├── chart/                       app-of-apps Helm chart (what consumers point at)
+├── install/                     app-of-apps Helm chart (what consumers point at)
 │   ├── Chart.yaml
 │   ├── values.yaml
 │   ├── values.schema.json
@@ -16,9 +16,8 @@ apps/minio/
 │       ├── minio.yaml           renders Application "minio"            (sync-wave 0)
 │       ├── certs.yaml           renders Application "minio-certs"      (sync-wave -5, gated by certs.enabled)
 │       └── httproute.yaml       renders Application "minio-httproute"  (sync-wave 10, gated by httpRoute.enabled)
-└── charts/                      internal sub-charts rendered by the certs + httproute Applications
-    ├── certs/                   cert-manager Certificates (list-shaped input from parent)
-    └── httproute/               Gateway API HTTPRoutes     (list-shaped input from parent)
+├── certs/                       internal sub-chart — cert-manager Certificates (list-shaped input from parent)
+└── httproute/                   internal sub-chart — Gateway API HTTPRoutes (list-shaped input from parent)
 ```
 
 The two hostnames (`console` + `api`) are first-class values on the parent chart and flow automatically into both the Certificate list and the HTTPRoute list — set them once, get TLS + routing coherent across both Applications.
@@ -72,7 +71,7 @@ spec:
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
     targetRevision: main
-    path: apps/minio/chart
+    path: apps/minio/install
     helm:
       values: |
         catalog:
@@ -136,7 +135,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
-        path: apps/minio/chart
+        path: apps/minio/install
         helm:
           values: |
             catalog:
@@ -198,7 +197,7 @@ extraValues:
 
 ## Values reference
 
-See `chart/values.yaml` for defaults and `chart/values.schema.json` for the full JSON Schema. Invalid overrides fail the sync loudly.
+See `install/values.yaml` for defaults and `install/values.schema.json` for the full JSON Schema. Invalid overrides fail the sync loudly.
 
 | Key | Default | Purpose |
 |---|---|---|

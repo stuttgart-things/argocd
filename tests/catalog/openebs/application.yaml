@@ -1,5 +1,5 @@
 ---
-# Standalone test Application for the apps-of-apps chart at infra/openebs/chart.
+# Standalone test Application for the apps-of-apps chart at infra/openebs/install.
 # Apply directly on the management cluster (the one running Argo CD):
 #   kubectl apply -f tests/catalog/openebs/application.yaml
 #
@@ -20,7 +20,7 @@ spec:
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
     targetRevision: HEAD
-    path: infra/openebs/chart
+    path: infra/openebs/install
     helm:
       releaseName: openebs
       values: |

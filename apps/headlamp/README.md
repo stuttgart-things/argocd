@@ -1,6 +1,6 @@
 # apps/headlamp
 
-Catalog entry for [Headlamp](https://headlamp.dev/) — a general-purpose Kubernetes web UI. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/headlamp/chart`, pass overrides via `helm.values` (or `helm.valuesObject` on Argo CD 2.6+), and the chart renders the real child `Application`s that install Headlamp and optionally its RBAC.
+Catalog entry for [Headlamp](https://headlamp.dev/) — a general-purpose Kubernetes web UI. Packaged as an **app-of-apps Helm chart**: consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `apps/headlamp/install`, pass overrides via `helm.values` (or `helm.valuesObject` on Argo CD 2.6+), and the chart renders the real child `Application`s that install Headlamp and optionally its RBAC.
 
 Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this entry requires **zero files** in the consumer repo — everything is driven by values on the consumer-side Argo CR.
 
@@ -8,7 +8,7 @@ Unlike the kustomize-remote-base pattern used elsewhere in this catalog, this en
 
 ```
 apps/headlamp/
-├── chart/                          app-of-apps Helm chart (what consumers point at)
+├── install/                        app-of-apps Helm chart (what consumers point at)
 │   ├── Chart.yaml
 │   ├── values.yaml
 │   ├── values.schema.json          schema-validated overrides
@@ -47,7 +47,7 @@ spec:
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
     targetRevision: main
-    path: apps/headlamp/chart
+    path: apps/headlamp/install
     helm:
       values: |
         project: my-cluster
@@ -96,7 +96,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
-        path: apps/headlamp/chart
+        path: apps/headlamp/install
         helm:
           values: |
             project: {{name}}
@@ -126,7 +126,7 @@ Label the ArgoCD cluster Secrets with `headlamp: enabled` and `domain: <fqdn>`; 
 
 ## Values reference
 
-See `chart/values.yaml` for defaults and `chart/values.schema.json` for the full JSON Schema. Invalid overrides (unknown keys, wrong types, missing `hostname` when `httpRoute.enabled: true`) fail the sync loudly.
+See `install/values.yaml` for defaults and `install/values.schema.json` for the full JSON Schema. Invalid overrides (unknown keys, wrong types, missing `hostname` when `httpRoute.enabled: true`) fail the sync loudly.
 
 | Key | Default | Purpose |
 |---|---|---|
