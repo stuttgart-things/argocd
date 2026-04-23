@@ -1,0 +1,33 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: tekton-operator
+
+# Source for the vendored Tekton Operator manifests. The rendered Application
+# uses a `directory:` source — the manifests (~1500 lines of upstream YAML)
+# live in the Flux repo to avoid duplicating across repos.
+source:
+  repoURL: https://github.com/stuttgart-things/flux.git
+  targetRevision: HEAD
+  path: cicd/tekton/components/operator
+
+# Sync policy applied to the rendered Application.
+# sync-wave: -10 so the Operator CRDs register before dependent CRs
+# (TektonConfig, etc.) in other sub-entries.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

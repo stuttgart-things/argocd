@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: tekton-ci-namespace
+description: Renders one or more namespaces annotated to skip the Tekton Operator pruner
+type: application
+version: 0.1.0

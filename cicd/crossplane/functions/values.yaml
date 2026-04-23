@@ -1,0 +1,21 @@
+---
+# Crossplane Composition Functions to install.
+#
+# Each entry:
+#   name:       Function resource name
+#   package:    full xpkg reference including tag
+#   apiVersion: optional — defaults to pkg.crossplane.io/v1beta1. Pin to
+#               pkg.crossplane.io/v1 for Functions already promoted to GA
+#               (e.g. function-kcl).
+#
+# Defaults cover the stuttgart-things opinionated stack for most Compositions.
+functions:
+  - name: function-auto-ready
+    package: xpkg.crossplane.io/crossplane-contrib/function-auto-ready:v0.6.0
+  - name: function-go-templating
+    package: xpkg.crossplane.io/crossplane-contrib/function-go-templating:v0.11.3
+  - name: function-kcl
+    apiVersion: pkg.crossplane.io/v1
+    package: xpkg.upbound.io/crossplane-contrib/function-kcl:v0.12.0
+  - name: function-patch-and-transform
+    package: xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.9.3

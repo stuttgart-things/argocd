@@ -1,0 +1,36 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: kro-system
+
+# Upstream kro OCI Helm chart version (registry.k8s.io/kro/charts/kro).
+chartVersion: "0.9.1"
+
+# Deep-merged on top of the valuesObject passed to the upstream chart.
+# Use for any upstream key (image pinning, resources, etc.).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+# `Replace=true` is required — kro ships its own CRDs in the chart and the
+# upstream HelmRelease equivalent uses `install.crds: CreateReplace`. Replace
+# mirrors that behaviour on sync: CRDs are replaced rather than strategically
+# merged, matching kro's release expectations and avoiding field drift on
+# upgrades.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - Replace=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

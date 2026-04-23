@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: tekton-config
+description: Renders the Tekton Operator TektonConfig CR
+type: application
+version: 0.1.0

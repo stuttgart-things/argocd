@@ -1,0 +1,13 @@
+---
+# List of HTTPRoutes to render. Empty by default — consumers declare the routes
+# they actually need, with real hostnames and parentRefs per cluster.
+#
+# Each entry:
+#   name:       HTTPRoute name
+#   namespace:  HTTPRoute namespace (usually `kargo`)
+#   parentRefs: list of Gateway parentRefs; each at minimum { name, namespace }
+#   hostnames:  list of DNS hostnames the route answers to
+#   rules:      raw gateway.networking.k8s.io/v1 HTTPRouteRule list, passed through
+#
+# See README.md for a copy-paste Kargo API route example.
+httpRoutes: []

@@ -1,0 +1,15 @@
+---
+# List of cert-manager Certificates to render. Empty by default — consumers
+# define the Certificates their cluster needs (typically one for the Kargo
+# API hostname, issued by the cluster CA ClusterIssuer).
+#
+# Each entry:
+#   name:       Certificate name
+#   namespace:  Certificate namespace (usually `kargo`)
+#   commonName: CN on the cert (typically same as the first DNS name)
+#   dnsNames:   list of DNS names the cert is valid for
+#   secretName: Secret the issued cert + key are written to
+#   issuerRef:  { name, kind } — typically { cluster-ca, ClusterIssuer }
+#
+# See README.md for a copy-paste Kargo API Certificate example.
+certificates: []

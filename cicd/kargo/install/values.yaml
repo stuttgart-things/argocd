@@ -1,0 +1,64 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: kargo
+
+# Upstream akuity/kargo OCI Helm chart version.
+chartVersion: "1.9.6"
+
+# Kargo API configuration.
+api:
+  # External hostname the API is reached at. Override per cluster. Must match
+  # the httproute/ hostname and the cert Certificate dnsNames.
+  host: kargo.example.com
+  service:
+    type: ClusterIP
+  # TLS terminates at the Gateway / Ingress in front of the API Service —
+  # not inside the Service itself.
+  tls:
+    enabled: false
+  # The chart's own Ingress is disabled in favor of the httproute/ entry.
+  ingress:
+    enabled: false
+  # Admin account credentials. SHIP AS EMPTY PLACEHOLDERS — don't deploy
+  # as-is. See README.md "Credentials" for the three supported injection
+  # patterns (External Secrets / AVP / SOPS overlay).
+  adminAccount:
+    passwordHash: ""     # pragma: allowlist secret
+    tokenSigningKey: ""  # pragma: allowlist secret
+    tokenTTL: 24h
+
+# Controller + GC log levels (DEBUG / INFO / WARN / ERROR).
+controller:
+  logLevel: INFO
+garbageCollector:
+  logLevel: INFO
+
+# Webhook server bootstraps TLS via its own self-signed cert, not cert-manager.
+webhooksServer:
+  tls:
+    selfSignedCert: true
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above (resources,
+# nodeSelector, image pinning, extra env, OIDC config, etc.).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

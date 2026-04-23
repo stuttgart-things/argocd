@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "kargo install app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "minLength": 1 },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] }
+          },
+          "required": ["type"]
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "enabled": { "type": "boolean" } },
+          "required": ["enabled"]
+        },
+        "ingress": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": { "enabled": { "type": "boolean" } },
+          "required": ["enabled"]
+        },
+        "adminAccount": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "passwordHash":    { "type": "string" },
+            "tokenSigningKey": { "type": "string" },
+            "tokenTTL":        { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "required": ["host"]
+    },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logLevel": { "type": "string", "enum": ["DEBUG", "INFO", "WARN", "ERROR"] }
+      },
+      "required": ["logLevel"]
+    },
+    "garbageCollector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logLevel": { "type": "string", "enum": ["DEBUG", "INFO", "WARN", "ERROR"] }
+      },
+      "required": ["logLevel"]
+    },
+    "webhooksServer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "selfSignedCert": { "type": "boolean" } },
+          "required": ["selfSignedCert"]
+        }
+      },
+      "required": ["tls"]
+    },
+    "extraValues": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
