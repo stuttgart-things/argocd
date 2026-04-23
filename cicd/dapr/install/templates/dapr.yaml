@@ -1,0 +1,36 @@
+{{- $computed := dict
+    "global" (dict
+        "ha"        (dict "enabled" .Values.global.ha.enabled)
+        "logAsJson" .Values.global.logAsJson)
+    "dapr_operator"         (dict "logLevel" .Values.logLevel.operator)
+    "dapr_placement"        (dict "logLevel" .Values.logLevel.placement)
+    "dapr_sidecar_injector" (dict "logLevel" .Values.logLevel.sidecarInjector)
+    "dapr_scheduler"        (dict "logLevel" .Values.logLevel.scheduler)
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+{{- $defaultName := printf "dapr-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://dapr.github.io/helm-charts/
+    chart: dapr
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: dapr
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

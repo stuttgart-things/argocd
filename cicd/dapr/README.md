@@ -1,15 +1,20 @@
 # cicd/dapr
 
-Catalog entry for the [Dapr](https://dapr.io) control-plane — installs the upstream Helm chart from `https://dapr.github.io/helm-charts/` so the runtime (operator, placement, scheduler, sentry, sidecar injector) is available to inject sidecars into workloads.
+Catalog entry for the [Dapr](https://dapr.io) control-plane — packaged as an **app-of-apps Helm chart** wrapping the upstream chart at `https://dapr.github.io/helm-charts/`. Consumers create one ArgoCD `Application` (or `ApplicationSet`) pointing at `cicd/dapr/install`, pass overrides via `helm.values`, and the chart renders the child `Application` that installs the Dapr runtime (operator, placement, scheduler, sentry, sidecar injector).
 
 Placed in `cicd/` because Dapr is primarily used here as a CI/CD-adjacent workflow engine (Backstage template workers, Argo Rollouts glue, etc.), not as a user-facing app.
 
-## Files
+## Layout
 
-| File | Purpose |
-|---|---|
-| `application.yaml` | Child `Application`: Dapr Helm chart pin (`1.17.4`) + `dapr-system` destination placeholder + sync policy. |
-| `kustomization.yaml` | Kustomize base that includes `application.yaml`. |
+```
+cicd/dapr/
+└── install/                        app-of-apps Helm chart
+    ├── Chart.yaml
+    ├── values.yaml
+    ├── values.schema.json          schema-validated overrides
+    └── templates/
+        └── dapr.yaml               renders Application "dapr" (sync-wave 0)
+```
 
 ## Opinionated defaults
 
@@ -19,50 +24,95 @@ Mirrors the Flux module (`flux/apps/dapr/components/control-plane`):
 |---|---|
 | `global.ha.enabled` | `false` — single-replica control-plane; override to `true` for production (3 replicas per component) |
 | `global.logAsJson` | `true` — structured logs |
-| `dapr_operator.logLevel` / `dapr_placement.logLevel` / `dapr_sidecar_injector.logLevel` / `dapr_scheduler.logLevel` | `info` |
+| `logLevel.operator` / `logLevel.placement` / `logLevel.sidecarInjector` / `logLevel.scheduler` | `info` |
 
 ## Consumer usage
 
-Minimal — point a root `Application` at this directory:
+### Single cluster — one `Application`
 
 ```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dapr
+  namespace: argocd
 spec:
+  project: my-cluster
   source:
     repoURL: https://github.com/stuttgart-things/argocd.git
-    targetRevision: HEAD
-    path: cicd/dapr
+    targetRevision: main
+    path: cicd/dapr/install
+    helm:
+      values: |
+        project: my-cluster
+        destination:
+          server: https://<cluster-api>:6443
+          namespace: dapr-system
+        global:
+          ha:
+            enabled: true
+          logAsJson: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-### Overriding destination cluster
+The outer `destination.server` is the **management cluster** (where the rendered child Application CR lives). The inner `destination.server` in values is the **workload cluster** where Dapr installs.
 
-Consumer cluster repo creates an overlay dir (e.g. `clusters/<cluster>/argocd/dapr/`) with a `kustomization.yaml` pulling this path as a remote base and patching the child Application's `project` + `destination.server`:
+### Fleet — one `ApplicationSet` across many clusters
 
 ```yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - https://github.com/stuttgart-things/argocd.git/cicd/dapr?ref=main
-patches:
-  - target: { kind: Application, name: dapr }
-    patch: |-
-      - op: replace
-        path: /spec/project
-        value: <cluster-project>
-      - op: replace
-        path: /spec/destination/server
-        value: https://<cluster-api>:<port>
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: dapr
+  namespace: argocd
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            dapr: enabled
+  template:
+    metadata:
+      name: '{{name}}-dapr'
+    spec:
+      project: '{{name}}'
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: cicd/dapr/install
+        helm:
+          values: |
+            project: {{name}}
+            destination:
+              server: {{server}}
+              namespace: dapr-system
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-### Enabling HA
+## Values reference
 
-```yaml
-patches:
-  - target: { kind: Application, name: dapr }
-    patch: |-
-      - op: replace
-        path: /spec/source/helm/valuesObject/global/ha/enabled
-        value: true
-```
+See `install/values.yaml` for defaults and `install/values.schema.json` for the full JSON Schema.
+
+| Key | Default | Purpose |
+|---|---|---|
+| `project` | `default` | ArgoCD AppProject for the rendered Application |
+| `destination.server` / `namespace` | `https://kubernetes.default.svc` / `dapr-system` | Target workload cluster + namespace |
+| `chartVersion` | `1.17.4` | Upstream Dapr Helm chart version |
+| `global.ha.enabled` | `false` | HA control-plane (3 replicas per component) |
+| `global.logAsJson` | `true` | Structured JSON logs |
+| `logLevel.operator` / `placement` / `sidecarInjector` / `scheduler` | `info` | Per-component log level |
+| `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
+| `syncPolicy` | automated + retry | Applied to the rendered Application |
 
 ## Per-app Dapr Components
 
