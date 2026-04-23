@@ -1,0 +1,38 @@
+{{- $computed := dict
+    "api" (dict
+        "host"         .Values.api.host
+        "service"      .Values.api.service
+        "tls"          .Values.api.tls
+        "ingress"      .Values.api.ingress
+        "adminAccount" .Values.api.adminAccount)
+    "controller"       (dict "logLevel" .Values.controller.logLevel)
+    "garbageCollector" (dict "logLevel" .Values.garbageCollector.logLevel)
+    "webhooksServer"   (dict "tls" (dict "selfSignedCert" .Values.webhooksServer.tls.selfSignedCert))
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+{{- $defaultName := printf "kargo-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: ghcr.io/akuity/kargo-charts
+    chart: kargo
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: kargo
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
