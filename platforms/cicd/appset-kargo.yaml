@@ -46,6 +46,16 @@ spec:
             # "kargo.example.com" on clusters without the annotation.
             api:
               host: 'kargo.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." | default "example.com" }}'
+            # Credentials live in a per-cluster Secret named `kargo-admin` in
+            # the kargo namespace on the target cluster. Keys expected by the
+            # upstream chart: ADMIN_ACCOUNT_PASSWORD_HASH (bcrypt, $2a$ variant)
+            # + ADMIN_ACCOUNT_TOKEN_SIGNING_KEY (32 chars). Routed via
+            # extraValues because the wrapper chart doesn't expose
+            # existingSecret as a first-class value yet.
+            extraValues:
+              api:
+                adminAccount:
+                  existingSecret: kargo-admin
       syncPolicy:
         automated:
           prune: true
