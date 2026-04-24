@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: machinery-httproute
+description: Gateway API HTTPRoute for Machinery — loaded as a sub-Application by apps/machinery/install.
+type: application
+version: 0.1.0

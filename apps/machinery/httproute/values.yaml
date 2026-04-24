@@ -1,0 +1,11 @@
+---
+namespace: machinery
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: machinery
+    hostname: machinery.example.com
+    backend:
+      name: machinery
+      port: 8080

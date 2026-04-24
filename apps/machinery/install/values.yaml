@@ -1,0 +1,49 @@
+---
+# Reference back to this catalog repo — used by the httpRoute Application
+# to load apps/machinery/httproute from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: machinery
+
+# Machinery OCI kustomize base (ghcr.io/stuttgart-things/machinery-kustomize).
+# Argo CD 2.13+ resolves oci:// repoURLs as kustomize sources.
+kustomize:
+  repoURL: ghcr.io/stuttgart-things/machinery-kustomize
+  targetRevision: 1.3.0
+
+# Machinery container image — patched into the Deployment rendered by the base.
+image:
+  repository: ghcr.io/stuttgart-things/machinery
+  tag: 1.3.0
+
+# Gateway API HTTPRoute sub-Application (opt-in).
+# When enabled, the base's KCL-generated HTTPRoute is pruned via $patch: delete.
+httpRoute:
+  enabled: true
+  hostname: machinery.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
