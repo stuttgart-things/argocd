@@ -1,0 +1,11 @@
+---
+namespace: monitoring
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: prometheus
+    hostname: prometheus.example.com
+    backend:
+      name: prometheus-server
+      port: 80
