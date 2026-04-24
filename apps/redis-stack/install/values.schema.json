@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "redis-stack app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion", "image"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "password": { "type": "string" }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registry":   { "type": "string", "minLength": 1 },
+        "repository": { "type": "string", "minLength": 1 },
+        "tag":        { "type": "string", "minLength": 1 }
+      },
+      "required": ["registry", "repository", "tag"]
+    },
+    "sentinel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":       { "type": "boolean" },
+        "masterSet":     { "type": "string", "minLength": 1 },
+        "quorum":        { "type": "integer", "minimum": 1 },
+        "parallelSyncs": { "type": "integer", "minimum": 1 },
+        "serviceType":   { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry":   { "type": "string", "minLength": 1 },
+            "repository": { "type": "string", "minLength": 1 },
+            "tag":        { "type": "string", "minLength": 1 }
+          },
+          "required": ["registry", "repository", "tag"]
+        }
+      },
+      "required": ["enabled"]
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "storageClass": { "type": "string", "minLength": 1 },
+        "size":         { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" }
+      },
+      "required": ["enabled"]
+    },
+    "replicaCount": { "type": "integer", "minimum": 0 },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed valuesObject passed to the upstream chart.",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

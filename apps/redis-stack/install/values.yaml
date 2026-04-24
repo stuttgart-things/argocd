@@ -1,0 +1,63 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: redis-stack
+
+# Upstream stuttgart-things/redis Helm chart (OCI: ghcr.io/stuttgart-things/charts/redis).
+chartVersion: 17.1.4
+
+# Root Redis password. Leave empty and override per-cluster via an ArgoCD Vault Plugin
+# / SOPS overlay. Never inline the literal in values checked into git.
+auth:
+  password: ""                      # pragma: allowlist secret
+
+# Redis container image — defaults to the stuttgart-things redis-stack-server mirror
+# which bundles RediSearch/RedisJSON/RedisTimeSeries/RedisBloom.
+image:
+  registry: ghcr.io
+  repository: stuttgart-things/redis-stack-server
+  tag: 7.2.0-v18
+
+# Sentinel sidecar — enabled by default so the cluster runs in HA mode.
+sentinel:
+  enabled: true
+  masterSet: mymaster
+  quorum: 1
+  parallelSyncs: 1
+  serviceType: ClusterIP
+  image:
+    registry: ghcr.io
+    repository: stuttgart-things/redis-sentinel
+    tag: 7.4.2-debian-12-r9
+
+# Persistence — shared by master + replica StatefulSets.
+persistence:
+  enabled: true
+  storageClass: standard
+  size: 8Gi
+
+# Replica count for the replica StatefulSet.
+replicaCount: 1
+
+# Deep-merged on top of the computed valuesObject passed to the upstream redis chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
