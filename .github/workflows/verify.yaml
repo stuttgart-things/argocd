@@ -67,3 +67,9 @@ jobs:
   validate-schemas:
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-validate-json-schema.yaml@main
     secrets: inherit
+
+  verify-catalog:
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-argocd-verify-catalog.yaml@main
+    with:
+      src: .
+    secrets: inherit
