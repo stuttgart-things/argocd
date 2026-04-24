@@ -8,4 +8,5 @@ resources:
   - appset-argo-rollouts.yaml
   - appset-crossplane.yaml
   - appset-kargo.yaml
+  - appset-kargo-httproute.yaml
   - appset-tekton.yaml

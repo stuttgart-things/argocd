@@ -1,0 +1,73 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kargo-httproute-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            # Inherit the kargo opt-out: switching kargo off on a cluster
+            # should also switch off its HTTPRoute.
+            - key: cicd-platform/kargo
+              operator: NotIn
+              values: ["false"]
+            # Only clusterbook-registered clusters have the Gateway and the
+            # `<cluster>-gateway-tls` wildcard Certificate this HTTPRoute
+            # depends on. Non-clusterbook clusters would need their own
+            # Gateway convention — skip them here.
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+  template:
+    metadata:
+      name: kargo-httproute-{{ .name }}
+      annotations:
+        # Informational — top-level Applications don't order across appsets.
+        # Retry on kargo-httproute-<cluster> handles the race if the kargo
+        # namespace / Service isn't ready yet.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      # Leaf chart — emits HTTPRoute CRs directly, so destination IS the
+      # workload cluster (not the mgmt cluster's argocd namespace).
+      destination:
+        name: '{{ .name }}'
+        namespace: kargo
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: cicd/kargo/httproute
+        helm:
+          valuesObject:
+            httpRoutes:
+              - name: kargo
+                namespace: kargo
+                parentRefs:
+                  - name: '{{ .name }}-gateway'
+                    namespace: default
+                hostnames:
+                  - 'kargo.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+                rules:
+                  - backendRefs:
+                      - name: kargo-api
+                        port: 443
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true
