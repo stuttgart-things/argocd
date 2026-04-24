@@ -38,6 +38,14 @@ spec:
             destination:
               server: '{{ .server }}'
               namespace: kargo
+            # Derive external hostname from the cluster's clusterbook FQDN
+            # annotation (e.g. "*.philly.sthings-vsphere.labul.sva.de" →
+            # "kargo.philly.sthings-vsphere.labul.sva.de"). Must match the
+            # HTTPRoute hostname + certificate SAN — kargo's API performs a
+            # cookie Host check against this. Falls back to the chart default
+            # "kargo.example.com" on clusters without the annotation.
+            api:
+              host: 'kargo.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." | default "example.com" }}'
       syncPolicy:
         automated:
           prune: true
