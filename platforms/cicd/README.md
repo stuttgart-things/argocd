@@ -45,6 +45,44 @@ kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/cicd?r
 
 `application.yaml` is intentionally **not** listed in `kustomization.yaml` — the bootstrap Application must not manage itself.
 
+## Per-cluster prerequisites
+
+Some components need Secrets that can't live in Git. Create these on the target cluster **before** or **just after** enrolling it — missing ones leave the corresponding inner Application stuck in `ComparisonError` / `SyncFailed`.
+
+### `kargo-admin` (required when enrolling kargo)
+
+The upstream kargo chart refuses to render without an admin password hash + token signing key. This platform points it at an `existingSecret` named `kargo-admin` in the `kargo` namespace; you create that Secret per cluster.
+
+**Keys the Secret must carry:**
+
+| Key                              | Format                                                         |
+|---|---|
+| `ADMIN_ACCOUNT_PASSWORD_HASH`     | bcrypt, `$2a$` variant (NOT `$2y$`)                            |
+| `ADMIN_ACCOUNT_TOKEN_SIGNING_KEY` | random, 32 chars                                                |
+
+**Minimal recipe (kubectl against the target cluster):**
+
+```bash
+# bcrypt the admin password — use htpasswd, or python3 -c "import bcrypt; ..."
+PASSWORD_HASH=$(htpasswd -bnBC 10 "" '<your-password>' | tr -d ':\n' | sed 's/$2y/$2a/')
+TOKEN_SIGNING_KEY=$(openssl rand -base64 29 | tr -d '=+/' | head -c 32)
+
+kubectl create namespace kargo --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n kargo create secret generic kargo-admin \
+  --from-literal=ADMIN_ACCOUNT_PASSWORD_HASH="$PASSWORD_HASH" \
+  --from-literal=ADMIN_ACCOUNT_TOKEN_SIGNING_KEY="$TOKEN_SIGNING_KEY"
+```
+
+Python bcrypt fallback if `htpasswd` isn't available:
+
+```bash
+PASSWORD_HASH=$(python3 -c 'import bcrypt; print(bcrypt.hashpw(b"<your-password>", bcrypt.gensalt(rounds=10)).decode().replace("$2b$","$2a$"))')
+```
+
+**For prod / multi-cluster fleets**, replace `kubectl` with External Secrets Operator (syncs from Vault / AWS / GCP Secret Manager), Argo CD Vault Plugin, or a SOPS-encrypted overlay — whichever your threat model calls for. The appset stays the same; only *how* `kargo-admin` gets onto the cluster changes.
+
+**Rotation:** replace the Secret and `kubectl -n kargo rollout restart deploy kargo-api`. The Secret is only read at pod start.
+
 ## Per-cluster opt-out
 
 Default behaviour: labelling a cluster with `cicd-platform: "true"` enrols it in **all** three components. To skip a single component on a specific cluster, add a per-component label on that cluster's `Secret` in the `argocd` namespace:
