@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: clusterbook-pdns
+description: PowerDNS token Secret for Clusterbook — loaded as a sub-Application by apps/clusterbook/install.
+type: application
+version: 0.1.0

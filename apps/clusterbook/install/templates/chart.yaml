@@ -1,0 +1,74 @@
+{{- $defaultName := printf "clusterbook-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $envFrom := list
+      (dict "configMapRef" (dict "name" "clusterbook-config"))
+}}
+{{- if .Values.pdns.enabled }}
+  {{- $envFrom = append $envFrom (dict "secretRef" (dict "name" "clusterbook-pdns")) }}
+{{- end }}
+{{- $deployPatch := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" "clusterbook")
+      "spec" (dict "template" (dict "spec" (dict "containers" (list
+        (dict
+          "name" "clusterbook"
+          "image" (printf "%s:%s" .Values.image.repository .Values.image.tag)
+          "envFrom" $envFrom
+        )
+      ))))
+}}
+{{- $cmPatch := dict
+      "apiVersion" "v1"
+      "kind" "ConfigMap"
+      "metadata" (dict "name" "clusterbook-config")
+      "data" (dict
+        "PDNS_ENABLED" (ternary "true" "false" .Values.pdns.enabled)
+        "PDNS_URL"     .Values.pdns.url
+        "PDNS_ZONE"    .Values.pdns.zone
+      )
+}}
+{{- $hrDelete := dict
+      "apiVersion" "gateway.networking.k8s.io/v1"
+      "kind" "HTTPRoute"
+      "metadata" (dict "name" "clusterbook")
+      "$patch" "delete"
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.kustomize.repoURL | quote }}
+    targetRevision: {{ .Values.kustomize.targetRevision | quote }}
+    path: .
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: clusterbook
+          patch: |
+{{ toYaml $deployPatch | indent 12 }}
+        - target:
+            kind: ConfigMap
+            name: clusterbook-config
+          patch: |
+{{ toYaml $cmPatch | indent 12 }}
+        {{- if .Values.httpRoute.enabled }}
+        - target:
+            kind: HTTPRoute
+            name: clusterbook
+          patch: |
+{{ toYaml $hrDelete | indent 12 }}
+        {{- end }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
