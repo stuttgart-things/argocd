@@ -51,7 +51,7 @@ Some components need Secrets that can't live in Git. Create these on the target 
 
 ### `kargo-admin` (required when enrolling kargo)
 
-The upstream kargo chart refuses to render without an admin password hash + token signing key. This platform points it at an `existingSecret` named `kargo-admin` in the `kargo` namespace; you create that Secret per cluster.
+The upstream kargo chart refuses to render without an admin password hash + token signing key. This platform sets `api.secret.name: kargo-admin`, which tells the chart to suppress its own Secret template and consume an existing Secret by that name in the `kargo` namespace. You create that Secret per cluster.
 
 **Keys the Secret must carry:**
 
