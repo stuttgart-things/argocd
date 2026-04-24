@@ -1,0 +1,77 @@
+{{- $defaultName := printf "vault-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $server := dict
+      "image" (dict
+        "registry"   .Values.image.registry
+        "repository" .Values.image.repository
+        "tag"        .Values.image.tag
+        "digest"     ""
+        "pullPolicy" (.Values.image.pullPolicy | default "IfNotPresent")
+      )
+}}
+{{- if .Values.ingress.enabled }}
+  {{- $_ := set $server "ingress" (dict
+        "enabled"          true
+        "ingressClassName" .Values.ingress.className
+        "hostname"         .Values.ingress.hostname
+        "tls"              true
+        "extraTls"         (list (dict "hosts" (list .Values.ingress.hostname)))
+        "secretName"       .Values.ingress.hostname
+  ) }}
+{{- else }}
+  {{- $_ := set $server "ingress" (dict "enabled" false) }}
+{{- end }}
+{{- $injector := dict "enabled" .Values.injector.enabled }}
+{{- if .Values.injector.enabled }}
+  {{- $_ := set $injector "serviceAccount" (dict "automountServiceAccountToken" true) }}
+  {{- $_ := set $injector "image" (dict
+        "registry"   .Values.injector.image.registry
+        "repository" .Values.injector.image.repository
+        "tag"        .Values.injector.image.tag
+        "pullPolicy" (.Values.injector.image.pullPolicy | default "IfNotPresent")
+  ) }}
+{{- end }}
+{{- $volPerm := dict "enabled" .Values.volumePermissions.enabled }}
+{{- if .Values.volumePermissions.enabled }}
+  {{- $_ := set $volPerm "image" (dict
+        "registry"   .Values.volumePermissions.image.registry
+        "repository" .Values.volumePermissions.image.repository
+        "tag"        .Values.volumePermissions.image.tag
+        "digest"     ""
+        "pullPolicy" (.Values.volumePermissions.image.pullPolicy | default "IfNotPresent")
+  ) }}
+{{- end }}
+{{- $computed := dict
+      "server" $server
+      "global" (dict
+        "storageClass" .Values.storageClass
+        "security"     (dict "allowInsecureImages" true)
+      )
+      "injector"          $injector
+      "volumePermissions" $volPerm
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: ghcr.io/stuttgart-things
+    chart: charts/vault/vault
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: vault
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

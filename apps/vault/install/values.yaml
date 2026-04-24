@@ -1,0 +1,98 @@
+---
+# Reference back to this catalog repo — used by the certs / httpRoute / autounseal
+# Applications to load apps/vault/{certs,httproute,autounseal} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: vault
+
+# Upstream Vault OCI chart (stuttgart-things mirror).
+chartVersion: 1.9.0
+
+# Vault server image.
+image:
+  registry: ghcr.io
+  repository: stuttgart-things/vault
+  tag: 1.20.2-debian-12-r2
+  pullPolicy: IfNotPresent
+
+# Storage class for server PVCs.
+storageClass: standard
+
+# Vault built-in ingress (disabled by default — prefer the httpRoute sub-App for Gateway API).
+ingress:
+  enabled: false
+  className: nginx
+  hostname: vault.example.com
+
+# Vault Agent Injector sidecar.
+injector:
+  enabled: true
+  image:
+    registry: ghcr.io
+    repository: stuttgart-things/vault-k8s
+    tag: 1.7.0-debian-12-r4
+    pullPolicy: IfNotPresent
+
+# Init container that chown-s the data dir (required for non-root filesystems).
+volumePermissions:
+  enabled: true
+  image:
+    registry: ghcr.io
+    repository: stuttgart-things/os-shell
+    tag: 12-debian-12-r50
+    pullPolicy: IfNotPresent
+
+# cert-manager Certificate sub-Application (opt-in). Provisions a TLS Secret that
+# ingress.enabled: true would consume. Ignored when ingress.enabled is false.
+certs:
+  enabled: false
+  hostname: vault.example.com
+  secretName: vault-ingress-tls
+  issuer:
+    name: cluster-ca
+    kind: ClusterIssuer
+
+# Gateway API HTTPRoute sub-Application (opt-in). Alternative to the Vault chart's
+# built-in ingress — keep ingress.enabled: false when using this.
+httpRoute:
+  enabled: true
+  hostname: vault.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# vault-autounseal sub-Application (opt-in). Separate Helm chart from
+# https://pytoshka.github.io/vault-autounseal.
+autounseal:
+  enabled: false
+  chartVersion: 0.5.3
+  repoURL: https://pytoshka.github.io/vault-autounseal
+  vaultURL: http://vault-server.vault.svc:8200
+  labelSelector: app.kubernetes.io/component=server
+
+# Deep-merged on top of the computed valuesObject passed to the upstream Vault chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

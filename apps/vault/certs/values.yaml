@@ -1,0 +1,7 @@
+---
+namespace: vault
+hostname: vault.example.com
+secretName: vault-ingress-tls
+issuer:
+  name: cluster-ca
+  kind: ClusterIssuer

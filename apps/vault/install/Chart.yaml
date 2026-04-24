@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: vault-install
+description: App-of-apps chart packaging HashiCorp Vault (stuttgart-things OCI chart) with optional cert-manager Certificate, Gateway API HTTPRoute, and vault-autounseal sub-Applications.
+type: application
+version: 0.1.0
+appVersion: "1.9.0"
