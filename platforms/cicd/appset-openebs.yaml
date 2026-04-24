@@ -7,11 +7,20 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
+  # Keep child resources if the cluster opts out later (label → "false").
+  # Without this, dropping out would delete the child Application and prune
+  # the StorageClass / DaemonSets / namespace it manages.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   generators:
     - clusters:
         selector:
           matchLabels:
             cicd-platform: "true"
+          matchExpressions:
+            - key: cicd-platform/openebs
+              operator: NotIn
+              values: ["false"]
   template:
     metadata:
       name: openebs-{{ .name }}

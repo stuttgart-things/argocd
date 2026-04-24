@@ -7,11 +7,20 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
+  # Keep child resources if the cluster opts out later (label → "false").
+  # Without this, dropping out would delete the child Application and prune
+  # the Dapr control-plane it manages.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   generators:
     - clusters:
         selector:
           matchLabels:
             cicd-platform: "true"
+          matchExpressions:
+            - key: cicd-platform/dapr
+              operator: NotIn
+              values: ["false"]
   template:
     metadata:
       name: dapr-{{ .name }}

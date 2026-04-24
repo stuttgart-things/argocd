@@ -38,6 +38,26 @@ kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/cicd?r
 
 `application.yaml` is intentionally **not** listed in `kustomization.yaml` — the bootstrap Application must not manage itself.
 
+## Per-cluster opt-out
+
+Default behaviour: labelling a cluster with `cicd-platform: "true"` enrols it in **all** three components. To skip a single component on a specific cluster, add a per-component label on that cluster's `Secret` in the `argocd` namespace:
+
+| Label on the cluster Secret              | Effect on that cluster |
+|---|---|
+| `cicd-platform/openebs: "false"`         | Skip `openebs-cicd`   |
+| `cicd-platform/dapr: "false"`            | Skip `dapr-cicd`      |
+| `cicd-platform/kro: "false"`             | Skip `kro-cicd`       |
+
+Semantics: each ApplicationSet selector is `cicd-platform=true` AND `cicd-platform/<component> NotIn ["false"]`. Absent label = included (default). Only the explicit string `"false"` opts out.
+
+If the cluster is managed by `clusterbook-operator`, add the label to the `ClusterbookCluster` CR's `spec.labels` — the operator propagates it onto the Argo Secret on the next reconcile.
+
+### Opt-out safety: `preserveResourcesOnDeletion`
+
+Each ApplicationSet sets `spec.syncPolicy.preserveResourcesOnDeletion: true`. When a cluster flips from included → opted out, the child `Application` CR is deleted, **but the workload resources it managed stay in place** (StorageClass, namespaces, DaemonSets, CRDs). This avoids tearing out live state — especially for storage (OpenEBS) and CRD owners (kro) — on a flag flip.
+
+Clean-up is manual: `kubectl delete ns <namespace>` (or equivalent) on the target cluster if you want the resources gone. Until then, the cluster keeps running what was deployed; ArgoCD just stops managing it.
+
 ## Adding a catalog entry
 
 1. Drop a new `appset-<name>.yaml` in this directory following the dapr/kro template (same cluster selector, path pointing at the new catalog entry's `install/` chart).
