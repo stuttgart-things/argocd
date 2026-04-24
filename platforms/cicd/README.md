@@ -19,7 +19,9 @@ Catalog entries rendered:
 | `crossplane-cicd`    | `cicd/crossplane/install`      | `crossplane-system`| Crossplane core; providers/functions/configurations are separate charts under `cicd/crossplane/` — opt in per cluster via follow-up Applications |
 | `kargo-cicd`         | `cicd/kargo/install`           | `kargo`            | Kargo control-plane. `api.host` is derived from the cluster's `clusterbook.stuttgart-things.com/fqdn` annotation (→ `kargo.<fqdn>`) so install + HTTPRoute + cert + cookie-Host check line up |
 | `kargo-httproute-cicd` | `cicd/kargo/httproute`       | `kargo`            | Gateway API `HTTPRoute` exposing the kargo API. **Additionally gated on** `clusterbook.stuttgart-things.com/allocation-ip` being present — only clusterbook-registered clusters have the `<cluster>-gateway` Gateway and `<cluster>-gateway-tls` wildcard cert this route consumes. Non-clusterbook clusters in the cicd platform get kargo installed but no HTTPRoute (bring your own Gateway) |
-| `tekton-cicd`        | `cicd/tekton/operator`         | `tekton-operator`  | Tekton **operator** only. The operator needs a `TektonConfig` CR to bring up the actual pipelines — supply via `cicd/tekton/config` as a follow-up Application or add a separate appset here if the platform should own it |
+| `tekton-cicd`        | `cicd/tekton/operator`         | `tekton-operator`  | Tekton operator (control plane for the rest) |
+| `tekton-config-cicd` | `cicd/tekton/config`           | `tekton-pipelines` | `TektonConfig` CR, profile `all` (Pipelines + Triggers + Dashboard + Chains + Results). Uniform across clusters today; per-cluster override via cluster-Secret annotation can be added when needed |
+| `tekton-dashboard-httproute-cicd` | `cicd/tekton/dashboard-httproute` | `tekton-pipelines` | Gateway API `HTTPRoute` exposing `tekton-dashboard:9097` on `tekton.<cluster-fqdn>`. **Additionally gated on** `clusterbook.stuttgart-things.com/allocation-ip` — clusterbook clusters only (same reason as `kargo-httproute-cicd`) |
 
 **Ordering:** `openebs-cicd` carries sync-wave `-10`, the others wave `0`. As noted in `platforms/clusterbook`, sync-wave on top-level Applications is informational (each ApplicationSet fires independently). Convergence on fresh clusters relies on each component's `syncPolicy.retry` — e.g. dapr scheduler PVCs stay `Pending` until OpenEBS installs the default StorageClass, then Argo re-syncs dapr.
 
@@ -55,7 +57,7 @@ Default behaviour: labelling a cluster with `cicd-platform: "true"` enrols it in
 | `cicd-platform/argo-rollouts: "false"`         | Skip `argo-rollouts-cicd` |
 | `cicd-platform/crossplane: "false"`            | Skip `crossplane-cicd`    |
 | `cicd-platform/kargo: "false"`                 | Skip `kargo-cicd` **and** `kargo-httproute-cicd` (shared key) |
-| `cicd-platform/tekton: "false"`                | Skip `tekton-cicd`        |
+| `cicd-platform/tekton: "false"`                | Skip `tekton-cicd`, `tekton-config-cicd` **and** `tekton-dashboard-httproute-cicd` (shared key) |
 
 Semantics: each ApplicationSet selector is `cicd-platform=true` AND `cicd-platform/<component> NotIn ["false"]`. Absent label = included (default). Only the explicit string `"false"` opts out.
 

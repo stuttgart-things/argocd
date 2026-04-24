@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tekton-dashboard-httproute-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            # Shared opt-out with the tekton operator/config appsets.
+            - key: cicd-platform/tekton
+              operator: NotIn
+              values: ["false"]
+            # Only clusterbook-registered clusters have the `<cluster>-gateway`
+            # Gateway and `<cluster>-gateway-tls` wildcard cert this HTTPRoute
+            # depends on. BYO-gateway clusters ship their own Application.
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+  template:
+    metadata:
+      name: tekton-dashboard-httproute-{{ .name }}
+      annotations:
+        # +2 after operator (0) and config (1). Informational — top-level
+        # Applications don't order across appsets; retry handles the race if
+        # the tekton-dashboard Service isn't up yet on first sync.
+        argocd.argoproj.io/sync-wave: "2"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        name: '{{ .name }}'
+        namespace: tekton-pipelines
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: cicd/tekton/dashboard-httproute
+        helm:
+          valuesObject:
+            httpRoutes:
+              - name: tekton-dashboard
+                namespace: tekton-pipelines
+                parentRefs:
+                  - name: '{{ .name }}-gateway'
+                    namespace: default
+                hostnames:
+                  - 'tekton.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+                rules:
+                  - backendRefs:
+                      - name: tekton-dashboard
+                        port: 9097
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
