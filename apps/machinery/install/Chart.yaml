@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: machinery-install
+description: App-of-apps chart packaging Machinery (OCI kustomize base + optional HTTPRoute)
+type: application
+version: 0.1.0
+appVersion: "1.3.0"
