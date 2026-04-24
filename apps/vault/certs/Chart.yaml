@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: vault-certs
+description: cert-manager Certificate for Vault's built-in ingress TLS — loaded as a sub-Application by apps/vault/install.
+type: application
+version: 0.1.0

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "vault-certs sub-chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namespace", "hostname", "secretName", "issuer"],
+  "properties": {
+    "namespace":  { "type": "string", "minLength": 1 },
+    "hostname":   { "type": "string", "minLength": 1 },
+    "secretName": { "type": "string", "minLength": 1 },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["Issuer", "ClusterIssuer"] }
+      },
+      "required": ["name", "kind"]
+    }
+  }
+}

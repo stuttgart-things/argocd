@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: vault-httproute
+description: Gateway API HTTPRoute for Vault — loaded as a sub-Application by apps/vault/install.
+type: application
+version: 0.1.0

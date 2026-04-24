@@ -1,0 +1,11 @@
+---
+namespace: vault
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: vault
+    hostname: vault.example.com
+    backend:
+      name: vault-server
+      port: 8200
