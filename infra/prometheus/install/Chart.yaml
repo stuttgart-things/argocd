@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: prometheus-install
+description: App-of-apps chart packaging the upstream prometheus-community/prometheus Helm chart with optional Gateway API HTTPRoute.
+type: application
+version: 0.1.0
+appVersion: "28.13.0"

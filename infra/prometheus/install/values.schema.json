@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "prometheus app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": { "type": "string", "format": "uri" },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repoURL", "targetRevision"]
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "storageClass": { "type": "string", "minLength": 1 },
+    "storageSize":  { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" },
+    "retention":    { "type": "string", "minLength": 1 },
+    "alertmanager": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "required": ["enabled"]
+    },
+    "pushgateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "required": ["enabled"]
+    },
+    "kubeStateMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "required": ["enabled"]
+    },
+    "nodeExporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "required": ["enabled"]
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "hostname": { "type": "string", "minLength": 1 },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name":      { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "namespace"]
+        }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": { "required": ["hostname", "gateway"] }
+    },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed valuesObject passed to the upstream chart.",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

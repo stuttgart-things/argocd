@@ -1,0 +1,62 @@
+---
+# Reference back to this catalog repo — used by the httpRoute Application
+# to load infra/prometheus/httproute from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: monitoring
+
+# Upstream prometheus-community/prometheus Helm chart version.
+chartVersion: 28.13.0
+
+# Persistent server storage.
+storageClass: nfs4-csi
+storageSize: 10Gi
+
+# Data retention window on the prometheus-server.
+retention: 15d
+
+# Subcharts of the upstream prometheus chart. All default to the same values
+# the flux version used; flip via consumer valuesObject.
+alertmanager:
+  enabled: false
+pushgateway:
+  enabled: false
+kubeStateMetrics:
+  enabled: true
+nodeExporter:
+  enabled: true
+
+# Gateway API HTTPRoute sub-Application (opt-in).
+httpRoute:
+  enabled: true
+  hostname: prometheus.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

@@ -1,0 +1,41 @@
+{{- $defaultName := printf "prometheus-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $computed := dict
+      "alertmanager"            (dict "enabled" .Values.alertmanager.enabled)
+      "prometheus-pushgateway"  (dict "enabled" .Values.pushgateway.enabled)
+      "kube-state-metrics"      (dict "enabled" .Values.kubeStateMetrics.enabled)
+      "prometheus-node-exporter" (dict "enabled" .Values.nodeExporter.enabled)
+      "server" (dict
+        "persistentVolume" (dict
+          "enabled"      true
+          "storageClass" .Values.storageClass
+          "size"         .Values.storageSize
+        )
+        "retention" .Values.retention
+      )
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: prometheus
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
