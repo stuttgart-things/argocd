@@ -1,0 +1,31 @@
+---
+# Bootstrap Application for the cicd platform bundle.
+# Apply once on the management cluster (the one running Argo CD):
+#   kubectl apply -f platforms/cicd/application.yaml
+#
+# It renders platforms/cicd/ via kustomize (the kustomization.yaml in that
+# directory lists the ApplicationSets). ApplicationSets then fan out to every
+# cluster Secret labelled `cicd-platform: "true"`.
+#
+# This file itself is intentionally NOT listed in kustomization.yaml so the
+# rendered set does not contain the bootstrap Application (no self-reference).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cicd-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: platforms/cicd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
