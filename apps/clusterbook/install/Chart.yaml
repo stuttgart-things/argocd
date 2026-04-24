@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: clusterbook-install
+description: App-of-apps chart packaging Clusterbook (OCI kustomize base + optional HTTPRoute + optional PDNS secret)
+type: application
+version: 0.1.0
+appVersion: "1.24.0"

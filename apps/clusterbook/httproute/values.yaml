@@ -1,0 +1,16 @@
+---
+# Namespace where HTTPRoutes land.
+namespace: clusterbook
+
+# Gateway every route parents onto.
+gateway:
+  name: cilium-gateway
+  namespace: default
+
+# Routes to render. Each item becomes one Gateway API HTTPRoute.
+routes:
+  - name: clusterbook
+    hostname: clusterbook.example.com
+    backend:
+      name: clusterbook-http
+      port: 8080

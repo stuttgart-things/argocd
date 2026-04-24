@@ -1,0 +1,7 @@
+---
+# Namespace where the Secret lands.
+namespace: clusterbook
+
+# PowerDNS API token. Inline only for dev — prefer an ExternalSecret / SOPS / Vault
+# plugin overlay so the literal never lands in git.
+token: ""                           # pragma: allowlist secret

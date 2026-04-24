@@ -1,0 +1,58 @@
+---
+# Reference back to this catalog repo — used by the httpRoute + pdns Applications
+# to load apps/clusterbook/{httproute,pdns} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: clusterbook
+
+# Clusterbook OCI kustomize base (ghcr.io/stuttgart-things/clusterbook-kustomize).
+# Argo CD 2.13+ resolves oci:// repoURLs as kustomize sources.
+kustomize:
+  repoURL: ghcr.io/stuttgart-things/clusterbook-kustomize
+  targetRevision: 1.24.0
+
+# Clusterbook container image — patched into the Deployment rendered by the base.
+image:
+  repository: ghcr.io/stuttgart-things/clusterbook
+  tag: 1.24.0
+
+# PowerDNS integration — patched into the clusterbook-config ConfigMap rendered by the base.
+# When enabled, the pdns sub-Application also provisions the clusterbook-pdns Secret.
+pdns:
+  enabled: false
+  url: ""
+  zone: ""
+  # Token passed through to the rendered Secret. Prefer an ExternalSecret / SOPS / Vault
+  # plugin overlay instead of inlining a literal here.
+  token: ""                         # pragma: allowlist secret
+
+# Gateway API HTTPRoute sub-Application (opt-in).
+httpRoute:
+  enabled: true
+  hostname: clusterbook.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
