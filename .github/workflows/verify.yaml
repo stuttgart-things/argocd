@@ -13,18 +13,48 @@ jobs:
       charts: ${{ steps.find.outputs.charts }}
     steps:
       - uses: actions/checkout@v4
-      - id: find
-        name: Find all Chart.yaml directories
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        name: Compute changed files vs base
         run: |
-          charts=$(find apps cicd config infra -name Chart.yaml -printf '%h\n' \
-            | sort \
-            | jq -R -s -c 'split("\n") | map(select(length>0))')
-          echo "charts=${charts}" >> "$GITHUB_OUTPUT"
-          echo "Discovered charts:"
-          echo "${charts}" | jq -r '.[]'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+          # New branch / initial push: diff against the empty tree
+          if [ "$base" = "0000000000000000000000000000000000000000" ] || [ -z "$base" ]; then
+            base=$(git hash-object -t tree /dev/null)
+          fi
+          git diff --name-only "$base" "$head" > changed.txt
+          echo "Changed files:"
+          cat changed.txt || true
+
+      - id: find
+        name: Intersect changed paths with chart directories
+        run: |
+          all=$(find apps cicd config infra -name Chart.yaml -printf '%h\n' | sort -u)
+          charts_json=$(
+            while IFS= read -r c; do
+              [ -z "$c" ] && continue
+              if grep -q "^${c}/" changed.txt; then
+                echo "$c"
+              fi
+            done <<< "$all" \
+            | sort -u \
+            | jq -R -s -c 'split("\n") | map(select(length>0))'
+          )
+          echo "charts=${charts_json}" >> "$GITHUB_OUTPUT"
+          echo "Charts to verify:"
+          echo "${charts_json}" | jq -r '.[]'
 
   verify:
     needs: discover
+    if: needs.discover.outputs.charts != '[]'
     strategy:
       fail-fast: false
       matrix:
