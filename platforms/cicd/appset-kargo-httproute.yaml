@@ -56,9 +56,14 @@ spec:
                 hostnames:
                   - 'kargo.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
                 rules:
+                  # kargo-api Service is plain HTTP on port 80 — TLS terminates
+                  # at the Gateway, not the API Service (chart default
+                  # api.tls.enabled=false). Pointing at 443 gives Envoy a
+                  # plaintext→TLS mismatch → 500 Internal Server Error from
+                  # the Gateway.
                   - backendRefs:
                       - name: kargo-api
-                        port: 443
+                        port: 80
       syncPolicy:
         automated:
           prune: true
