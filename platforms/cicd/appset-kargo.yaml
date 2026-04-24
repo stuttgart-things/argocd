@@ -46,16 +46,21 @@ spec:
             # "kargo.example.com" on clusters without the annotation.
             api:
               host: 'kargo.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." | default "example.com" }}'
-            # Credentials live in a per-cluster Secret named `kargo-admin` in
-            # the kargo namespace on the target cluster. Keys expected by the
-            # upstream chart: ADMIN_ACCOUNT_PASSWORD_HASH (bcrypt, $2a$ variant)
-            # + ADMIN_ACCOUNT_TOKEN_SIGNING_KEY (32 chars). Routed via
-            # extraValues because the wrapper chart doesn't expose
-            # existingSecret as a first-class value yet.
+            # Tell the upstream chart to consume an existing Secret named
+            # `kargo-admin` in the kargo namespace instead of rendering its
+            # own from inline passwordHash/tokenSigningKey values. The chart
+            # guards its Secret template with `{{ if not .Values.api.secret.name }}`
+            # — setting this key suppresses the render AND the required check.
+            # The api Deployment's envFrom.secretRef.name falls back to this
+            # value too, so one knob does both.
+            #
+            # Keys expected in the Secret: ADMIN_ACCOUNT_PASSWORD_HASH
+            # (bcrypt, $2a$ variant) + ADMIN_ACCOUNT_TOKEN_SIGNING_KEY (32
+            # chars). Created per-cluster out-of-band (see platform README).
             extraValues:
               api:
-                adminAccount:
-                  existingSecret: kargo-admin
+                secret:
+                  name: kargo-admin
       syncPolicy:
         automated:
           prune: true
