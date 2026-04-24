@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tekton-config-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            # Shared opt-out with the tekton operator appset — disabling tekton
+            # should disable both operator install and the TektonConfig CR.
+            - key: cicd-platform/tekton
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: tekton-config-{{ .name }}
+      annotations:
+        # Informational — top-level Applications don't order across appsets.
+        # The config Application's retry handles the race: TektonConfig apply
+        # fails until the operator CRD is registered, then retry succeeds.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      # Leaf chart — emits a (cluster-scoped) TektonConfig CR directly, so
+      # destination IS the workload cluster.
+      destination:
+        name: '{{ .name }}'
+        namespace: tekton-pipelines
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: cicd/tekton/config
+        helm:
+          # Defaults from cicd/tekton/config/values.yaml are what we want for
+          # the cicd platform: name=config, profile=all (Pipelines + Triggers
+          # + Dashboard + Chains + Results), targetNamespace=tekton-pipelines.
+          # Override per-cluster via cluster Secret annotations + a
+          # valuesObject override here if profiles diverge in the future.
+          valuesObject: {}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
