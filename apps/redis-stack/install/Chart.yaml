@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: redis-stack-install
+description: App-of-apps chart packaging the stuttgart-things/redis Helm chart with RediSearch/RedisJSON/RedisTimeSeries/RedisBloom modules loaded via a merged start-script.
+type: application
+version: 0.1.0
+appVersion: "17.1.4"
