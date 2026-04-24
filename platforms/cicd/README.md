@@ -10,10 +10,13 @@ cicd-platform: "true"
 
 Catalog entries rendered (initial set):
 
-| ApplicationSet | Catalog path       | Workload namespace | Notes |
+| ApplicationSet  | Catalog path          | Workload namespace | Notes |
 |---|---|---|---|
-| `dapr-cicd`    | `cicd/dapr/install` | `dapr-system`      | Dapr control-plane via app-of-apps chart |
-| `kro-cicd`     | `cicd/kro/install`  | `kro-system`       | kro (Kube Resource Orchestrator); sync uses `Replace=true` for CRDs |
+| `openebs-cicd`  | `infra/openebs/install` | `openebs`          | Storage prerequisite — default hostpath StorageClass; dapr scheduler PVCs depend on it |
+| `dapr-cicd`     | `cicd/dapr/install`     | `dapr-system`      | Dapr control-plane via app-of-apps chart |
+| `kro-cicd`      | `cicd/kro/install`      | `kro-system`       | kro (Kube Resource Orchestrator); sync uses `Replace=true` for CRDs |
+
+**Ordering:** `openebs-cicd` carries sync-wave `-10`, the others wave `0`. As noted in `platforms/clusterbook`, sync-wave on top-level Applications is informational (each ApplicationSet fires independently). Convergence on fresh clusters relies on dapr's `syncPolicy.retry` — the scheduler PVCs stay `Pending` until OpenEBS installs the default StorageClass, then Argo re-syncs dapr.
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 
