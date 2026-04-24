@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kargo-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            - key: cicd-platform/kargo
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: kargo-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: cicd/kargo/install
+        helm:
+          valuesObject:
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: kargo
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

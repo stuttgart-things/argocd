@@ -5,3 +5,7 @@ resources:
   - appset-openebs.yaml
   - appset-dapr.yaml
   - appset-kro.yaml
+  - appset-argo-rollouts.yaml
+  - appset-crossplane.yaml
+  - appset-kargo.yaml
+  - appset-tekton.yaml

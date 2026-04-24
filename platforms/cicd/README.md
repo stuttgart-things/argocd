@@ -8,15 +8,19 @@ All ApplicationSets share one cluster selector — the ArgoCD cluster `Secret` m
 cicd-platform: "true"
 ```
 
-Catalog entries rendered (initial set):
+Catalog entries rendered:
 
-| ApplicationSet  | Catalog path          | Workload namespace | Notes |
+| ApplicationSet       | Catalog path                  | Workload namespace | Notes |
 |---|---|---|---|
-| `openebs-cicd`  | `infra/openebs/install` | `openebs`          | Storage prerequisite — default hostpath StorageClass; dapr scheduler PVCs depend on it |
-| `dapr-cicd`     | `cicd/dapr/install`     | `dapr-system`      | Dapr control-plane via app-of-apps chart |
-| `kro-cicd`      | `cicd/kro/install`      | `kro-system`       | kro (Kube Resource Orchestrator); sync uses `Replace=true` for CRDs |
+| `openebs-cicd`       | `infra/openebs/install`        | `openebs`          | Storage prerequisite — provisions `openebs-hostpath` and annotates it as the cluster default SC |
+| `dapr-cicd`          | `cicd/dapr/install`            | `dapr-system`      | Dapr control-plane |
+| `kro-cicd`           | `cicd/kro/install`             | `kro-system`       | kro (Kube Resource Orchestrator); inner sync uses `Replace=true` for CRDs |
+| `argo-rollouts-cicd` | `cicd/argo-rollouts/install`   | `argo-rollouts`    | Progressive-delivery controller |
+| `crossplane-cicd`    | `cicd/crossplane/install`      | `crossplane-system`| Crossplane core; providers/functions/configurations are separate charts under `cicd/crossplane/` — opt in per cluster via follow-up Applications |
+| `kargo-cicd`         | `cicd/kargo/install`           | `kargo`            | Kargo control-plane; HTTPRoute + certs (`cicd/kargo/httproute`, `cicd/kargo/certs`) not shipped by the platform — consumers wire those per cluster if exposure is needed |
+| `tekton-cicd`        | `cicd/tekton/operator`         | `tekton-operator`  | Tekton **operator** only. The operator needs a `TektonConfig` CR to bring up the actual pipelines — supply via `cicd/tekton/config` as a follow-up Application or add a separate appset here if the platform should own it |
 
-**Ordering:** `openebs-cicd` carries sync-wave `-10`, the others wave `0`. As noted in `platforms/clusterbook`, sync-wave on top-level Applications is informational (each ApplicationSet fires independently). Convergence on fresh clusters relies on dapr's `syncPolicy.retry` — the scheduler PVCs stay `Pending` until OpenEBS installs the default StorageClass, then Argo re-syncs dapr.
+**Ordering:** `openebs-cicd` carries sync-wave `-10`, the others wave `0`. As noted in `platforms/clusterbook`, sync-wave on top-level Applications is informational (each ApplicationSet fires independently). Convergence on fresh clusters relies on each component's `syncPolicy.retry` — e.g. dapr scheduler PVCs stay `Pending` until OpenEBS installs the default StorageClass, then Argo re-syncs dapr.
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 
@@ -42,11 +46,15 @@ kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/cicd?r
 
 Default behaviour: labelling a cluster with `cicd-platform: "true"` enrols it in **all** three components. To skip a single component on a specific cluster, add a per-component label on that cluster's `Secret` in the `argocd` namespace:
 
-| Label on the cluster Secret              | Effect on that cluster |
+| Label on the cluster Secret                    | Effect on that cluster |
 |---|---|
-| `cicd-platform/openebs: "false"`         | Skip `openebs-cicd`   |
-| `cicd-platform/dapr: "false"`            | Skip `dapr-cicd`      |
-| `cicd-platform/kro: "false"`             | Skip `kro-cicd`       |
+| `cicd-platform/openebs: "false"`               | Skip `openebs-cicd`       |
+| `cicd-platform/dapr: "false"`                  | Skip `dapr-cicd`          |
+| `cicd-platform/kro: "false"`                   | Skip `kro-cicd`           |
+| `cicd-platform/argo-rollouts: "false"`         | Skip `argo-rollouts-cicd` |
+| `cicd-platform/crossplane: "false"`            | Skip `crossplane-cicd`    |
+| `cicd-platform/kargo: "false"`                 | Skip `kargo-cicd`         |
+| `cicd-platform/tekton: "false"`                | Skip `tekton-cicd`        |
 
 Semantics: each ApplicationSet selector is `cicd-platform=true` AND `cicd-platform/<component> NotIn ["false"]`. Absent label = included (default). Only the explicit string `"false"` opts out.
 
