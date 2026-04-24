@@ -21,6 +21,10 @@
       "required": ["server", "namespace"]
     },
     "chartVersion": { "type": "string", "minLength": 1 },
+    "defaultStorageClass": {
+      "type": "boolean",
+      "description": "If true, the rendered openebs-hostpath StorageClass is annotated as the cluster default (storageclass.kubernetes.io/is-default-class=true). Default false to avoid clashing with an existing default SC."
+    },
     "preUpgradeHook": {
       "type": "object",
       "additionalProperties": false,
