@@ -41,6 +41,11 @@ spec:
             destination:
               server: '{{ .server }}'
               namespace: openebs
+            # cicd platform expects openebs-hostpath to be the cluster's
+            # default StorageClass. Without this, PVCs created on the target
+            # cluster without an explicit storageClassName (e.g. dapr-scheduler's
+            # volumeClaimTemplates) would stay Pending forever.
+            defaultStorageClass: true
       syncPolicy:
         automated:
           prune: true

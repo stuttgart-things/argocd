@@ -5,6 +5,7 @@
 {{- $_ := set $computed "openebs-crds"    (dict "csi" (dict "volumeSnapshots" (dict "enabled" .Values.volumeSnapshots.enabled))) }}
 {{- $_ := set $computed "mayastor"        (dict "csi" (dict "node" (dict "initContainers" (dict "enabled" .Values.mayastorInitContainers.enabled)))) }}
 {{- $_ := set $computed "engines"         .Values.engines }}
+{{- $_ := set $computed "localpv-provisioner" (dict "hostpathClass" (dict "isDefaultClass" (default false .Values.defaultStorageClass))) }}
 
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}

@@ -10,6 +10,15 @@ destination:
 # Upstream OpenEBS umbrella chart version (https://openebs.github.io/openebs).
 chartVersion: 4.4.0
 
+# Mark the rendered `openebs-hostpath` StorageClass as the cluster's default
+# (adds annotation storageclass.kubernetes.io/is-default-class: "true").
+#
+# Off by default to avoid surprising consumers who already have a default SC
+# from another provider. Turn on for clusters where OpenEBS is the intended
+# default storage — especially when other workloads create PVCs without an
+# explicit `storageClassName` (e.g. dapr-scheduler's volumeClaimTemplates).
+defaultStorageClass: false
+
 # Optional umbrella components — all off by default to keep the install minimal.
 # local-PV hostpath (the default engine) remains enabled upstream regardless.
 preUpgradeHook:
