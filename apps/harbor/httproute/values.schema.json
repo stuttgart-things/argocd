@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "harbor-httproute sub-chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namespace", "gateway", "fqdn", "wildcard"],
+  "properties": {
+    "namespace": { "type": "string", "minLength": 1 },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["name", "namespace"]
+    },
+    "fqdn":     { "type": "string", "minLength": 1 },
+    "wildcard": { "type": "string", "minLength": 1 }
+  }
+}
