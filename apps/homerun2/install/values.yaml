@@ -1,0 +1,130 @@
+---
+# Reference back to this catalog repo — used by the redis-stack / secrets / httpRoute
+# sub-Applications to load apps/redis-stack/install + apps/homerun2/{secrets,httproute} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: homerun2
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
+
+# trust-manager bundle used by k8s-pitcher (mounted at /etc/ssl/custom/trust-bundle.pem).
+trustBundleConfigMap: cluster-trust-bundle
+
+# K8sPitcherProfile ConfigMap name. The ConfigMap itself is provisioned out-of-band
+# (cluster-specific config); the chart only references it from the k8s-pitcher Deployment.
+k8sPitcherProfileConfigMap: homerun2-k8s-pitcher-profile
+
+# Shared credentials. Each component's kustomize base ships its own per-component
+# Secret (e.g. `homerun2-omni-pitcher-redis`, `homerun2-omni-pitcher-token`) which
+# we patch inline via kustomize.patches in the rendered Application — same pattern
+# the flux release.yaml uses, just expressed declaratively here.
+#
+# Inline literals are dev-only. For production, supply these values through an
+# ArgoCD Vault Plugin / SOPS overlay so the Application's `helm.values` resolves
+# them at sync time.
+redisPassword: ""                         # pragma: allowlist secret
+authToken: ""                             # pragma: allowlist secret
+
+# Default profile = flux apps/homerun2/profiles/base: redis-stack + omni-pitcher + core-catcher + scout.
+# Flip individual `enabled` keys to compose other profiles.
+
+# redis-stack sub-Application (delegates to apps/redis-stack/install in this catalog).
+redisStack:
+  enabled: true
+  chartVersion: 17.1.4
+  serviceType: ClusterIP
+  persistence:
+    enabled: true
+    storageClass: standard
+    size: 8Gi
+  image:
+    registry: ghcr.io
+    repository: stuttgart-things/redis-stack-server
+    tag: 7.2.0-v18
+  sentinel:
+    registry: ghcr.io
+    repository: stuttgart-things/redis-sentinel
+    tag: 7.4.2-debian-12-r9
+
+# omni-pitcher (HTTP gateway → Redis Streams).
+omniPitcher:
+  enabled: true
+  version: v1.6.2
+  hostname: omni-pitcher.example.com
+
+# core-catcher (Redis Streams consumer + web dashboard).
+coreCatcher:
+  enabled: true
+  version: v0.8.0
+  kustomizeVersion: v0.7.1               # may differ from image tag (e.g. -web suffix on older versions)
+  hostname: core-catcher.example.com
+
+# scout (web dashboard / monitoring).
+scout:
+  enabled: true
+  version: v0.7.0
+  hostname: scout.example.com
+
+# k8s-pitcher (informers/collectors → omni-pitcher). Often deployed in a different
+# namespace from the rest of the stack; override `namespace` if needed.
+k8sPitcher:
+  enabled: false
+  version: v0.4.0
+  namespace: homerun2
+
+# light-catcher (Redis Streams consumer → WLED HTTP).
+lightCatcher:
+  enabled: false
+  version: v0.3.0
+  hostname: light-catcher.example.com
+
+# wled-mock (mock WLED device + dashboard, for dev/testing).
+wledMock:
+  enabled: false
+  version: v0.3.0
+  hostname: wled-mock.example.com
+
+# demo-pitcher (web UI for manually pitching messages to Redis Streams).
+demoPitcher:
+  enabled: false
+  version: v1.4.0
+  hostname: demo-pitcher.example.com
+
+# led-catcher (Redis Streams consumer → LED display).
+ledCatcher:
+  enabled: false
+  version: v0.1.1
+  hostname: led-catcher.example.com
+
+# git-pitcher (watches Git repos → Redis Streams).
+gitPitcher:
+  enabled: false
+  version: v0.5.0
+
+# Gateway API HTTPRoutes for every enabled component that exposes one.
+httpRoute:
+  enabled: true
+  gateway:
+    name: cilium-gateway
+    namespace: default

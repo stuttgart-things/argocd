@@ -1,0 +1,51 @@
+{{- if .Values.lightCatcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-light-catcher" }}
+{{- $ns := .Values.destination.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-light-catcher" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "light-catcher" | quote }}
+    targetRevision: {{ .Values.lightCatcher.version | quote }}
+    path: .
+    kustomize:
+      patches:
+        - target:
+            kind: Ingress
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" "kind" "Ingress" "name" $name) | indent 12 }}
+        - target:
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.lightCatcher.version) | indent 12 }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.redisPasswordPatch" (dict "secretName" (printf "%s-redis" $name) "password" .Values.redisPassword) | indent 12 }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" list) | indent 12 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

@@ -1,0 +1,57 @@
+{{- if .Values.httpRoute.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $routes := list }}
+{{- if .Values.omniPitcher.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-omni-pitcher" "hostname" .Values.omniPitcher.hostname "backend" (dict "name" "homerun2-omni-pitcher" "port" 80)) }}
+{{- end }}
+{{- if .Values.coreCatcher.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-core-catcher" "hostname" .Values.coreCatcher.hostname "backend" (dict "name" "homerun2-core-catcher" "port" 80)) }}
+{{- end }}
+{{- if .Values.scout.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-scout" "hostname" .Values.scout.hostname "backend" (dict "name" "homerun2-scout" "port" 80)) }}
+{{- end }}
+{{- if .Values.lightCatcher.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-light-catcher" "hostname" .Values.lightCatcher.hostname "backend" (dict "name" "homerun2-light-catcher" "port" 80)) }}
+{{- end }}
+{{- if .Values.wledMock.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-wled-mock" "hostname" .Values.wledMock.hostname "backend" (dict "name" "homerun2-wled-mock" "port" 80)) }}
+{{- end }}
+{{- if .Values.demoPitcher.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-demo-pitcher" "hostname" .Values.demoPitcher.hostname "backend" (dict "name" "homerun2-demo-pitcher" "port" 80)) }}
+{{- end }}
+{{- if .Values.ledCatcher.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-led-catcher" "hostname" .Values.ledCatcher.hostname "backend" (dict "name" "homerun2-led-catcher" "port" 80)) }}
+{{- end }}
+{{- if eq (len $routes) 0 }}
+{{- /* Nothing to render — every route-bearing component is disabled */ -}}
+{{- else }}
+{{- $routesValues := dict
+      "namespace" .Values.destination.namespace
+      "gateway"   .Values.httpRoute.gateway
+      "routes"    $routes
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-httproute" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/homerun2/httproute
+    helm:
+      releaseName: homerun2-httproute
+      valuesObject:
+        {{- toYaml $routesValues | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
+{{- end }}

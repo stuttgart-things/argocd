@@ -3,12 +3,38 @@
   "title": "cilium-gateway chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "namespace", "gatewayClassName", "hostname", "tlsSecretName"],
+  "required": [
+    "name",
+    "namespace",
+    "gatewayClassName",
+    "hostname",
+    "tlsSecretName"
+  ],
   "properties": {
-    "name":             { "type": "string", "minLength": 1 },
-    "namespace":        { "type": "string", "minLength": 1 },
-    "gatewayClassName": { "type": "string", "minLength": 1 },
-    "hostname":         { "type": "string", "minLength": 1 },
-    "tlsSecretName":    { "type": "string", "minLength": 1 }
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gatewayClassName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hostname": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tlsSecretName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
   }
 }

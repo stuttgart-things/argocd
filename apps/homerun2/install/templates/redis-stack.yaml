@@ -1,0 +1,43 @@
+{{- if .Values.redisStack.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $rsValues := dict
+      "project"      .Values.project
+      "destination"  .Values.destination
+      "chartVersion" .Values.redisStack.chartVersion
+      "auth"         (dict "password" .Values.redisPassword)
+      "image"        .Values.redisStack.image
+      "sentinel"     (dict
+        "enabled"       true
+        "masterSet"     "mymaster"
+        "quorum"        1
+        "parallelSyncs" 1
+        "serviceType"   .Values.redisStack.serviceType
+        "image"         .Values.redisStack.sentinel
+      )
+      "persistence" .Values.redisStack.persistence
+      "syncPolicy"  .Values.syncPolicy
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-redis-stack" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/redis-stack/install
+    helm:
+      releaseName: homerun2-redis-stack
+      valuesObject:
+        {{- toYaml $rsValues | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

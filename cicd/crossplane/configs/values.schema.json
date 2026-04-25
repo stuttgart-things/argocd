@@ -3,19 +3,35 @@
   "title": "crossplane-configs chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["configurations"],
+  "required": [
+    "configurations"
+  ],
   "properties": {
     "configurations": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "package"],
+        "required": [
+          "name",
+          "package"
+        ],
         "properties": {
-          "name":    { "type": "string", "minLength": 1 },
-          "package": { "type": "string", "minLength": 1 }
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
     }
   }
 }

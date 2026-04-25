@@ -1,0 +1,68 @@
+{{- if .Values.k8sPitcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-k8s-pitcher" }}
+{{- $ns := .Values.k8sPitcher.namespace }}
+{{- $trustPatch := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" $name)
+      "spec" (dict "template" (dict "spec" (dict
+        "volumes" (list
+          (dict "name" "trust-bundle" "configMap" (dict "name" .Values.trustBundleConfigMap "optional" true))
+          (dict "name" "profile"      "configMap" (dict "name" .Values.k8sPitcherProfileConfigMap))
+        )
+        "containers" (list (dict
+          "name" $name
+          "env"  (list (dict "name" "SSL_CERT_DIR" "value" "/etc/ssl/custom"))
+          "ports" (list (dict "name" "webhook" "containerPort" 8080 "protocol" "TCP"))
+          "volumeMounts" (list (dict
+            "name"      "trust-bundle"
+            "mountPath" "/etc/ssl/custom/trust-bundle.pem"
+            "subPath"   "trust-bundle.pem"
+            "readOnly"  true
+          ))
+        ))
+      )))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-k8s-pitcher" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "k8s-pitcher" | quote }}
+    targetRevision: {{ .Values.k8sPitcher.version | quote }}
+    path: .
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.k8sPitcher.version) | indent 12 }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.authTokenPatch" (dict "secretName" (printf "%s-token" $name) "token" .Values.authToken) | indent 12 }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ toYaml $trustPatch | indent 12 }}
+        - target:
+            kind: ConfigMap
+            name: {{ printf "%s-profile" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "ConfigMap" "name" (printf "%s-profile" $name)) | indent 12 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
