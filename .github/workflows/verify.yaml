@@ -12,7 +12,7 @@ jobs:
     outputs:
       charts: ${{ steps.find.outputs.charts }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
