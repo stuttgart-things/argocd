@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: backstage-httproute
+description: Gateway API HTTPRoute + ReferenceGrant for Backstage — loaded as a sub-Application by apps/backstage/install.
+type: application
+version: 0.1.0

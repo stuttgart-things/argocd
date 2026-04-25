@@ -1,0 +1,99 @@
+---
+# Reference back to this catalog repo — used by the config / secrets / httpRoute
+# Applications to load apps/backstage/{config,secrets,httproute} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: portal
+
+# Upstream backstage Helm chart (oci://ghcr.io/backstage/charts).
+chartVersion: 2.6.3
+
+# Backstage container.
+replicas: 1
+image:
+  registry: ghcr.io
+  repository: stuttgart-things/sthings-backstage
+  tag: latest
+
+# Storage class for the bundled PostgreSQL StatefulSet.
+storageClass: nfs4-csi
+
+# Bundled PostgreSQL.
+postgresql:
+  enabled: true
+  username: backstage
+  # Password is mounted via the backstage-secrets Secret as $$BACKSTAGE_POSTGRESQL_PASSWORD;
+  # leave empty here unless you want a literal in helm.values (dev only).
+  password: ""                      # pragma: allowlist secret
+  architecture: standalone
+
+# Names of ConfigMaps mounted as extra app-config files. The first is owned by
+# the config sub-Application below; the second is expected to be provisioned
+# out-of-band (per-cluster catalog locations + User entities for sign-in).
+appConfig:
+  extraConfigMap: backstage-app-config
+  catalogConfigMap: backstage-catalog-config
+
+# Name of the Secret carrying runtime env-vars (APP_TITLE, GITHUB_TOKEN, etc).
+# Always referenced via secretKeyRef on the Deployment; the secrets sub-App
+# below provisions it inline only when secretsApp.enabled: true (dev only).
+secretName: backstage-secrets       # pragma: allowlist secret
+
+# config sub-Application (opt-in, sync-wave -10). Renders the
+# backstage-app-config ConfigMap with the Backstage-side `app-config.extra.yaml`.
+config:
+  enabled: true
+
+# secrets sub-Application (opt-in, sync-wave -10). Inlines the backstage-secrets
+# Secret in git — DEV ONLY. Production: leave disabled and provision via
+# ExternalSecrets / SOPS / Vault plugin.
+secretsApp:
+  enabled: false
+  appTitle: Stuttgart Things Backstage
+  organizationName: stuttgart-things
+  appBaseURL: https://backstage.example.com
+  backendBaseURL: https://backstage.example.com
+  corsOrigin: https://backstage.example.com
+  authEnvironment: development
+  claimMachineryAPIURL: https://claim-api.example.com
+  claimMachineryRegistryURL: https://registry-api.example.com
+  github:
+    token: ""                       # pragma: allowlist secret
+    clientId: ""                    # pragma: allowlist secret
+    clientSecret: ""                # pragma: allowlist secret
+  backendSecret: ""                 # pragma: allowlist secret
+  externalAccessToken: ""           # pragma: allowlist secret
+
+# Gateway API HTTPRoute + ReferenceGrant sub-Application (opt-in).
+httpRoute:
+  enabled: true
+  hostname: backstage.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

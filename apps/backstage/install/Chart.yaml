@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: backstage-install
+description: App-of-apps chart packaging Backstage (upstream backstage chart + optional app-config ConfigMap, dev-only Secret, and Gateway API HTTPRoute + ReferenceGrant).
+type: application
+version: 0.1.0
+appVersion: "2.6.3"

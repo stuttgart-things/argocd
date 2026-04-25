@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "backstage app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion", "image", "appConfig", "secretName"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": { "type": "string", "format": "uri" },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repoURL", "targetRevision"]
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "replicas":     { "type": "integer", "minimum": 0 },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registry":   { "type": "string", "minLength": 1 },
+        "repository": { "type": "string", "minLength": 1 },
+        "tag":        { "type": "string", "minLength": 1 }
+      },
+      "required": ["registry", "repository", "tag"]
+    },
+    "storageClass": { "type": "string", "minLength": 1 },
+    "postgresql": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "username":     { "type": "string", "minLength": 1 },
+        "password":     { "type": "string" },
+        "architecture": { "type": "string", "enum": ["standalone", "replication"] }
+      },
+      "required": ["enabled"]
+    },
+    "appConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "extraConfigMap":   { "type": "string", "minLength": 1 },
+        "catalogConfigMap": { "type": "string", "minLength": 1 }
+      },
+      "required": ["extraConfigMap", "catalogConfigMap"]
+    },
+    "secretName": { "type": "string", "minLength": 1 },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } },
+      "required": ["enabled"]
+    },
+    "secretsApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":                   { "type": "boolean" },
+        "appTitle":                  { "type": "string" },
+        "organizationName":          { "type": "string" },
+        "appBaseURL":                { "type": "string" },
+        "backendBaseURL":            { "type": "string" },
+        "corsOrigin":                { "type": "string" },
+        "authEnvironment":           { "type": "string" },
+        "claimMachineryAPIURL":      { "type": "string" },
+        "claimMachineryRegistryURL": { "type": "string" },
+        "github": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "token":        { "type": "string" },
+            "clientId":     { "type": "string" },
+            "clientSecret": { "type": "string" }
+          }
+        },
+        "backendSecret":       { "type": "string" },
+        "externalAccessToken": { "type": "string" }
+      },
+      "required": ["enabled"]
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "hostname": { "type": "string", "minLength": 1 },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name":      { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "namespace"]
+        }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": { "required": ["hostname", "gateway"] }
+    },
+    "extraValues": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

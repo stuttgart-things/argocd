@@ -1,0 +1,9 @@
+---
+namespace: portal
+hostname: backstage.example.com
+gateway:
+  name: cilium-gateway
+  namespace: default
+backend:
+  name: backstage-deployment
+  port: 7007
