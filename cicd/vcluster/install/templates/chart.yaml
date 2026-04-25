@@ -1,0 +1,67 @@
+{{- $defaultName := printf "vcluster-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $persistence := dict
+      "volumeClaim" (dict
+        "enabled"         .Values.persistence.enabled
+        "retentionPolicy" "Retain"
+        "size"            .Values.persistence.size
+        "storageClass"    .Values.persistence.storageClass
+        "accessModes"     (list "ReadWriteOnce")
+      )
+}}
+{{- $controlPlane := dict
+      "distro" (dict
+        "k8s" (dict
+          "enabled" true
+          "image"   (dict "tag" .Values.k8sVersion)
+        )
+      )
+      "backingStore" (dict
+        "etcd" (dict "embedded" (dict "enabled" true))
+        "resources"        .Values.resources
+        "highAvailability" (dict "replicas" .Values.replicas)
+      )
+      "persistence" $persistence
+}}
+{{- $sync := dict
+      "toHost" (dict
+        "services"               (dict "enabled" .Values.sync.toHost.services)
+        "endpoints"              (dict "enabled" .Values.sync.toHost.endpoints)
+        "persistentVolumeClaims" (dict "enabled" .Values.sync.toHost.persistentVolumeClaims)
+      )
+      "fromHost" (dict
+        "events"         (dict "enabled" .Values.sync.fromHost.events)
+        "storageClasses" (dict "enabled" .Values.sync.fromHost.storageClasses)
+        "nodes"          (dict "enabled" .Values.sync.fromHost.nodes "selector" (dict "all" false))
+        "ingressClasses" (dict "enabled" .Values.sync.fromHost.ingressClasses)
+      )
+}}
+{{- $computed := dict
+      "controlPlane" $controlPlane
+      "sync"         $sync
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://charts.loft.sh
+    chart: vcluster
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: vcluster
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
