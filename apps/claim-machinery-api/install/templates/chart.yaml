@@ -1,0 +1,120 @@
+{{- $defaultName := printf "claim-machinery-api-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $sslCertDir := .Values.trustBundle.sslCertDir }}
+{{- $bundleKey := .Values.trustBundle.key }}
+{{- $ingressDelete := dict
+      "apiVersion" "networking.k8s.io/v1"
+      "kind" "Ingress"
+      "metadata" (dict "name" "claim-machinery-api")
+      "$patch" "delete"
+}}
+{{- $deployImage := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" "claim-machinery-api")
+      "spec" (dict "template" (dict "spec" (dict "containers" (list
+        (dict
+          "name"  "claim-machinery-api"
+          "image" (printf "%s:%s" .Values.image.repository .Values.image.tag)
+          "args"  (list "server")
+        )
+      ))))
+}}
+{{- $cmPatch := dict
+      "apiVersion" "v1"
+      "kind" "ConfigMap"
+      "metadata" (dict "name" "claim-machinery-api")
+      "data" (dict
+        "TEMPLATE_PROFILE_PATH" .Values.config.templateProfilePath
+        "ENABLE_HOMERUN"        (ternary "true" "false" .Values.config.homerun.enabled)
+        "HOMERUN_URL"           .Values.config.homerun.url
+      )
+}}
+{{- $authPatch := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" "claim-machinery-api")
+      "spec" (dict "template" (dict "spec" (dict "containers" (list
+        (dict
+          "name" "claim-machinery-api"
+          "env"  (list (dict
+            "name" "HOMERUN_AUTH_TOKEN"
+            "valueFrom" (dict "secretKeyRef" (dict
+              "name"     .Values.auth.secretName
+              "key"      .Values.auth.secretKey
+              "optional" true
+            ))
+          ))
+        )
+      ))))
+}}
+{{- $trustPatch := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" "claim-machinery-api")
+      "spec" (dict "template" (dict "spec" (dict
+        "volumes" (list (dict
+          "name" "trust-bundle"
+          "configMap" (dict
+            "name"     .Values.trustBundle.configMapName
+            "optional" true
+          )
+        ))
+        "containers" (list (dict
+          "name" "claim-machinery-api"
+          "env"  (list (dict "name" "SSL_CERT_DIR" "value" $sslCertDir))
+          "volumeMounts" (list (dict
+            "name"      "trust-bundle"
+            "mountPath" (printf "%s/%s" $sslCertDir $bundleKey)
+            "subPath"   $bundleKey
+            "readOnly"  true
+          ))
+        ))
+      )))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.kustomize.repoURL | quote }}
+    targetRevision: {{ .Values.kustomize.targetRevision | quote }}
+    path: .
+    kustomize:
+      patches:
+        - target:
+            kind: Ingress
+            name: claim-machinery-api
+          patch: |
+{{ toYaml $ingressDelete | indent 12 }}
+        - target:
+            kind: Deployment
+            name: claim-machinery-api
+          patch: |
+{{ toYaml $deployImage | indent 12 }}
+        - target:
+            kind: ConfigMap
+            name: claim-machinery-api
+          patch: |
+{{ toYaml $cmPatch | indent 12 }}
+        - target:
+            kind: Deployment
+            name: claim-machinery-api
+          patch: |
+{{ toYaml $authPatch | indent 12 }}
+        - target:
+            kind: Deployment
+            name: claim-machinery-api
+          patch: |
+{{ toYaml $trustPatch | indent 12 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

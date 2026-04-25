@@ -1,0 +1,77 @@
+---
+# Reference back to this catalog repo — used by httpRoute + authSecret Applications
+# to load apps/claim-machinery-api/{httproute,auth-secret} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: claim-machinery
+
+# OCI kustomize base (ghcr.io/stuttgart-things/claim-machinery-api-kustomize).
+kustomize:
+  repoURL: ghcr.io/stuttgart-things/claim-machinery-api-kustomize
+  targetRevision: v0.21.1
+
+# Container image — patched into the Deployment rendered by the base.
+image:
+  repository: ghcr.io/stuttgart-things/claim-machinery-api
+  tag: v0.21.1
+
+# Application config patched into the claim-machinery-api ConfigMap.
+config:
+  templateProfilePath: ""
+  homerun:
+    enabled: false
+    url: ""
+
+# HOMERUN_AUTH_TOKEN injection. The Secret is referenced via secretKeyRef on the
+# Deployment regardless; with `optional: true` so the pod still starts when missing.
+# Set authSecret.enabled to true to provision the Secret via the auth-secret sub-App.
+auth:
+  secretName: claim-machinery-auth      # pragma: allowlist secret
+  secretKey: HOMERUN_AUTH_TOKEN
+
+# trust-manager bundle mounted for outbound TLS trust. Defaults match the
+# `cluster-trust-bundle` produced by infra/trust-manager.
+trustBundle:
+  configMapName: cluster-trust-bundle
+  key: trust-bundle.pem
+  sslCertDir: /etc/ssl/custom
+
+# Gateway API HTTPRoute sub-Application (opt-in). When enabled, the base's
+# Ingress is pruned via $patch: delete (we always delete the base Ingress
+# regardless — it's never the right shape for Gateway API consumers).
+httpRoute:
+  enabled: true
+  hostname: claim-machinery-api.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# auth-secret sub-Application (opt-in, sync-wave -10). Inlines the Secret in git;
+# dev-only path. For real deployments, leave this disabled and provision the
+# Secret via ExternalSecrets / SOPS / Vault plugin.
+authSecret:
+  enabled: false
+  homerunAuthToken: ""                  # pragma: allowlist secret
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
