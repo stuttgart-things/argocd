@@ -1,0 +1,46 @@
+{{- if .Values.gitPitcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-git-pitcher" }}
+{{- $ns := .Values.destination.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-git-pitcher" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "git-pitcher" | quote }}
+    targetRevision: {{ .Values.gitPitcher.version | quote }}
+    path: .
+    kustomize:
+      patches:
+        - target:
+            kind: Namespace
+            name: homerun2
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Namespace" "name" "homerun2") | indent 12 }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.gitPitcher.version) | indent 12 }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.redisPasswordPatch" (dict "secretName" (printf "%s-redis" $name) "password" .Values.redisPassword) | indent 12 }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" list) | indent 12 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

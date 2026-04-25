@@ -1,0 +1,11 @@
+---
+namespace: homerun2
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: homerun2-omni-pitcher
+    hostname: omni-pitcher.example.com
+    backend:
+      name: homerun2-omni-pitcher
+      port: 80

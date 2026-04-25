@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: homerun2-httproute
+description: Gateway API HTTPRoutes for the homerun2 stack — loaded as a sub-Application by apps/homerun2/install with a values list driven by which components are enabled.
+type: application
+version: 0.1.0

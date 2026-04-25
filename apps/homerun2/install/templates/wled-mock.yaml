@@ -1,0 +1,31 @@
+{{- if .Values.wledMock.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-wled-mock" }}
+{{- $ns := .Values.destination.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-wled-mock" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "wled-mock" | quote }}
+    targetRevision: {{ .Values.wledMock.version | quote }}
+    path: .
+    kustomize:
+      patches:
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.wledMock.version) | indent 12 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

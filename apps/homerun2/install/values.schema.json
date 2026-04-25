@@ -1,0 +1,181 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2 app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination"],
+  "properties": {
+    "applicationName": { "type": "string", "minLength": 1 },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": { "type": "string", "format": "uri" },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repoURL", "targetRevision"]
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "syncPolicy": { "type": "object", "additionalProperties": true },
+    "trustBundleConfigMap":      { "type": "string", "minLength": 1 },
+    "k8sPitcherProfileConfigMap": { "type": "string", "minLength": 1 },
+    "redisPassword": { "type": "string" },
+    "authToken":     { "type": "string" },
+    "redisStack": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "chartVersion": { "type": "string", "minLength": 1 },
+        "serviceType":  { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled":      { "type": "boolean" },
+            "storageClass": { "type": "string", "minLength": 1 },
+            "size":         { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" }
+          },
+          "required": ["enabled"]
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry":   { "type": "string", "minLength": 1 },
+            "repository": { "type": "string", "minLength": 1 },
+            "tag":        { "type": "string", "minLength": 1 }
+          },
+          "required": ["registry", "repository", "tag"]
+        },
+        "sentinel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "registry":   { "type": "string", "minLength": 1 },
+            "repository": { "type": "string", "minLength": 1 },
+            "tag":        { "type": "string", "minLength": 1 }
+          },
+          "required": ["registry", "repository", "tag"]
+        }
+      },
+      "required": ["enabled"]
+    },
+    "omniPitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "version":  { "type": "string", "minLength": 1 },
+        "hostname": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "coreCatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":          { "type": "boolean" },
+        "version":          { "type": "string", "minLength": 1 },
+        "kustomizeVersion": { "type": "string", "minLength": 1 },
+        "hostname":         { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "scout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "version":  { "type": "string", "minLength": 1 },
+        "hostname": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "k8sPitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":   { "type": "boolean" },
+        "version":   { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "lightCatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "version":  { "type": "string", "minLength": 1 },
+        "hostname": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "wledMock": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "version":  { "type": "string", "minLength": 1 },
+        "hostname": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "demoPitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "version":  { "type": "string", "minLength": 1 },
+        "hostname": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "ledCatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "version":  { "type": "string", "minLength": 1 },
+        "hostname": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "gitPitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "version": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"]
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name":      { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "namespace"]
+        }
+      },
+      "required": ["enabled"]
+    }
+  }
+}
