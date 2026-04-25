@@ -3,32 +3,88 @@
   "title": "nfs-csi-storageclasses chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["provisioner", "storageClasses"],
+  "required": [
+    "provisioner",
+    "storageClasses"
+  ],
   "properties": {
-    "provisioner": { "type": "string", "minLength": 1 },
+    "provisioner": {
+      "type": "string",
+      "minLength": 1
+    },
     "storageClasses": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "server", "share", "mountPermissions", "mountOptions"],
+        "required": [
+          "name",
+          "server",
+          "share",
+          "mountPermissions",
+          "mountOptions"
+        ],
         "properties": {
-          "name": { "type": "string", "minLength": 1 },
-          "server": { "type": "string", "minLength": 1 },
-          "share": { "type": "string", "minLength": 1 },
-          "subDir": { "type": "string", "minLength": 1 },
-          "mountPermissions": { "type": "string", "pattern": "^0[0-7]{0,3}$" },
-          "onDelete": { "type": "string", "enum": ["delete", "archive", "retain"] },
-          "volumeBindingMode": { "type": "string", "enum": ["Immediate", "WaitForFirstConsumer"] },
-          "reclaimPolicy": { "type": "string", "enum": ["Delete", "Retain"] },
-          "allowVolumeExpansion": { "type": "boolean" },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "server": {
+            "type": "string",
+            "minLength": 1
+          },
+          "share": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subDir": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mountPermissions": {
+            "type": "string",
+            "pattern": "^0[0-7]{0,3}$"
+          },
+          "onDelete": {
+            "type": "string",
+            "enum": [
+              "delete",
+              "archive",
+              "retain"
+            ]
+          },
+          "volumeBindingMode": {
+            "type": "string",
+            "enum": [
+              "Immediate",
+              "WaitForFirstConsumer"
+            ]
+          },
+          "reclaimPolicy": {
+            "type": "string",
+            "enum": [
+              "Delete",
+              "Retain"
+            ]
+          },
+          "allowVolumeExpansion": {
+            "type": "boolean"
+          },
           "mountOptions": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
     }
   }
 }

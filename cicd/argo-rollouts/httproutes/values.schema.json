@@ -3,42 +3,76 @@
   "title": "argo-rollouts-httproutes chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["httpRoutes"],
+  "required": [
+    "httpRoutes"
+  ],
   "properties": {
     "httpRoutes": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "namespace", "parentRefs", "hostnames", "rules"],
+        "required": [
+          "name",
+          "namespace",
+          "parentRefs",
+          "hostnames",
+          "rules"
+        ],
         "properties": {
-          "name":      { "type": "string", "minLength": 1 },
-          "namespace": { "type": "string", "minLength": 1 },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1
+          },
           "parentRefs": {
             "type": "array",
             "minItems": 1,
             "items": {
               "type": "object",
               "additionalProperties": true,
-              "required": ["name", "namespace"],
+              "required": [
+                "name",
+                "namespace"
+              ],
               "properties": {
-                "name":      { "type": "string", "minLength": 1 },
-                "namespace": { "type": "string", "minLength": 1 }
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1
+                }
               }
             }
           },
           "hostnames": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "rules": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "object", "additionalProperties": true }
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
           }
         }
       }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
     }
   }
 }

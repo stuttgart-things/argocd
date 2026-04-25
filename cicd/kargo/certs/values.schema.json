@@ -3,35 +3,76 @@
   "title": "kargo-certs chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["certificates"],
+  "required": [
+    "certificates"
+  ],
   "properties": {
     "certificates": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "namespace", "commonName", "dnsNames", "secretName", "issuerRef"],
+        "required": [
+          "name",
+          "namespace",
+          "commonName",
+          "dnsNames",
+          "secretName",
+          "issuerRef"
+        ],
         "properties": {
-          "name":       { "type": "string", "minLength": 1 },
-          "namespace":  { "type": "string", "minLength": 1 },
-          "commonName": { "type": "string", "minLength": 1 },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commonName": {
+            "type": "string",
+            "minLength": 1
+          },
           "dnsNames": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "secretName": { "type": "string", "minLength": 1 },
+          "secretName": {
+            "type": "string",
+            "minLength": 1
+          },
           "issuerRef": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "kind"],
+            "required": [
+              "name",
+              "kind"
+            ],
             "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "kind": { "type": "string", "enum": ["Issuer", "ClusterIssuer"] }
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "Issuer",
+                  "ClusterIssuer"
+                ]
+              }
             }
           }
         }
       }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
     }
   }
 }

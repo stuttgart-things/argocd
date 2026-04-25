@@ -3,9 +3,22 @@
   "title": "clusterbook-pdns sub-chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespace", "token"],
+  "required": [
+    "namespace",
+    "token"
+  ],
   "properties": {
-    "namespace": { "type": "string", "minLength": 1 },
-    "token":     { "type": "string" }
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "token": {
+      "type": "string"
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
   }
 }

@@ -3,11 +3,31 @@
   "title": "claim-machinery-api-auth-secret sub-chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespace", "secretName", "secretKey"],
+  "required": [
+    "namespace",
+    "secretName",
+    "secretKey"
+  ],
   "properties": {
-    "namespace":  { "type": "string", "minLength": 1 },
-    "secretName": { "type": "string", "minLength": 1 },
-    "secretKey":  { "type": "string", "minLength": 1 },
-    "token":      { "type": "string" }
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "secretName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "secretKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "token": {
+      "type": "string"
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
   }
 }

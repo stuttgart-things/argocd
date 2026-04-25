@@ -3,20 +3,42 @@
   "title": "tekton-ci-namespace chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespaces"],
+  "required": [
+    "namespaces"
+  ],
   "properties": {
     "namespaces": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "properties": {
-          "name":        { "type": "string", "minLength": 1 },
-          "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
-          "labels":      { "type": "object", "additionalProperties": { "type": "string" } }
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "annotations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
         }
       }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
     }
   }
 }
