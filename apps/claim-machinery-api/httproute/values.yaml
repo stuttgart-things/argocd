@@ -1,0 +1,11 @@
+---
+namespace: claim-machinery
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: claim-machinery-api
+    hostname: claim-machinery-api.example.com
+    backend:
+      name: claim-machinery-api
+      port: 8080

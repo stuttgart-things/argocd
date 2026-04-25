@@ -1,0 +1,5 @@
+---
+namespace: claim-machinery
+secretName: claim-machinery-auth        # pragma: allowlist secret
+secretKey: HOMERUN_AUTH_TOKEN
+token: ""                               # pragma: allowlist secret

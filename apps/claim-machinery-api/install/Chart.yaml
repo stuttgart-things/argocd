@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: claim-machinery-api-install
+description: App-of-apps chart packaging claim-machinery-api (OCI kustomize base + optional HTTPRoute + optional auth Secret)
+type: application
+version: 0.1.0
+appVersion: "v0.21.1"

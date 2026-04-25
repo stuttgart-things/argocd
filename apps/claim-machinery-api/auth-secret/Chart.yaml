@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: claim-machinery-api-auth-secret
+description: HOMERUN auth-token Secret for claim-machinery-api — loaded as a sub-Application by apps/claim-machinery-api/install.
+type: application
+version: 0.1.0
