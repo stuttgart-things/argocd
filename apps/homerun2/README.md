@@ -226,6 +226,10 @@ curl -X POST https://omni.<DOMAIN>/pitch \
 
 The full payload schema is documented in the upstream [homerun2-omni-pitcher](https://stuttgart-things.github.io/homerun2-omni-pitcher/) README. Health check: `curl https://omni.<DOMAIN>/health`.
 
+## Promoting with Kargo
+
+See [`kargo.md`](./kargo.md) for a full Warehouse + Stage example (dev → staging → prod) including the version-key paths Kargo's `yaml-update` step targets, the `coreCatcher.version`/`kustomizeVersion` paired-bump pattern, and the sub-Application health-check gotcha.
+
 ## Related
 
 - Flux equivalent: [`stuttgart-things/flux` — `apps/homerun2`](https://github.com/stuttgart-things/flux/tree/main/apps/homerun2)
