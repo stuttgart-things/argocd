@@ -1,0 +1,63 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: vcluster
+
+# Upstream loft-sh/vcluster Helm chart version.
+chartVersion: 0.29.1
+
+# Kubernetes version inside the virtual cluster (controlPlane.distro.k8s.image.tag).
+k8sVersion: v1.33.4
+
+# controlPlane resources (passed through to backingStore.etcd.resources).
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+    ephemeral-storage: 1Gi
+  limits:
+    memory: 4Gi
+    ephemeral-storage: 8Gi
+
+# HA replicas for the controlPlane (set to 3 for true HA).
+replicas: 1
+
+# Persistent volume backing the controlPlane.
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 10Gi
+
+# Sync resources between vcluster and host cluster. Defaults match the flux setup.
+sync:
+  toHost:
+    services: true
+    endpoints: true
+    persistentVolumeClaims: true
+  fromHost:
+    events: true
+    storageClasses: true
+    nodes: false
+    ingressClasses: true
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
