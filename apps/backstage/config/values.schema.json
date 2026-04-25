@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "backstage-config sub-chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namespace", "configMapName"],
+  "properties": {
+    "namespace":     { "type": "string", "minLength": 1 },
+    "configMapName": { "type": "string", "minLength": 1 }
+  }
+}

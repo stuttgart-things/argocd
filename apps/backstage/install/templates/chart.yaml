@@ -1,0 +1,68 @@
+{{- $defaultName := printf "backstage-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $secretRef := .Values.secretName }}
+{{- $envKeys := list
+      "APP_TITLE" "ORGANIZATION_NAME" "APP_BASE_URL" "BACKEND_BASE_URL" "CORS_ORIGIN"
+      "CLAIM_MACHINERY_API_URL" "CLAIM_MACHINERY_REGISTRY_URL" "AUTH_ENVIRONMENT"
+      "GITHUB_TOKEN" "GITHUB_CLIENT_ID" "GITHUB_CLIENT_SECRET"
+      "BACKEND_SECRET" "EXTERNAL_ACCESS_TOKEN"
+}}
+{{- $extraEnvVars := list }}
+{{- range $envKeys }}
+  {{- $extraEnvVars = append $extraEnvVars (dict
+        "name" .
+        "valueFrom" (dict "secretKeyRef" (dict "name" $secretRef "key" .))
+  ) }}
+{{- end }}
+{{- $backstage := dict
+      "replicas" .Values.replicas
+      "image" (dict
+        "registry"   .Values.image.registry
+        "repository" .Values.image.repository
+        "tag"        .Values.image.tag
+        "digest"     ""
+      )
+      "extraEnvVars" $extraEnvVars
+      "extraAppConfig" (list
+        (dict "filename" "app-config.extra.yaml"   "configMapRef" .Values.appConfig.extraConfigMap)
+        (dict "filename" "app-config.catalog.yaml" "configMapRef" .Values.appConfig.catalogConfigMap)
+      )
+}}
+{{- $computed := dict
+      "global"     (dict "storageClass" .Values.storageClass)
+      "ingress"    (dict "enabled" false)
+      "postgresql" (dict
+        "enabled"      .Values.postgresql.enabled
+        "auth"         (dict
+          "username" .Values.postgresql.username
+          "password" .Values.postgresql.password
+        )
+        "architecture" .Values.postgresql.architecture
+      )
+      "backstage" $backstage
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: ghcr.io/backstage/charts
+    chart: backstage
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: backstage
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
