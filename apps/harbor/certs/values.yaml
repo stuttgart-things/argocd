@@ -1,0 +1,7 @@
+---
+namespace: harbor
+fqdn: harbor.example.com
+secretName: harbor.example.com-tls
+issuer:
+  name: cluster-ca
+  kind: ClusterIssuer

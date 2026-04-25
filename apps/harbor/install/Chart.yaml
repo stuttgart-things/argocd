@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: harbor-install
+description: App-of-apps chart packaging Harbor (bitnami chart with bitnamilegacy image overrides) plus optional cert-manager Certificate, Gateway API HTTPRoutes, and harbor-project-proxy sub-Applications.
+type: application
+version: 0.1.0
+appVersion: "27.0.3"

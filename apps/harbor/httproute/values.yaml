@@ -1,0 +1,7 @@
+---
+namespace: harbor
+gateway:
+  name: cilium-gateway
+  namespace: default
+fqdn: harbor.example.com
+wildcard: "*.harbor.example.com"

@@ -1,0 +1,93 @@
+---
+# Reference back to this catalog repo — used by the certs / httpRoute / projectProxy
+# Applications to load apps/harbor/{certs,httproute,project-proxy} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: harbor
+
+# Upstream bitnami harbor OCI chart version.
+chartVersion: 27.0.3
+
+# Public hostname Harbor is exposed on (single label + apex domain).
+# externalURL is set to "<hostname>.<domain>"; the project-proxy / cert wildcards
+# match "*.<hostname>.<domain>".
+hostname: harbor
+domain: example.com
+
+# Harbor admin password. Inline only for dev — prefer an ArgoCD Vault Plugin
+# / SOPS overlay so the literal never lands in git.
+adminPassword: ""                   # pragma: allowlist secret
+
+# StorageClass used by Harbor's PVCs (registry/trivy/jobservice + bundled DBs).
+storageClass: nfs4-csi
+
+# Persistence — disable to drop PVCs (dev only).
+persistence:
+  enabled: true
+  registrySize: 12Gi
+  trivySize: 5Gi
+  jobserviceSize: 1Gi
+
+# Harbor exposure type (`ingress`, `clusterIP`, `nodePort`, `loadBalancer`).
+# Defaults to `ingress` because the chart needs an exposureType to render correctly,
+# but we ship our own HTTPRoute as well — set this to `clusterIP` to disable the
+# bitnami Ingress entirely.
+exposureType: ingress
+
+# Built-in bitnami Ingress config. Set `enabled: false` (or exposureType=clusterIP)
+# when using the httpRoute sub-Application.
+ingress:
+  enabled: true
+  className: nginx
+
+# cert-manager Certificate sub-Application (opt-in, sync-wave -10). Provisions
+# the TLS Secret consumed by the bitnami Ingress + project-proxy.
+certs:
+  enabled: false
+  issuer:
+    name: cluster-ca
+    kind: ClusterIssuer
+
+# Gateway API HTTPRoute sub-Application (opt-in, sync-wave 10). Renders two
+# HTTPRoutes: one for the main Harbor API/portal, one wildcard for project-proxy.
+httpRoute:
+  enabled: false
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# harbor-project-proxy sub-Application (opt-in, sync-wave 10). Routes pulls
+# of the form `<project>.<hostname>.<domain>` to the right Harbor project.
+projectProxy:
+  enabled: false
+  chartVersion: 0.0.1
+  replicaCount: 1
+  ingress:
+    enabled: true
+    className: nginx
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

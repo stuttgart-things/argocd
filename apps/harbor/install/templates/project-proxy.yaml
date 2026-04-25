@@ -1,0 +1,48 @@
+{{- if .Values.projectProxy.enabled }}
+{{- $defaultName := printf "harbor-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $fqdn := printf "%s.%s" .Values.hostname .Values.domain }}
+{{- $proxyValues := dict
+      "replicaCount"   .Values.projectProxy.replicaCount
+      "harborUpstream" (printf "http://harbor-core.%s.svc" .Values.destination.namespace)
+}}
+{{- if .Values.projectProxy.ingress.enabled }}
+  {{- $_ := set $proxyValues "ingress" (dict
+        "enabled"   true
+        "className" .Values.projectProxy.ingress.className
+        "hosts"     (list (dict
+          "host"  (printf "*.%s" $fqdn)
+          "paths" (list (dict "path" "/" "pathType" "ImplementationSpecific"))
+        ))
+        "tls" (list (dict
+          "secretName" (printf "%s-tls" $fqdn)
+          "hosts"      (list (printf "*.%s" $fqdn))
+        ))
+  ) }}
+{{- else }}
+  {{- $_ := set $proxyValues "ingress" (dict "enabled" false) }}
+{{- end }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-project-proxy" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: ghcr.io/hiddenmarten
+    chart: harbor-project-proxy
+    targetRevision: {{ .Values.projectProxy.chartVersion | quote }}
+    helm:
+      releaseName: harbor-project-proxy
+      valuesObject:
+        {{- toYaml $proxyValues | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

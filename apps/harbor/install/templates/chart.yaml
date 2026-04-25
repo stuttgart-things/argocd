@@ -1,0 +1,87 @@
+{{- $defaultName := printf "harbor-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $fqdn := printf "%s.%s" .Values.hostname .Values.domain }}
+{{- $tlsSecret := printf "%s-tls" $fqdn }}
+{{- $ingressBlock := dict
+      "core" (dict
+        "ingressClassName" .Values.ingress.className
+        "hostname"         $fqdn
+        "tls"              true
+        "extraTls"         (list (dict
+          "hosts"      (list $fqdn)
+          "secretName" $tlsSecret
+        ))
+        "annotations" (dict
+          "ingress.kubernetes.io/ssl-redirect"          "true"
+          "ingress.kubernetes.io/proxy-body-size"       "0"
+          "nginx.ingress.kubernetes.io/ssl-redirect"    "true"
+          "nginx.ingress.kubernetes.io/proxy-body-size" "0"
+        )
+      )
+}}
+{{- $persistenceBlock := dict
+      "enabled"        .Values.persistence.enabled
+      "resourcePolicy" ""
+      "persistentVolumeClaim" (dict
+        "registry"   (dict "size" .Values.persistence.registrySize)
+        "trivy"      (dict "size" .Values.persistence.trivySize)
+        "jobservice" (dict "size" .Values.persistence.jobserviceSize)
+      )
+}}
+{{- $computed := dict
+      "externalURL"   $fqdn
+      "clusterDomain" "cluster.local"
+      "adminPassword" .Values.adminPassword
+      "global" (dict
+        "imageRegistry"      "docker.io"
+        "defaultStorageClass" .Values.storageClass
+        "storageClass"       .Values.storageClass
+        "security"           (dict "allowInsecureImages" true)
+      )
+      "nginx"      (dict "image" (dict "repository" "bitnamilegacy/nginx"))
+      "portal"     (dict "image" (dict "repository" "bitnamilegacy/harbor-portal"))
+      "core"       (dict "image" (dict "repository" "bitnamilegacy/harbor-core"))
+      "jobservice" (dict "image" (dict "repository" "bitnamilegacy/harbor-jobservice"))
+      "registry" (dict
+        "server"     (dict "image" (dict "repository" "bitnamilegacy/harbor-registry"))
+        "controller" (dict "image" (dict "repository" "bitnamilegacy/harbor-registryctl"))
+      )
+      "trivy"             (dict "image" (dict "repository" "bitnamilegacy/harbor-adapter-trivy"))
+      "exporter"          (dict "image" (dict "repository" "bitnamilegacy/harbor-exporter"))
+      "volumePermissions" (dict "image" (dict "repository" "bitnamilegacy/os-shell"))
+      "exposureType" .Values.exposureType
+      "service"      (dict "type" "ClusterIP")
+      "ipFamily" (dict
+        "ipv6" (dict "enabled" false)
+        "ipv4" (dict "enabled" true)
+      )
+      "ingress"     $ingressBlock
+      "persistence" $persistenceBlock
+      "postgresql"  (dict "image" (dict "repository" "bitnamilegacy/postgresql"))
+      "redis"       (dict "image" (dict "repository" "bitnamilegacy/redis"))
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: registry-1.docker.io/bitnamicharts
+    chart: harbor
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: harbor
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: harbor-httproute
+description: Gateway API HTTPRoutes for Harbor (main API/portal split + wildcard project-proxy) — loaded as a sub-Application by apps/harbor/install.
+type: application
+version: 0.1.0

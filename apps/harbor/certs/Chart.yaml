@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: harbor-certs
+description: cert-manager Certificate for Harbor's ingress TLS — loaded as a sub-Application by apps/harbor/install. Includes a wildcard SAN for the project-proxy.
+type: application
+version: 0.1.0
