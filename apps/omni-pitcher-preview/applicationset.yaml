@@ -1,0 +1,80 @@
+# ApplicationSet using ArgoCD's Pull Request generator on
+# stuttgart-things/homerun2-omni-pitcher.
+#
+# For each open PR, renders ONE Argo CD Application that points at the
+# apps/omni-pitcher-preview/install Helm chart in this catalog. That chart
+# emits two child Applications (redis-stack + omni-pitcher) into a single
+# PR-scoped namespace (omni-pitcher-pr-<number>).
+#
+# Apply this ApplicationSet once into the argocd namespace; new PRs are
+# picked up automatically on the requeueAfterSeconds interval.
+#
+# Prerequisites:
+#   - Secret `github-token` in the argocd namespace with key `token`
+#     (read access to stuttgart-things/homerun2-omni-pitcher).
+#   - CI on the source repo publishes per-PR artifacts tagged with the
+#     head short SHA:
+#       * container image  ghcr.io/stuttgart-things/homerun2-omni-pitcher:<sha>
+#       * kustomize OCI    ghcr.io/stuttgart-things/homerun2-omni-pitcher-kustomize:<sha>
+#     Override `omniPitcher.version` in the template if your CI uses a
+#     different tagging scheme (e.g. `pr-<number>`).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: omni-pitcher-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - pullRequest:
+        github:
+          owner: stuttgart-things
+          repo: homerun2-omni-pitcher
+          tokenRef:
+            secretName: github-token
+            key: token
+          labels:
+            - preview
+        requeueAfterSeconds: 180
+  template:
+    metadata:
+      name: 'omni-pitcher-pr-{{ .number }}'
+      labels:
+        homerun2.sthings.io/component: omni-pitcher
+        homerun2.sthings.io/preview: "true"
+        homerun2.sthings.io/pr-number: '{{ .number }}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: HEAD
+        path: apps/omni-pitcher-preview/install
+        helm:
+          releaseName: 'omni-pitcher-pr-{{ .number }}'
+          valuesObject:
+            pr:
+              number: '{{ .number }}'
+              branch: '{{ .branch }}'
+              headSha: '{{ .head_sha }}'
+              headShortSha: '{{ .head_short_sha }}'
+            destination:
+              namespace: 'omni-pitcher-pr-{{ .number }}'
+            omniPitcher:
+              version: '{{ .head_short_sha }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

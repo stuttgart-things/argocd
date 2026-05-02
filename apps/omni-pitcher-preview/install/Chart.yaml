@@ -1,0 +1,6 @@
+apiVersion: v2
+name: omni-pitcher-preview
+description: PR-preview umbrella chart that emits redis-stack + omni-pitcher Argo CD Applications into one shared per-PR namespace. Driven by the apps/omni-pitcher-preview ApplicationSet pullRequest generator.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

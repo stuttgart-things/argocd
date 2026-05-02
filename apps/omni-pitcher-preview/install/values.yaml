@@ -1,0 +1,74 @@
+# Reference back to this catalog repo - the redis-stack child Application
+# loads apps/redis-stack/install from this commit.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered child Applications belong to.
+project: default
+
+# Where all rendered child Applications deploy. The ApplicationSet template
+# overrides `destination.namespace` with `omni-pitcher-pr-<number>` per PR;
+# the default below lets the chart render standalone for `helm template`.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: omni-pitcher-preview
+
+# PR coordinates injected by the ApplicationSet template. Defaults are
+# placeholders so the chart still renders standalone.
+pr:
+  number: "0"
+  branch: main
+  headSha: ""                       # pragma: allowlist secret
+  headShortSha: latest
+
+# Sync policy applied to every rendered child Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
+
+# Ephemeral previews use throwaway literals - wire to a Vault-backed secret
+# in real environments. Both values are patched into the per-component Secret
+# the omni-pitcher kustomize base ships.
+redisPassword: "preview-redis-password"   # pragma: allowlist secret
+authToken: "preview-auth-token"           # pragma: allowlist secret
+
+# redis-stack child Application (delegates to apps/redis-stack/install in
+# this catalog).
+redisStack:
+  enabled: true
+  chartVersion: 17.1.4
+  serviceType: ClusterIP
+  persistence:
+    enabled: false                  # ephemeral preview - no PV by default
+    storageClass: standard
+    size: 8Gi
+  image:
+    registry: ghcr.io
+    repository: stuttgart-things/redis-stack-server
+    tag: 7.2.0-v18
+  sentinel:
+    registry: ghcr.io
+    repository: stuttgart-things/redis-sentinel
+    tag: 7.4.2-debian-12-r9
+
+# omni-pitcher child Application - pulls the per-commit kustomize OCI
+# artifact and patches in the PR's image tag, redis address, and ephemeral
+# secrets.
+omniPitcher:
+  enabled: true
+  # Defaults to the ApplicationSet substitution `{{ .head_short_sha }}` -
+  # CI must publish a kustomize OCI tag matching the head short SHA.
+  version: latest
+  # Optional override of the OCI repo (e.g. forks).
+  kustomizeRepo: "ghcr.io/stuttgart-things/homerun2-omni-pitcher-kustomize"
