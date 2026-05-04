@@ -1,0 +1,73 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cilium-install-kind
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            clusterbook.stuttgart-things.com/cluster-type: kind
+  template:
+    metadata:
+      name: cilium-install-{{ .name }}
+      annotations:
+        # Cilium is the CNI — must land before the LB pool / Gateway / cert-manager
+        # bundles can reach a healthy cluster. Wave is informational across
+        # independent ApplicationSets (see README), so retries do the actual ordering.
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        # Renders an App-of-Apps on the management cluster; the inner
+        # Application targets the workload cluster via valuesObject.destination.
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/cilium/install
+        helm:
+          valuesObject:
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: kube-system
+            k8s:
+              # kind's kube-apiserver is reachable via the control-plane node's
+              # docker hostname (<cluster>-control-plane). Required for
+              # kubeProxyReplacement when the in-cluster default doesn't resolve.
+              serviceHost: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/cluster-name" }}-control-plane'
+              servicePort: 6443
+            operatorReplicas: 2
+            extraValues:
+              # kind clusters use the docker bridge — native routing avoids the
+              # tunnel overhead and keeps LoadBalancer L2 announcements simple.
+              routingMode: native
+              ipv4NativeRoutingCIDR: 10.244.0.0/16
+              autoDirectNodeRoutes: true
+              devices:
+                - eth0
+                - net0
+              l2announcements:
+                # Tight lease timings keep failover fast on the small kind nodes
+                # where leadership churn is more likely than on a real cluster.
+                leaseDuration: 3s
+                leaseRenewDeadline: 1s
+                leaseRetryPeriod: 500ms
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true
