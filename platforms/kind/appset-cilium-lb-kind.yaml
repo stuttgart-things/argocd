@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cilium-lb-kind
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            clusterbook.stuttgart-things.com/cluster-type: kind
+  template:
+    metadata:
+      name: cilium-lb-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        name: '{{ .name }}'
+        namespace: kube-system
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/cilium/lb
+        helm:
+          valuesObject:
+            poolName: '{{ .name }}-pool'
+            # kind LoadBalancer IPs come from the docker bridge network as a
+            # contiguous range (not a single VIP). The clusterbook-operator
+            # writes the resolved range to these annotations.
+            blocks:
+              - start: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/lb-range-start" }}'
+                stop: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/lb-range-stop" }}'
+            l2Policy:
+              name: default-l2-announcement-policy
+              namespace: kube-system
+              externalIPs: true
+              loadBalancerIPs: true
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
