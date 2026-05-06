@@ -12,6 +12,7 @@ spec:
         selector:
           matchLabels:
             clusterbook.stuttgart-things.com/cluster-type: kind
+            clusterbook.stuttgart-things.com/expose-external: "true"
   template:
     metadata:
       name: cert-manager-cluster-ca-{{ .name }}

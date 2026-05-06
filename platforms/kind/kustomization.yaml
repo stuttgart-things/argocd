@@ -1,10 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: argocd
+# Base bundle — the four AppSets that work on any kind cluster
+# (Cilium CNI + LB pool + cert-manager install + selfsigned issuer).
+# The cluster-CA + cilium-gateway AppSets live in ./expose-external/
+# and require an FQDN; opt in there only on clusters that publish
+# their kind LB IPs externally via DNS.
 resources:
   - appset-cilium-install-kind.yaml
   - appset-cert-manager-install-kind.yaml
   - appset-cert-manager-selfsigned-kind.yaml
-  - appset-cert-manager-cluster-ca-kind.yaml
   - appset-cilium-lb-kind.yaml
-  - appset-cilium-gateway-kind.yaml

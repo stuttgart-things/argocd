@@ -1,11 +1,16 @@
 # platforms/kind
 
-Kind-aware platform bootstrap: six `ApplicationSet`s on the management cluster that fan out to every kind cluster registered via [clusterbook-operator](https://github.com/stuttgart-things/clusterbook-operator), wiring Cilium itself + LoadBalancer IP pool + Gateway + cert-manager chain onto each one.
+Kind-aware platform bootstrap: `ApplicationSet`s on the management cluster that fan out to every kind cluster registered via [clusterbook-operator](https://github.com/stuttgart-things/clusterbook-operator), wiring Cilium itself + LoadBalancer IP pool + cert-manager chain onto each one.
 
 Mirrors [`platforms/clusterbook/`](../clusterbook/) but with two differences forced by kind:
 
 1. **Cilium is installed by this bundle** — kind ships without a CNI. The vSphere/Talos clusters that `platforms/clusterbook/` targets already have Cilium pre-installed; kind doesn't.
 2. **The LB pool comes from a docker-bridge IP range** — kind LoadBalancer IPs are carved out of the docker network the cluster runs on, so each cluster needs its own contiguous `start`/`stop` block. The clusterbook-operator writes that range to the cluster Secret as annotations.
+
+The bundle is split in two:
+
+- **base** (this directory) — the four AppSets that work on any kind cluster: Cilium install + LB pool + cert-manager install + selfsigned issuer.
+- **`expose-external/`** — opt-in overlay (cluster-CA + Cilium Gateway) for clusters that publish their kind LB IPs externally via DNS. Gated on a per-cluster opt-in label so the default kind install doesn't generate Applications that can't render without an FQDN. See [Expose externally](#expose-externally) below.
 
 ## Prerequisite — clusterbook-operator ≥ v0.15.0
 
@@ -14,12 +19,15 @@ Each kind cluster's ArgoCD `Secret` (created or enriched by `ClusterbookCluster`
 ```yaml
 labels:
   clusterbook.stuttgart-things.com/cluster-type: kind
+  # only when applying expose-external/:
+  clusterbook.stuttgart-things.com/expose-external: "true"
 annotations:
   clusterbook.stuttgart-things.com/cluster-name:    <cluster-name>
-  clusterbook.stuttgart-things.com/ip:              <primary-ip>
-  clusterbook.stuttgart-things.com/fqdn:            <wildcard-fqdn>
   clusterbook.stuttgart-things.com/lb-range-start:  <range-start>
   clusterbook.stuttgart-things.com/lb-range-stop:   <range-stop>
+  # only when applying expose-external/:
+  clusterbook.stuttgart-things.com/fqdn:            <wildcard-fqdn>
+  clusterbook.stuttgart-things.com/ip:              <primary-ip>
 ```
 
 `clusterType`, `lbRange`, and the `cluster-name` annotation are added by [stuttgart-things/clusterbook-operator#79](https://github.com/stuttgart-things/clusterbook-operator/issues/79) (released in v0.15.0). Until that operator version reconciles your cluster, none of the ApplicationSets here will generate.
@@ -28,12 +36,19 @@ A minimal `ClusterbookCluster` for kind (user-pinned docker-bridge range) lives 
 
 ## What gets deployed per registered kind cluster
 
+### base (default install)
+
 | ApplicationSet | Wave | Destination | Catalog path | Produces |
 |---|---|---|---|---|
 | `cilium-install-kind`             | -10 | mgmt cluster | `infra/cilium/install`        | child `Application` installing Cilium on the workload cluster (CNI + L2 + GatewayClass) |
 | `cert-manager-install-kind`       |   0 | mgmt cluster | `infra/cert-manager/install`  | child `Application` installing cert-manager on the workload cluster |
 | `cilium-lb-kind`                  |   0 | workload/kube-system | `infra/cilium/lb`     | `CiliumLoadBalancerIPPool` with a docker-bridge range + L2 announcement policy |
 | `cert-manager-selfsigned-kind`    |   1 | workload/cert-manager | `infra/cert-manager/selfsigned` | `selfsigned` `ClusterIssuer` |
+
+### expose-external (opt-in)
+
+| ApplicationSet | Wave | Destination | Catalog path | Produces |
+|---|---|---|---|---|
 | `cert-manager-cluster-ca-kind`    |   2 | workload/cert-manager | `infra/cert-manager/cluster-ca` | cluster CA `Certificate` + `ClusterIssuer` + `<cluster>-gateway-tls` wildcard for the FQDN |
 | `cilium-gateway-kind`             |   3 | workload/default | `infra/cilium/gateway`   | Gateway API `Gateway` listening on the FQDN, TLS from `<cluster>-gateway-tls` |
 
@@ -73,11 +88,40 @@ This is the same caveat as `platforms/clusterbook/`. The one wave that matters i
 kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/kind?ref=main
 ```
 
-All six ApplicationSets land in the `argocd` namespace on the management cluster. They become active as soon as clusterbook-operator labels a cluster Secret with `cluster-type=kind`.
+The four base ApplicationSets land in the `argocd` namespace on the management cluster. They become active as soon as clusterbook-operator labels a cluster Secret with `cluster-type=kind`.
+
+## Expose externally
+
+The cluster-CA + gateway flow needs an FQDN that resolves to the kind cluster's LB IP. kind LB IPs live on the docker bridge of the host running the cluster — they're host-local by default, so DNS publication only makes sense for clusters where someone has set up routing or port-forwarding to that range.
+
+Apply the overlay separately:
+
+```bash
+kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/kind/expose-external?ref=main
+```
+
+Then opt each cluster in by adding the label to its ArgoCD cluster Secret. With clusterbook-operator that's:
+
+```yaml
+apiVersion: clusterbook.stuttgart-things.com/v1alpha1
+kind: ClusterbookCluster
+metadata:
+  name: dev-a
+spec:
+  clusterType: kind
+  # … kubeconfigSecretRef, lbRange, etc.
+  labels:
+    auto-project: "true"
+    clusterbook.stuttgart-things.com/expose-external: "true"   # opt in here
+```
+
+Without the label, the two AppSets in `expose-external/` won't generate Applications for the cluster — even if the overlay is applied on the management cluster. This is deliberate: applying the overlay shouldn't fan out to every existing kind cluster automatically, only the ones that genuinely have external DNS pointing at their LB IPs.
+
+Both labels (`cluster-type=kind` and `expose-external=true`) and a non-empty `clusterbook.stuttgart-things.com/fqdn` annotation must be present for the helm charts to render — without an FQDN they fail validation with `wildcard.commonName: minLength got 0`. The clusterbook-operator's `ClusterbookProviderConfig` has to be pointing at a server that allocates DNS records for the cluster.
 
 ## Swapping the issuer (Vault PKI path)
 
-Same path as [`platforms/clusterbook/README.md`](../clusterbook/README.md#swapping-the-issuer-vault-pki-path) — the selfsigned + cluster-ca chain is replaceable with a Vault-backed `ClusterIssuer`. The gateway ApplicationSet stays as-is.
+Same path as [`platforms/clusterbook/README.md`](../clusterbook/README.md#swapping-the-issuer-vault-pki-path) — the selfsigned + cluster-ca chain is replaceable with a Vault-backed `ClusterIssuer`. The gateway ApplicationSet (in `expose-external/`) stays as-is.
 
 ## Related
 

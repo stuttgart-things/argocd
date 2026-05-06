@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+# Opt-in overlay — gateway + cluster-CA AppSets that require a per-cluster
+# FQDN. Only generates Applications for kind clusters whose ArgoCD
+# cluster Secret carries BOTH labels:
+#   clusterbook.stuttgart-things.com/cluster-type: kind
+#   clusterbook.stuttgart-things.com/expose-external: "true"
+# Apply only on clusters that actually publish their kind LB IPs
+# externally via DNS — kind LB IPs live on the docker bridge and are
+# host-local by default, so this is the exception, not the default.
+resources:
+  - appset-cert-manager-cluster-ca-kind.yaml
+  - appset-cilium-gateway-kind.yaml
