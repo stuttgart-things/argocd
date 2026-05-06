@@ -24,8 +24,14 @@ spec:
             # `<cluster>-gateway-tls` wildcard Certificate this HTTPRoute
             # depends on. Non-clusterbook clusters would need their own
             # Gateway convention — skip them here.
+            # NotIn [""] is required in addition to Exists because the operator
+            # stamps allocation-ip="" on registration-only kind clusters, where
+            # Exists alone would falsely match.
             - key: clusterbook.stuttgart-things.com/allocation-ip
               operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
   template:
     metadata:
       name: kargo-httproute-{{ .name }}

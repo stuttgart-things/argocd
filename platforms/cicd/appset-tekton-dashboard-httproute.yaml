@@ -22,8 +22,14 @@ spec:
             # Only clusterbook-registered clusters have the `<cluster>-gateway`
             # Gateway and `<cluster>-gateway-tls` wildcard cert this HTTPRoute
             # depends on. BYO-gateway clusters ship their own Application.
+            # NotIn [""] is required in addition to Exists because the operator
+            # stamps allocation-ip="" on registration-only kind clusters, where
+            # Exists alone would falsely match.
             - key: clusterbook.stuttgart-things.com/allocation-ip
               operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
   template:
     metadata:
       name: tekton-dashboard-httproute-{{ .name }}
