@@ -1,0 +1,34 @@
+{{- if not .Values.applicationSet.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.applicationName | quote }}
+  labels:
+    {{- include "run-things-collector.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.applicationName | quote }}
+  labels:
+    {{- include "run-things-collector.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccountName | quote }}
+    namespace: {{ .Values.namespace | quote }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Values.applicationName | quote }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

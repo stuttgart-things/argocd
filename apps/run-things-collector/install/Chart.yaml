@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: run-things-collector
+description: Cluster-side collector agent that reports workload inventory to a central run-things server
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

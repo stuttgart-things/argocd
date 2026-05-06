@@ -1,0 +1,9 @@
+{{- if not .Values.applicationSet.enabled }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace | quote }}
+  labels:
+    {{- include "run-things-collector.labels" . | nindent 4 }}
+{{- end }}

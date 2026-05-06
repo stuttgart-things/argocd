@@ -1,0 +1,55 @@
+{{- if .Values.applicationSet.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ .Values.applicationSet.name | quote }}
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        {{- with .Values.applicationSet.generators.clusters.selector }}
+        selector:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+  template:
+    metadata:
+      name: 'run-things-collector-{{ "{{" }} .name {{ "}}" }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "5"
+    spec:
+      project: {{ .Values.project | quote }}
+      source:
+        repoURL: {{ .Values.catalog.repoURL | quote }}
+        targetRevision: {{ .Values.catalog.targetRevision | quote }}
+        path: {{ .Values.catalog.path | quote }}
+        helm:
+          valuesObject:
+            applicationName: {{ .Values.applicationName | quote }}
+            namespace: {{ .Values.namespace | quote }}
+            serviceAccountName: {{ .Values.serviceAccountName | quote }}
+            clusterName: '{{ "{{" }} .name {{ "}}" }}'
+            clusterEndpoint: '{{ "{{" }} .server {{ "}}" }}'
+            image:
+              repository: {{ .Values.image.repository | quote }}
+              tag: {{ .Values.image.tag | quote }}
+              pullPolicy: {{ .Values.image.pullPolicy | quote }}
+            server:
+              url: {{ .Values.server.url | quote }}
+              token: {{ .Values.server.token | quote }}
+            reportInterval: {{ .Values.reportInterval | quote }}
+            heartbeatInterval: {{ .Values.heartbeatInterval | quote }}
+            httpTimeout: {{ .Values.httpTimeout | quote }}
+            namespaces: {{ .Values.namespaces | quote }}
+            resources:
+              {{- toYaml .Values.resources | nindent 14 }}
+            applicationSet:
+              enabled: false
+      destination:
+        server: '{{ "{{" }} .server {{ "}}" }}'
+        namespace: {{ .Values.namespace | quote }}
+      syncPolicy:
+        {{- toYaml .Values.syncPolicy | nindent 8 }}
+{{- end }}

@@ -1,0 +1,74 @@
+---
+# Reference back to this catalog repo — the ApplicationSet uses it as the
+# source for the rendered Applications that deploy this chart to each cluster.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+  path: apps/run-things-collector/install
+
+# ArgoCD AppProject every rendered Application belongs to.
+project: default
+
+# Where the collector-agent runs inside each member cluster.
+namespace: run-things-collector
+serviceAccountName: run-things-collector
+applicationName: run-things-collector
+
+# Image. Build + push via `task build-collector-ko` from the run-things repo.
+image:
+  repository: ghcr.io/stuttgart-things/run-things-collector-agent
+  tag: v0.1.0
+  pullPolicy: Always
+
+# Connection to the central run-things server.
+server:
+  url: http://run-things.run-things.svc.cluster.local:50051
+  # Bearer token shared with the server. Empty disables auth on both sides.
+  # Wire this through ExternalSecret / SOPS — never commit a literal here.
+  token: ""                          # pragma: allowlist secret
+
+# Reporting cadence. Go duration strings (e.g. "60s", "5m").
+reportInterval: 60s
+heartbeatInterval: 30s
+httpTimeout: 15s
+
+# Optional comma-separated namespace allow list. Empty = cluster-wide.
+namespaces: ""
+
+# Cluster identity. Override per cluster from the ApplicationSet generator.
+clusterName: default
+clusterEndpoint: ""
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# ApplicationSet wiring. The cluster generator fans the Application out to
+# every cluster registered with Argo CD (selectable via labels).
+applicationSet:
+  enabled: true
+  name: run-things-collector
+  generators:
+    clusters:
+      selector:
+        matchLabels:
+          run-things/collector: "enabled"
+
+# Sync policy applied to every rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
