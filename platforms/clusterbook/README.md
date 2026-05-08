@@ -2,7 +2,7 @@
 
 Clusterbook-aware platform bootstrap: five `ApplicationSet`s on the management cluster that fan out to every cluster registered via [clusterbook-operator](https://github.com/stuttgart-things/clusterbook-operator), wiring its reserved IP + FQDN through cilium LoadBalancer, cert-manager, and a cilium Gateway.
 
-All five ApplicationSets share one selector — the ArgoCD cluster `Secret` enriched by clusterbook-operator must carry:
+All five ApplicationSets share a base anchor — the ArgoCD cluster `Secret` enriched by clusterbook-operator must carry:
 
 ```
 clusterbook.stuttgart-things.com/allocation-ip: <label exists>
@@ -11,6 +11,33 @@ clusterbook.stuttgart-things.com/fqdn:  <annotation, the reserved FQDN>
 ```
 
 These are emitted by `ClusterbookCluster` and `ClusterbookAllocation` CRs. Nothing here generates until clusterbook-operator has populated them.
+
+## Opt-in: `network-platform` master gate + per-feature toggles
+
+On top of the `allocation-ip` anchor, each ApplicationSet additionally requires a master `network-platform` gate **and** allows opting individual components out via per-feature labels — same pattern as `platforms/cicd`'s `cicd-platform/<feature>`.
+
+| ApplicationSet | per-feature label key |
+|---|---|
+| `cilium-lb-clusterbook`               | `network-platform/cilium-lb` |
+| `cilium-gateway-clusterbook`          | `network-platform/cilium-gateway` |
+| `cert-manager-install-clusterbook`    | `network-platform/cert-manager-install` |
+| `cert-manager-selfsigned-clusterbook` | `network-platform/cert-manager-selfsigned` |
+| `cert-manager-cluster-ca-clusterbook` | `network-platform/cert-manager-cluster-ca` |
+
+Selector logic per appset:
+
+```yaml
+matchLabels:
+  network-platform: "true"
+matchExpressions:
+  - key: clusterbook.stuttgart-things.com/allocation-ip
+    operator: Exists
+  - key: network-platform/<feature>
+    operator: NotIn
+    values: ["false"]
+```
+
+That means a cluster Secret needs `network-platform: "true"` to receive any of these components, and can opt out of an individual feature with `network-platform/<feature>: "false"`. Missing per-feature labels default to enabled (NotIn ["false"] matches both true and missing).
 
 ## What gets deployed per registered cluster
 
@@ -36,7 +63,7 @@ If you need real ordering (e.g. to swap the selfsigned + cluster-ca chain for a 
 kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/clusterbook?ref=main
 ```
 
-All five ApplicationSets land in the `argocd` namespace on the management cluster. They become active as soon as clusterbook-operator labels a cluster Secret with `allocation-ip`.
+All five ApplicationSets land in the `argocd` namespace on the management cluster. They become active once clusterbook-operator labels the cluster Secret with `allocation-ip` **and** the `ClusterbookCluster` carries `spec.labels.network-platform: "true"` (plus, optionally, per-feature opt-out toggles).
 
 ## Swapping the issuer (Vault PKI path)
 

@@ -10,9 +10,14 @@ spec:
   generators:
     - clusters:
         selector:
+          matchLabels:
+            network-platform: "true"
           matchExpressions:
             - key: clusterbook.stuttgart-things.com/allocation-ip
               operator: Exists
+            - key: network-platform/cert-manager-selfsigned
+              operator: NotIn
+              values: ["false"]
   template:
     metadata:
       name: cert-manager-selfsigned-{{ .name }}
