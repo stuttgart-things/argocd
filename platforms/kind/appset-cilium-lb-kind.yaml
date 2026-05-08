@@ -12,6 +12,10 @@ spec:
         selector:
           matchLabels:
             clusterbook.stuttgart-things.com/cluster-type: kind
+          matchExpressions:
+            - key: kind-platform/cilium-lb
+              operator: NotIn
+              values: ["false"]
   template:
     metadata:
       name: cilium-lb-{{ .name }}

@@ -90,6 +90,19 @@ kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/kind?r
 
 The four base ApplicationSets land in the `argocd` namespace on the management cluster. They become active as soon as clusterbook-operator labels a cluster Secret with `cluster-type=kind`.
 
+## Per-feature opt-out (base bundle)
+
+Each base ApplicationSet additionally allows opting out per cluster via a `kind-platform/<feature>: "false"` label on the cluster Secret. Missing labels default to enabled — same `NotIn ["false"]` semantics as `platforms/cicd` and `platforms/network`. There is no master gate: `cluster-type=kind` itself is the gate.
+
+| ApplicationSet | per-feature label key |
+|---|---|
+| `cilium-install-kind`          | `kind-platform/cilium-install` |
+| `cilium-lb-kind`               | `kind-platform/cilium-lb` |
+| `cert-manager-install-kind`    | `kind-platform/cert-manager-install` |
+| `cert-manager-selfsigned-kind` | `kind-platform/cert-manager-selfsigned` |
+
+The `expose-external/` overlay (cluster-CA + Gateway) is **not** covered by this pattern — it stays gated on the explicit `clusterbook.stuttgart-things.com/expose-external: "true"` label.
+
 ## Expose externally
 
 The cluster-CA + gateway flow needs an FQDN that resolves to the kind cluster's LB IP. kind LB IPs live on the docker bridge of the host running the cluster — they're host-local by default, so DNS publication only makes sense for clusters where someone has set up routing or port-forwarding to that range.
