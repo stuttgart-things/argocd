@@ -1,4 +1,4 @@
-# platforms/clusterbook
+# platforms/network
 
 Clusterbook-aware platform bootstrap: five `ApplicationSet`s on the management cluster that fan out to every cluster registered via [clusterbook-operator](https://github.com/stuttgart-things/clusterbook-operator), wiring its reserved IP + FQDN through cilium LoadBalancer, cert-manager, and a cilium Gateway.
 
@@ -60,7 +60,7 @@ If you need real ordering (e.g. to swap the selfsigned + cluster-ca chain for a 
 ## Install
 
 ```bash
-kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/clusterbook?ref=main
+kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/network?ref=main
 ```
 
 All five ApplicationSets land in the `argocd` namespace on the management cluster. They become active once clusterbook-operator labels the cluster Secret with `allocation-ip` **and** the `ClusterbookCluster` carries `spec.labels.network-platform: "true"` (plus, optionally, per-feature opt-out toggles).

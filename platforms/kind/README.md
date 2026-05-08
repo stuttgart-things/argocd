@@ -2,9 +2,9 @@
 
 Kind-aware platform bootstrap: `ApplicationSet`s on the management cluster that fan out to every kind cluster registered via [clusterbook-operator](https://github.com/stuttgart-things/clusterbook-operator), wiring Cilium itself + LoadBalancer IP pool + cert-manager chain onto each one.
 
-Mirrors [`platforms/clusterbook/`](../clusterbook/) but with two differences forced by kind:
+Mirrors [`platforms/network/`](../clusterbook/) but with two differences forced by kind:
 
-1. **Cilium is installed by this bundle** — kind ships without a CNI. The vSphere/Talos clusters that `platforms/clusterbook/` targets already have Cilium pre-installed; kind doesn't.
+1. **Cilium is installed by this bundle** — kind ships without a CNI. The vSphere/Talos clusters that `platforms/network/` targets already have Cilium pre-installed; kind doesn't.
 2. **The LB pool comes from a docker-bridge IP range** — kind LoadBalancer IPs are carved out of the docker network the cluster runs on, so each cluster needs its own contiguous `start`/`stop` block. The clusterbook-operator writes that range to the cluster Secret as annotations.
 
 The bundle is split in two:
@@ -80,7 +80,7 @@ Add the `auto-project=true` label via `spec.labels` on the `ClusterbookCluster` 
 
 `argocd.argoproj.io/sync-wave` on the **Application** metadata only orders children of a common parent App-of-Apps. Here the Applications are top-level (each ApplicationSet fires independently, each has its own `automated.selfHeal`), so the -10 → 0 → 1 → 2 → 3 waves are **informational**. Convergence happens through retries + cert-manager's own ordering, not sync-waves.
 
-This is the same caveat as `platforms/clusterbook/`. The one wave that matters in practice is `cilium-install-kind` (-10) needing to land before anything else — without a CNI, every other reconcile loop will retry forever, but they will eventually converge once Cilium is up.
+This is the same caveat as `platforms/network/`. The one wave that matters in practice is `cilium-install-kind` (-10) needing to land before anything else — without a CNI, every other reconcile loop will retry forever, but they will eventually converge once Cilium is up.
 
 ## Install
 
@@ -121,11 +121,11 @@ Both labels (`cluster-type=kind` and `expose-external=true`) and a non-empty `cl
 
 ## Swapping the issuer (Vault PKI path)
 
-Same path as [`platforms/clusterbook/README.md`](../clusterbook/README.md#swapping-the-issuer-vault-pki-path) — the selfsigned + cluster-ca chain is replaceable with a Vault-backed `ClusterIssuer`. The gateway ApplicationSet (in `expose-external/`) stays as-is.
+Same path as [`platforms/network/README.md`](../clusterbook/README.md#swapping-the-issuer-vault-pki-path) — the selfsigned + cluster-ca chain is replaceable with a Vault-backed `ClusterIssuer`. The gateway ApplicationSet (in `expose-external/`) stays as-is.
 
 ## Related
 
 - [`stuttgart-things/clusterbook-operator`](https://github.com/stuttgart-things/clusterbook-operator) — the operator that produces the `cluster-type=kind` label and the `lb-range-{start,stop}` annotations consumed here.
-- [`platforms/clusterbook`](../clusterbook/) — the vSphere/Talos sibling bundle that this one mirrors.
+- [`platforms/network`](../network/) — the vSphere/Talos sibling bundle that this one mirrors.
 - [`config/cluster-project`](../../config/cluster-project/) — the per-cluster `AppProject` provisioner.
 - [`infra/cilium`](../../infra/cilium/), [`infra/cert-manager`](../../infra/cert-manager/) — the catalog charts these ApplicationSets render.

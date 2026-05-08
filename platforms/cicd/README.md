@@ -23,7 +23,7 @@ Catalog entries rendered:
 | `tekton-config-cicd` | `cicd/tekton/config`           | `tekton-pipelines` | `TektonConfig` CR, profile `all` (Pipelines + Triggers + Dashboard + Chains + Results). Uniform across clusters today; per-cluster override via cluster-Secret annotation can be added when needed |
 | `tekton-dashboard-httproute-cicd` | `cicd/tekton/dashboard-httproute` | `tekton-pipelines` | Gateway API `HTTPRoute` exposing `tekton-dashboard:9097` on `tekton.<cluster-fqdn>`. **Additionally gated on** `clusterbook.stuttgart-things.com/allocation-ip` — clusterbook clusters only (same reason as `kargo-httproute-cicd`) |
 
-**Ordering:** `openebs-cicd` carries sync-wave `-10`, the others wave `0`. As noted in `platforms/clusterbook`, sync-wave on top-level Applications is informational (each ApplicationSet fires independently). Convergence on fresh clusters relies on each component's `syncPolicy.retry` — e.g. dapr scheduler PVCs stay `Pending` until OpenEBS installs the default StorageClass, then Argo re-syncs dapr.
+**Ordering:** `openebs-cicd` carries sync-wave `-10`, the others wave `0`. As noted in `platforms/network`, sync-wave on top-level Applications is informational (each ApplicationSet fires independently). Convergence on fresh clusters relies on each component's `syncPolicy.retry` — e.g. dapr scheduler PVCs stay `Pending` until OpenEBS installs the default StorageClass, then Argo re-syncs dapr.
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 
@@ -116,4 +116,4 @@ Clean-up is manual: `kubectl delete ns <namespace>` (or equivalent) on the targe
 ## Related
 
 - [`cicd/dapr`](../../cicd/dapr/), [`cicd/kro`](../../cicd/kro/) — catalog entries rendered by these ApplicationSets.
-- [`platforms/clusterbook`](../clusterbook/) — sibling platform bundle targeting clusterbook-registered clusters (different selector, different catalog entries).
+- [`platforms/network`](../network/) — sibling platform bundle targeting clusterbook-registered classic clusters (different selector, different catalog entries).
