@@ -43,9 +43,17 @@ spec:
               namespace: kube-system
             k8s:
               # kind's kube-apiserver is reachable via the control-plane node's
-              # docker hostname (<cluster>-control-plane). Required for
+              # docker hostname (<kind-name>-control-plane). Required for
               # kubeProxyReplacement when the in-cluster default doesn't resolve.
-              serviceHost: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/cluster-name" }}-control-plane'
+              #
+              # Prefer the form-set `kind-cluster-name` label so the user can
+              # store/manage the cluster under a longer descriptive name (e.g.
+              # cd-mgmt-1-kind-dev1) while pointing Cilium at the actual local
+              # `kind create cluster --name <X>` value (e.g. dev1). Falls back
+              # to the operator-stamped cluster-name annotation for clusters
+              # registered before this label was introduced (= where cluster_name
+              # already matches the kind container name).
+              serviceHost: '{{ or (index .metadata.labels "kind-cluster-name") (index .metadata.annotations "clusterbook.stuttgart-things.com/cluster-name") }}-control-plane'
               servicePort: 6443
             operatorReplicas: 2
             extraValues:
