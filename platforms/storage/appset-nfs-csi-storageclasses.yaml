@@ -1,0 +1,74 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nfs-csi-storageclasses-storage
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # StorageClasses are cluster-scoped and outlive opt-out flips; keep them
+  # in place so live PVs aren't orphaned the moment a cluster drops the label.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            storage-platform: "true"
+          matchExpressions:
+            # Operator signals "I have populated the nfs-* annotations" by
+            # adding this label (any value) to the cluster Secret. Mirrors the
+            # `clusterbook.stuttgart-things.com/allocation-ip` Exists pattern
+            # from platforms/network — without it we'd render an Application
+            # with empty server/share strings and chart validation would fail.
+            - key: storage-platform.stuttgart-things.com/nfs-config
+              operator: Exists
+            - key: storage-platform/nfs-csi-storageclasses
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: nfs-csi-storageclasses-{{ .name }}
+      annotations:
+        # After the driver, before any consumer PVC.
+        argocd.argoproj.io/sync-wave: "-5"
+    spec:
+      project: '{{ .name }}'
+      # Plain manifests (StorageClass resources) — no app-of-apps wrapper.
+      # Targets the workload cluster directly.
+      destination:
+        name: '{{ .name }}'
+        namespace: kube-system
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/nfs-csi/storageclasses
+        helm:
+          valuesObject:
+            provisioner: nfs.csi.k8s.io
+            # Single StorageClass per cluster, fields sourced from cluster-Secret
+            # annotations. For multiple SCs on one cluster, opt out of this
+            # appset (`storage-platform/nfs-csi-storageclasses: "false"`) and
+            # apply infra/nfs-csi/storageclasses directly with a richer values
+            # file via a per-cluster Application.
+            storageClasses:
+              - name: '{{ default "nfs-csi" (index .metadata.annotations "storage-platform.stuttgart-things.com/nfs-name") }}'
+                server: '{{ index .metadata.annotations "storage-platform.stuttgart-things.com/nfs-server" }}'
+                share: '{{ index .metadata.annotations "storage-platform.stuttgart-things.com/nfs-share" }}'
+                subDir: '{{ default .name (index .metadata.annotations "storage-platform.stuttgart-things.com/nfs-subdir") }}'
+                mountPermissions: '{{ default "0" (index .metadata.annotations "storage-platform.stuttgart-things.com/nfs-mount-permissions") }}'
+                mountOptions:
+                  - 'nfsvers={{ default "4.1" (index .metadata.annotations "storage-platform.stuttgart-things.com/nfs-version") }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true

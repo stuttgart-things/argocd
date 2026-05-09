@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: longhorn-storage
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # CSI driver + DaemonSets + StorageClass + live PVs all live in
+  # longhorn-system on the workload cluster. Pruning on opt-out flip would
+  # tear out volumes from running pods. Keep workload state in place; clean
+  # up manually if you want it gone.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            storage-platform: "true"
+          matchExpressions:
+            - key: storage-platform/longhorn
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: longhorn-storage-{{ .name }}
+      annotations:
+        # CSI driver must land before any consumer PVCs bind to it.
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      # App-of-apps: parent Application lives on the management cluster; the
+      # rendered chart emits a child Application targeting the workload cluster
+      # via `valuesObject.destination`.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/longhorn/install
+        helm:
+          valuesObject:
+            project: '{{ .name }}'
+            # Override the chart's default child-Application name (sha8 of
+            # destination.server) so the inner Application is uniquely named
+            # and won't collide with other longhorn installs on the same
+            # mgmt-cluster argocd namespace.
+            applicationName: longhorn-storage-{{ .name }}
+            destination:
+              server: '{{ .server }}'
+              namespace: longhorn-system
+            # platforms/storage leaves openebs-hostpath as the cluster's
+            # default StorageClass. Longhorn ships its SC alongside but is
+            # NOT marked default — flip per-cluster only after also opting
+            # out of `storage-platform/openebs` to avoid two SCs claiming
+            # default. See README "Default StorageClass conflicts".
+            defaultStorageClass: false
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

@@ -1,0 +1,67 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: longhorn-system
+
+# Upstream Longhorn Helm chart version (https://charts.longhorn.io).
+chartVersion: 1.11.2
+
+# Mark the rendered `longhorn` StorageClass as the cluster's default
+# (sets persistence.defaultClass=true in the upstream chart, which adds
+# annotation storageclass.kubernetes.io/is-default-class: "true").
+#
+# Off by default: in platforms/storage, openebs-hostpath already claims
+# the default-SC slot. Two SCs claiming default = non-deterministic binding
+# for PVCs without an explicit storageClassName. Flip on per-cluster only
+# after opting out of the conflicting default-SC source.
+defaultStorageClass: false
+
+# Replica count of the default Longhorn StorageClass.
+#
+# Defaults to 1 — works on single-node test clusters (kind, k3s, single-VM
+# k8s) out of the box; PVCs would otherwise stay Pending forever waiting for
+# 3 distinct nodes. **Bump to 3** (via extraValues, or by opting out of this
+# platform's longhorn appset and running a per-cluster Application) on real
+# multi-node prod clusters — single-replica defeats Longhorn's redundancy.
+defaultClassReplicaCount: 1
+
+# StorageClass volume binding mode. Upstream default is Immediate.
+# Set "WaitForFirstConsumer" if you want volume placement to follow the pod
+# (better for topology-aware schedulers and zone-pinned nodes).
+volumeBindingMode: Immediate
+
+# Required for Argo CD / GitOps installs.
+#
+# The upstream pre-upgrade Job runs as part of the chart and probes the
+# longhorn-manager DaemonSet; on first sync the cluster is unready, the Job
+# stalls or fails, and the chart's Helm release stays Pending forever. Argo
+# CD ends up in `Progressing` until the timeout. Upstream documents the
+# workaround as: disable jobEnabled when installing via Argo CD.
+preUpgradeChecker:
+  jobEnabled: false
+  upgradeVersionCheck: false
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above
+# (longhornManager.tolerations, defaultSettings.*, ingress.*, persistence.*
+# fields beyond what's curated here, image overrides, networkPolicies, etc.).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
