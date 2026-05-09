@@ -56,7 +56,7 @@ A minimal `ClusterbookCluster` for kind (user-pinned docker-bridge range) lives 
 
 `appset-cilium-install-kind.yaml` feeds the `infra/cilium/install` chart these knobs:
 
-- `k8s.serviceHost: <cluster-name>-control-plane`, `servicePort: 6443` — kind's API endpoint via docker hostname; required for `kubeProxyReplacement`.
+- `k8s.serviceHost: <kind-name>-control-plane`, `servicePort: 6443` — kind's API endpoint via docker hostname; required for `kubeProxyReplacement`. Resolved from the `kind-cluster-name` label on the cluster Secret if present (form-set), else from the operator-stamped `clusterbook.stuttgart-things.com/cluster-name` annotation. The label exists so a cluster can be registered under a longer descriptive name (e.g. `cd-mgmt-1-kind-dev1` to indicate the host VM) while still resolving to the actual `kind create cluster --name <X>` value (e.g. `dev1`) for the docker hostname Cilium needs.
 - `operatorReplicas: 2` — survives a single docker-node restart.
 - `extraValues.routingMode: native` + `ipv4NativeRoutingCIDR: 10.244.0.0/16` + `autoDirectNodeRoutes: true` — uses the docker bridge directly (no tunnel overhead) and keeps LoadBalancer L2 announcements simple.
 - `extraValues.devices: [eth0, net0]` — kind nodes can have either depending on docker version / network topology.
