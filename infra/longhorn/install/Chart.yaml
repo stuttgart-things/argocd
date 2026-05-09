@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: longhorn-install
+description: App-of-apps chart packaging the upstream Longhorn Helm chart with GitOps-friendly defaults
+type: application
+version: 0.1.0
+appVersion: "1.11.2"

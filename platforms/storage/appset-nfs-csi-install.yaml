@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: nfs-csi-install-storage
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Keep child resources if the cluster opts out later — the CSI driver runs
+  # DaemonSets/CRDs that live PVCs depend on; pruning on flag flip would
+  # corrupt running workloads.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            storage-platform: "true"
+          matchExpressions:
+            - key: storage-platform/nfs-csi-install
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: nfs-csi-install-{{ .name }}
+      annotations:
+        # The driver must land before any StorageClass binds to it.
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      # App-of-apps: parent Application lives on the management cluster; the
+      # rendered chart emits a child Application targeting the workload cluster
+      # via `valuesObject.destination`.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/nfs-csi/install
+        helm:
+          valuesObject:
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: kube-system
+            chartVersion: v4.13.1
+            externalSnapshotter:
+              enabled: true
+              # Off — when openebs is also enabled in this platform its
+              # `volumeSnapshots` / `openebs-crds` path is the canonical owner
+              # of the cluster-wide VolumeSnapshot CRDs; two owners breaks sync.
+              customResourceDefinitions:
+                enabled: false
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
