@@ -112,6 +112,66 @@
         ]
       }
     },
+    "wildcardSecondary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commonName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dnsNames": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "duration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "renewBefore": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "name",
+          "namespace",
+          "secretName",
+          "commonName",
+          "dnsNames"
+        ]
+      }
+    },
     "destination": {
       "type": "object",
       "additionalProperties": true,

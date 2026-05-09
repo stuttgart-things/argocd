@@ -136,9 +136,9 @@ Without the label, the two AppSets in `expose-external/` won't generate Applicat
 
 Both labels (`cluster-type=kind` and `expose-external=true`) and a non-empty `clusterbook.stuttgart-things.com/fqdn` annotation must be present for the helm charts to render — without an FQDN they fail validation with `wildcard.commonName: minLength got 0`. The clusterbook-operator's `ClusterbookProviderConfig` has to be pointing at a server that allocates DNS records for the cluster.
 
-## Swapping the issuer (Vault PKI path)
+## Vault PKI as an alternative issuer
 
-Same path as [`platforms/network/README.md`](../clusterbook/README.md#swapping-the-issuer-vault-pki-path) — the selfsigned + cluster-ca chain is replaceable with a Vault-backed `ClusterIssuer`. The gateway ApplicationSet (in `expose-external/`) stays as-is.
+`platforms/network` exposes a Vault PKI `ClusterIssuer` as an additive opt-in (`network-platform/cert-manager-vault-pki: "true"` + clusterbook annotations for server / path / token Secret name) — both the cluster-CA chain and Vault PKI coexist, and consumers pick the issuer per `Certificate`. See [`platforms/network/README.md`](../network/README.md#enabling-the-vault-pki-clusterissuer) for the cluster-Secret shape. The gateway ApplicationSet (in `expose-external/`) stays as-is regardless of which issuer minted `<cluster>-gateway-tls`.
 
 ## Related
 

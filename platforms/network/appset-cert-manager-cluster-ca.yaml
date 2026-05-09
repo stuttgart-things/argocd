@@ -33,7 +33,7 @@ spec:
         targetRevision: main
         path: infra/cert-manager/cluster-ca
         helm:
-          valuesObject:
+          values: |
             ca:
               name: cluster-ca
               namespace: cert-manager
@@ -51,6 +51,18 @@ spec:
                 - '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" }}'
               duration: 2160h
               renewBefore: 360h
+            {{- if hasKey .metadata.annotations "clusterbook.stuttgart-things.com/fqdn-secondary" }}
+            wildcardSecondary:
+              enabled: true
+              name: '{{ .name }}-gateway-tls-secondary'
+              namespace: default
+              secretName: '{{ .name }}-gateway-tls-secondary'
+              commonName: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn-secondary" }}'
+              dnsNames:
+                - '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn-secondary" }}'
+              duration: 2160h
+              renewBefore: 360h
+            {{- end }}
       syncPolicy:
         automated:
           prune: true
