@@ -1,0 +1,20 @@
+---
+# cert-manager ClusterIssuer of type `vault` using token auth.
+# The referenced Secret (auth.tokenSecretRef.name) must already exist in
+# the cert-manager namespace and carry the Vault token under the configured
+# key — provisioned out-of-band (e.g. by Terraform vault-cert-issuer).
+
+# ClusterIssuer name as referenced from `Certificate.spec.issuerRef.name`.
+name: vault-pki
+
+vault:
+  # Vault server base URL (https://...).
+  server: "https://vault.example.com"
+  # Vault PKI sign path, e.g. `pki/sign/<role>`.
+  path: "pki/sign/example"
+  auth:
+    tokenSecretRef:
+      # Secret in the cert-manager namespace holding the Vault token.
+      name: vault-pki-token
+      # Key inside the Secret holding the raw token value.
+      key: token

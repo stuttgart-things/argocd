@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: trust-manager-bundle-clusterbook
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            network-platform: "true"
+          matchExpressions:
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            - key: network-platform/trust-manager-bundle
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: trust-manager-bundle-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "4"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        name: '{{ .name }}'
+        namespace: cert-manager
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/trust-manager/bundle
+        helm:
+          valuesObject:
+            bundles:
+              - name: cluster-trust-bundle
+                spec:
+                  sources:
+                    - useDefaultCAs: true
+                    - secret:
+                        name: cluster-ca-secret
+                        key: ca.crt
+                  target:
+                    configMap:
+                      key: trust-bundle.pem
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true

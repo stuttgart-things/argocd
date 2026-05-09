@@ -1,0 +1,13 @@
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+  vault:
+    server: {{ .Values.vault.server | quote }}
+    path: {{ .Values.vault.path | quote }}
+    auth:
+      tokenSecretRef:
+        name: {{ .Values.vault.auth.tokenSecretRef.name | quote }}
+        key: {{ .Values.vault.auth.tokenSecretRef.key | quote }}

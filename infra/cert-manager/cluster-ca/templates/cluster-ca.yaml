@@ -37,3 +37,21 @@ spec:
   duration: {{ .Values.wildcard.duration | quote }}
   renewBefore: {{ .Values.wildcard.renewBefore | quote }}
 {{- end }}
+{{- if and .Values.wildcardSecondary .Values.wildcardSecondary.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.wildcardSecondary.name | quote }}
+  namespace: {{ .Values.wildcardSecondary.namespace | quote }}
+spec:
+  secretName: {{ .Values.wildcardSecondary.secretName | quote }}
+  issuerRef:
+    name: {{ .Values.ca.name | quote }}
+    kind: ClusterIssuer
+  commonName: {{ .Values.wildcardSecondary.commonName | quote }}
+  dnsNames:
+    {{- toYaml .Values.wildcardSecondary.dnsNames | nindent 4 }}
+  duration: {{ .Values.wildcardSecondary.duration | quote }}
+  renewBefore: {{ .Values.wildcardSecondary.renewBefore | quote }}
+{{- end }}

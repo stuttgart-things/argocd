@@ -1,6 +1,6 @@
 # infra/cert-manager
 
-Catalog entries for [cert-manager](https://cert-manager.io/) and its common bootstrap resources. Three independently deployable pieces — consumers create one ArgoCD `Application` per piece they need.
+Catalog entries for [cert-manager](https://cert-manager.io/) and its common bootstrap resources. Four independently deployable pieces — consumers create one ArgoCD `Application` per piece they need.
 
 ## Layout
 
@@ -8,7 +8,8 @@ Catalog entries for [cert-manager](https://cert-manager.io/) and its common boot
 infra/cert-manager/
 ├── install/       app-of-apps — renders Application "cert-manager" → jetstack/cert-manager
 ├── selfsigned/    plain Helm chart — renders the `selfsigned` ClusterIssuer
-├── cluster-ca/    plain Helm chart — renders CA Certificate + CA ClusterIssuer + optional wildcard Certificate
+├── cluster-ca/    plain Helm chart — renders CA Certificate + CA ClusterIssuer + optional wildcard Certificate(s)
+├── vault-pki/     plain Helm chart — renders a Vault PKI ClusterIssuer (token auth)
 └── README.md
 ```
 
@@ -21,6 +22,7 @@ Typical combinations:
 | Full CA chain (prod) | `install`, `selfsigned`, `cluster-ca` |
 | CA chain on top of an already-installed cert-manager | `selfsigned`, `cluster-ca` |
 | Additional CA chain on a cluster that already has one | `cluster-ca` with renamed `ca.name` + `ca.secretName` |
+| Vault-backed issuer (token Secret pre-provisioned) | `install`, `vault-pki` |
 
 ## install/
 
@@ -97,7 +99,7 @@ spec:
 
 ## cluster-ca/
 
-Plain Helm chart that renders a CA chain: a CA `Certificate` (signed by the self-signed issuer), a CA `ClusterIssuer` backed by that Secret, and — when `wildcard.enabled: true` — an additional wildcard `Certificate` issued by the CA. Requires `selfsigned/` (or another compatible ClusterIssuer set via `ca.issuerRef`).
+Plain Helm chart that renders a CA chain: a CA `Certificate` (signed by the self-signed issuer), a CA `ClusterIssuer` backed by that Secret, and — when `wildcard.enabled: true` (and optionally `wildcardSecondary.enabled: true`) — one or two wildcard `Certificate`s issued by the CA. Requires `selfsigned/` (or another compatible ClusterIssuer set via `ca.issuerRef`).
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -148,6 +150,54 @@ spec:
 | `wildcard.name` / `namespace` / `secretName` | `wildcard-tls` / `default` / `wildcard-tls` | Wildcard Certificate identity |
 | `wildcard.commonName` / `dnsNames` | `*.example.com` placeholder | **Override per cluster** |
 | `wildcard.duration` / `renewBefore` | `2160h` / `360h` | Certificate lifetime and renewal window |
+| `wildcardSecondary.enabled` | `false` | Render a second wildcard Certificate (same shape as `wildcard`) — useful when fronting more than one Gateway hostname |
+| `wildcardSecondary.name` / `namespace` / `secretName` | `wildcard-secondary-tls` / `default` / `wildcard-secondary-tls` | Secondary wildcard identity |
+| `wildcardSecondary.commonName` / `dnsNames` | `*.secondary.example.com` placeholder | **Override per cluster** |
+| `wildcardSecondary.duration` / `renewBefore` | `2160h` / `360h` | Secondary certificate lifetime and renewal window |
+
+## vault-pki/
+
+Plain Helm chart that renders a single `vault`-type `ClusterIssuer` using token authentication. Requires a pre-provisioned `Secret` (default name `vault-pki-token`) in the cert-manager namespace carrying the Vault token under the configured key — provisioned out-of-band (e.g. by Terraform, like [`vault-cert-issuer`](https://github.com/stuttgart-things/stuttgart-things/tree/main/clusters/labul/vsphere/platform-sthings/vault-cert-issuer)).
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-vault-pki
+  namespace: argocd
+spec:
+  project: my-cluster
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: infra/cert-manager/vault-pki
+    helm:
+      values: |
+        name: vault-pki
+        vault:
+          server: https://vault.example.com
+          path: pki/sign/my-role
+          auth:
+            tokenSecretRef:
+              name: vault-pki-token
+              key: token
+  destination:
+    server: https://<cluster-api>:6443
+    namespace: cert-manager
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+```
+
+### vault-pki values reference
+
+| Key | Default | Purpose |
+|---|---|---|
+| `name` | `vault-pki` | ClusterIssuer name — referenced by `Certificate.spec.issuerRef.name` |
+| `vault.server` | placeholder | Vault server URL (`https://...`) |
+| `vault.path` | placeholder | Vault PKI sign path (`pki/sign/<role>`) |
+| `vault.auth.tokenSecretRef.name` | `vault-pki-token` | Secret in the cert-manager namespace holding the Vault token |
+| `vault.auth.tokenSecretRef.key` | `token` | Key inside the Secret holding the raw token |
 
 ## Fleet — one `ApplicationSet` per piece
 

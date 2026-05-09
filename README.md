@@ -14,7 +14,7 @@ infra/     platform infrastructure
 platforms/ pre-bundled ApplicationSets that fan out catalog entries to clusters by label, for fleets that don't want to hand-author overlays per cluster
 ```
 
-Every catalog entry is a self-contained Kustomize base producing one or more `Application` manifests. Larger apps (cert-manager, tekton, cilium, minio, …) are split into independent sub-entries so consumers can pick exactly what they need (e.g. `infra/cert-manager/chart` + `infra/cert-manager/selfsigned`, skipping the full `cluster-ca` chain).
+Every catalog entry is a self-contained Kustomize base producing one or more `Application` manifests. Larger apps (cert-manager, tekton, cilium, minio, …) are split into independent sub-entries so consumers can pick exactly what they need (e.g. `infra/cert-manager/install` + `infra/cert-manager/selfsigned`, skipping the full `cluster-ca` chain).
 
 ## Catalog index
 
@@ -25,12 +25,12 @@ Version columns show what the child `Application` currently pins. `—` in the V
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
-| [`cert-manager`](./infra/cert-manager/) | `chart` / `selfsigned` / `cluster-ca` | `v1.19.2` + — + — | cert-manager chart, self-signed `ClusterIssuer`, full CA chain (`cluster-ca` Certificate + ClusterIssuer + wildcard) |
+| [`cert-manager`](./infra/cert-manager/) | `install` / `selfsigned` / `cluster-ca` / `vault-pki` | `v1.19.2` + — + — + — | cert-manager chart, self-signed `ClusterIssuer`, CA chain (`cluster-ca` Certificate + ClusterIssuer + one or two wildcards), Vault PKI `ClusterIssuer` (token auth) |
 | [`cilium`](./infra/cilium/) | `chart` / `lb` / `gateway` | `1.18.5` + — + — | CNI with kube-proxy replacement, L2 LoadBalancer IP pool, Gateway API `Gateway` |
 | [`longhorn`](./infra/longhorn/) | `install` | `1.11.2` | Longhorn distributed block storage; GitOps-friendly defaults (`preUpgradeChecker.jobEnabled: false`, `defaultClassReplicaCount: 1` for single-node-safe install) |
 | [`nfs-csi`](./infra/nfs-csi/) | `chart` / `storageclasses` | `v4.13.1` + — | kubernetes-csi NFS driver + opinionated `StorageClass` set |
 | [`openebs`](./infra/openebs/) | — (single) | `4.4.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
-| [`trust-manager`](./infra/trust-manager/) | `chart` / `bundle` | `0.22.0` + — | trust-manager chart, cluster-wide `Bundle` merging default CAs + cluster CA + Vault PKI CA |
+| [`trust-manager`](./infra/trust-manager/) | `install` / `bundle` | `0.22.0` + — | trust-manager chart (app-of-apps), values-driven `Bundle`s — empty by default; consumers declare which Bundles their cluster needs |
 
 </details>
 
@@ -82,7 +82,7 @@ Selector pattern shared by all bundles:
 | Bundle | Master gate | Components | Notes |
 |---|---|---|---|
 | [`platforms/cicd`](./platforms/cicd/) | `cicd-platform: "true"` | 10 appsets — openebs, dapr, kro, argo-rollouts, crossplane, kargo + httproute, tekton + config + dashboard-httproute | Has bootstrap `application.yaml` (mgmt-cluster apply once). The `*-httproute` appsets additionally require `clusterbook.stuttgart-things.com/allocation-ip` Exists — non-clusterbook clusters get the workload but no Gateway API route |
-| [`platforms/network`](./platforms/network/) | `network-platform: "true"` + `clusterbook.stuttgart-things.com/allocation-ip` Exists | 5 appsets — cert-manager (install / selfsigned / cluster-ca), cilium (lb / gateway) | Clusterbook-aware. Reads the cluster's reserved IP + FQDN from `clusterbook-operator`-set annotations to wire LoadBalancer IPPool + wildcard cert + Gateway hostname |
+| [`platforms/network`](./platforms/network/) | `network-platform: "true"` + `clusterbook.stuttgart-things.com/allocation-ip` Exists | 9 appsets — cert-manager (install / selfsigned / cluster-ca), cilium (lb / gateway), trust-manager (install / bundle) by default; opt-in cilium gateway-secondary + cert-manager vault-pki | Clusterbook-aware. Reads the cluster's reserved IP + FQDN from `clusterbook-operator`-set annotations to wire LoadBalancer IPPool + wildcard cert + Gateway hostname. Optional second Gateway from `fqdn-secondary` annotation; optional Vault PKI `ClusterIssuer` from `vault-server`/`vault-pki-path`/`vault-token-secret` annotations |
 | [`platforms/kind`](./platforms/kind/) | `clusterbook.stuttgart-things.com/cluster-type: kind` (no master `kind-platform` label) | base: 4 appsets — cilium (install / lb), cert-manager (install / selfsigned). `expose-external/`: optional overlay adding cluster-CA + cilium gateway for kind clusters that publish their LB IPs via DNS | Tuned for kind networking (native routing on `eth0`/`net0`, tight L2-announcement leases). Per-feature opt-out via `kind-platform/<feature>: "false"` |
 | [`platforms/storage`](./platforms/storage/) | `storage-platform: "true"` | 4 appsets — openebs, longhorn, nfs-csi-install, nfs-csi-storageclasses | Has bootstrap `application.yaml`. openebs is the cluster default SC; longhorn ships alongside but not as default. NFS storage-class appset additionally requires `storage-platform.stuttgart-things.com/nfs-config` Exists; per-cluster `server`/`share`/etc. sourced from cluster-Secret annotations |
 
@@ -216,7 +216,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - https://github.com/stuttgart-things/argocd.git/infra/cert-manager/chart?ref=main
+  - https://github.com/stuttgart-things/argocd.git/infra/cert-manager/install?ref=main
   - https://github.com/stuttgart-things/argocd.git/infra/cert-manager/selfsigned?ref=main
 
 patches:

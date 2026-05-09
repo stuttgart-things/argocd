@@ -5,5 +5,9 @@ resources:
   - appset-cert-manager-install.yaml
   - appset-cert-manager-selfsigned.yaml
   - appset-cert-manager-cluster-ca.yaml
+  - appset-cert-manager-vault-pki.yaml
   - appset-cilium-lb.yaml
   - appset-cilium-gateway.yaml
+  - appset-cilium-gateway-secondary.yaml
+  - appset-trust-manager-install.yaml
+  - appset-trust-manager-bundle.yaml

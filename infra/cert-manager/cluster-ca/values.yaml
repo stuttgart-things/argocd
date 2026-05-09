@@ -24,3 +24,17 @@ wildcard:
     - "*.example.com"
   duration: 2160h      # 90 days
   renewBefore: 360h    # renew 15 days before expiry
+
+# Optional second wildcard Certificate issued by the same CA ClusterIssuer.
+# Mirrors `wildcard` shape — useful when a cluster fronts more than one
+# Gateway hostname (e.g. a secondary clusterbook FQDN). Off by default.
+wildcardSecondary:
+  enabled: false
+  name: wildcard-secondary-tls
+  namespace: default
+  secretName: wildcard-secondary-tls
+  commonName: "*.secondary.example.com"
+  dnsNames:
+    - "*.secondary.example.com"
+  duration: 2160h
+  renewBefore: 360h

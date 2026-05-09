@@ -225,3 +225,4 @@ No more raw-manifest patching — every per-cluster knob is a value, enforced by
 ## Related
 
 - Flux equivalent: [`stuttgart-things/flux` — `infra/cilium`](https://github.com/stuttgart-things/flux/tree/main/infra/cilium) — this catalog's `install/` `lb/` `gateway/` are the ArgoCD analogs of Flux's `components/install`, `components/lb`, `components/gateway`.
+- Platform integration: [`platforms/network`](../../platforms/network/) ships `lb` (clusterbook IP) and `gateway` (clusterbook FQDN, TLS from `<cluster>-gateway-tls`) per registered cluster. A second Gateway can be opted in with `network-platform/cilium-gateway-secondary: "true"` + `clusterbook.stuttgart-things.com/fqdn-secondary` annotation — same chart instantiated twice with separate names + TLS Secrets.
