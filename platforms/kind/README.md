@@ -88,11 +88,15 @@ This is the same caveat as `platforms/network/`. The one wave that matters in pr
 kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/kind?ref=main
 ```
 
-The four base ApplicationSets land in the `argocd` namespace on the management cluster. They become active as soon as clusterbook-operator labels a cluster Secret with `cluster-type=kind`.
+The four base ApplicationSets land in the `argocd` namespace on the management cluster. They become active as soon as a cluster Secret carries `kind-platform: "true"` (the master gate — see below).
 
-## Per-feature opt-out (base bundle)
+## Master gate + per-feature opt-out (base bundle)
 
-Each base ApplicationSet additionally allows opting out per cluster via a `kind-platform/<feature>: "false"` label on the cluster Secret. Missing labels default to enabled — same `NotIn ["false"]` semantics as `platforms/cicd` and `platforms/network`. There is no master gate: `cluster-type=kind` itself is the gate.
+The base ApplicationSets gate on a `kind-platform: "true"` master label (mirroring the `network-platform: "true"` pattern in `platforms/network/`). Each AppSet additionally allows opting a cluster out of a single feature via a `kind-platform/<feature>: "false"` label — missing labels default to enabled (same `NotIn ["false"]` semantics as `platforms/cicd` and `platforms/network`).
+
+The Backstage `create-argocd-cluster` template auto-derives the master gate from the multi-select `Kind Platform Features` form input (`kind-platform: "true"` if any feature is selected, otherwise `"false"`). Hand-rolled `ClusterbookCluster` CRs need to set `kind-platform: "true"` on `spec.labels` explicitly.
+
+Note: the AppSets no longer gate on `clusterbook.stuttgart-things.com/cluster-type=kind`. The operator still sets that label when `spec.clusterType: kind` is present on the CR — `cilium-lb-kind`'s template still consumes operator-written `lb-range-{start,stop}` annotations, so a kind cluster registered without `spec.clusterType: kind` (e.g. via the Backstage form while [stuttgart-things/kcl#48](https://github.com/stuttgart-things/kcl/issues/48) is open) will match `cilium-lb-kind` but render with empty LB range values.
 
 | ApplicationSet | per-feature label key |
 |---|---|

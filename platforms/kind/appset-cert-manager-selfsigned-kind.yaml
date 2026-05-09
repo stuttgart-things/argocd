@@ -11,7 +11,7 @@ spec:
     - clusters:
         selector:
           matchLabels:
-            clusterbook.stuttgart-things.com/cluster-type: kind
+            kind-platform: "true"
           matchExpressions:
             - key: kind-platform/cert-manager-selfsigned
               operator: NotIn
