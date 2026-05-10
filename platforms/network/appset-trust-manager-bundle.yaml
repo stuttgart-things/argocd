@@ -34,6 +34,14 @@ spec:
         path: infra/trust-manager/bundle
         helm:
           valuesObject:
+            # When the cluster has `network-platform/cert-manager-vault-pki=true`
+            # the chart appends an extra source pointing at the Vault PKI CA
+            # Secret (produced by either the cert-manager-vault-pki AppSet's
+            # chart or the create-vault-issuer workflow step). Templated as
+            # a quoted string so the manifest stays valid YAML for kustomize
+            # build; ArgoCD's goTemplate substitutes the value at App-create
+            # time before the chart renders.
+            includeVaultPkiCa: '{{ if eq (index .metadata.labels "network-platform/cert-manager-vault-pki") "true" }}true{{ else }}false{{ end }}'
             bundles:
               - name: cluster-trust-bundle
                 spec:
@@ -42,17 +50,6 @@ spec:
                     - secret:
                         name: cluster-ca-secret
                         key: ca.crt
-                    {{- /* Include the Vault PKI root CA in the bundle when
-                          this cluster has the cert-manager-vault-pki feature
-                          enabled. The Secret/vault-pki-ca/ca.crt source is
-                          produced by either the cert-manager-vault-pki AppSet
-                          (helm chart) or the create-vault-issuer workflow
-                          step (kubectl-applied). */}}
-                    {{- if eq (index .metadata.labels "network-platform/cert-manager-vault-pki") "true" }}
-                    - secret:
-                        name: vault-pki-ca
-                        key: ca.crt
-                    {{- end }}
                   target:
                     configMap:
                       key: trust-bundle.pem

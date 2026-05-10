@@ -16,3 +16,10 @@
 # See README.md for a copy-paste cluster-trust-bundle example combining
 # Mozilla's default CAs + the internal cluster CA.
 bundles: []
+
+# When set to the string "true" (or boolean true), every Bundle rendered by
+# this chart gets an additional `secret: { name: vault-pki-ca, key: ca.crt }`
+# source appended. Used by appset-trust-manager-bundle to conditionally
+# include the Vault PKI root CA on clusters with
+# `network-platform/cert-manager-vault-pki=true`. Default off.
+includeVaultPkiCa: "false"
