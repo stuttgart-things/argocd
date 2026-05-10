@@ -1,9 +1,19 @@
-{{- range .Values.bundles }}
+{{- range $bundle := .Values.bundles }}
 ---
 apiVersion: trust.cert-manager.io/v1alpha1
 kind: Bundle
 metadata:
-  name: {{ .name | quote }}
+  name: {{ $bundle.name | quote }}
 spec:
-  {{- toYaml .spec | nindent 2 }}
+  {{- /* Deep-copy so we can append to spec.sources without mutating the
+        caller's Helm values. When includeVaultPkiCa is "true" we add a
+        secret source pointing at vault-pki-ca/ca.crt (lives in the chart's
+        target namespace — typically cert-manager). */ -}}
+  {{- $spec := $bundle.spec | deepCopy }}
+  {{- if eq ($.Values.includeVaultPkiCa | default "false" | toString) "true" }}
+    {{- $sources := $spec.sources | default list }}
+    {{- $sources = append $sources (dict "secret" (dict "name" "vault-pki-ca" "key" "ca.crt")) }}
+    {{- $_ := set $spec "sources" $sources }}
+  {{- end }}
+  {{- toYaml $spec | nindent 2 }}
 {{- end }}

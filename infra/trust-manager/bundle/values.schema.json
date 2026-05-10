@@ -50,6 +50,10 @@
       "type": "object",
       "additionalProperties": true,
       "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "includeVaultPkiCa": {
+      "type": ["string", "boolean"],
+      "description": "When set to the string \"true\" (or boolean true), the chart appends a `secret: { name: vault-pki-ca, key: ca.crt }` source to every bundle. AppSet templates set this from a per-cluster label so trust bundles only include the Vault PKI CA on clusters that opted in."
     }
   }
 }
