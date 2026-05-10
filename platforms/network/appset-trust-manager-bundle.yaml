@@ -42,6 +42,17 @@ spec:
                     - secret:
                         name: cluster-ca-secret
                         key: ca.crt
+                    {{- /* Include the Vault PKI root CA in the bundle when
+                          this cluster has the cert-manager-vault-pki feature
+                          enabled. The Secret/vault-pki-ca/ca.crt source is
+                          produced by either the cert-manager-vault-pki AppSet
+                          (helm chart) or the create-vault-issuer workflow
+                          step (kubectl-applied). */}}
+                    {{- if eq (index .metadata.labels "network-platform/cert-manager-vault-pki") "true" }}
+                    - secret:
+                        name: vault-pki-ca
+                        key: ca.crt
+                    {{- end }}
                   target:
                     configMap:
                       key: trust-bundle.pem
