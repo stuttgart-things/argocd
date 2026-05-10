@@ -12,10 +12,12 @@ spec:
         selector:
           matchLabels:
             network-platform: "true"
-            network-platform/cilium-gateway-secondary: "true"
           matchExpressions:
             - key: clusterbook.stuttgart-things.com/allocation-ip
               operator: Exists
+            - key: network-platform/cilium-gateway-secondary
+              operator: NotIn
+              values: ["false"]
   template:
     metadata:
       name: cilium-gateway-secondary-{{ .name }}

@@ -12,10 +12,12 @@ spec:
         selector:
           matchLabels:
             network-platform: "true"
-            network-platform/cert-manager-vault-pki: "true"
           matchExpressions:
             - key: clusterbook.stuttgart-things.com/allocation-ip
               operator: Exists
+            - key: network-platform/cert-manager-vault-pki
+              operator: NotIn
+              values: ["false"]
   template:
     metadata:
       name: cert-manager-vault-pki-{{ .name }}
