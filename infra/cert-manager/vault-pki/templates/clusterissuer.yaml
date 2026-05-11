@@ -7,6 +7,11 @@ spec:
   vault:
     server: {{ .Values.vault.server | quote }}
     path: {{ .Values.vault.path | quote }}
+    {{- with .Values.vault.caBundleSecretRef }}
+    caBundleSecretRef:
+      name: {{ .name | quote }}
+      key: {{ .key | quote }}
+    {{- end }}
     auth:
       tokenSecretRef:
         name: {{ .Values.vault.auth.tokenSecretRef.name | quote }}

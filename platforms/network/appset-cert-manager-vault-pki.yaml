@@ -38,6 +38,9 @@ spec:
             vault:
               server: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-server" }}'
               path: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-pki-path" }}'
+              caBundleSecretRef:
+                name: vault-pki-ca
+                key: ca.crt
               auth:
                 tokenSecretRef:
                   name: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-token-secret" }}'
