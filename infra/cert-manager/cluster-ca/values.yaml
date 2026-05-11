@@ -12,8 +12,11 @@ ca:
     name: selfsigned
     kind: ClusterIssuer
 
-# Optional wildcard Certificate issued by the CA ClusterIssuer above.
-# Off by default — consumers opt in per cluster with their own hostname.
+# Optional wildcard Certificate. By default issued by the CA ClusterIssuer
+# above (i.e. `ca.name`, selfsigned-chained). Override `wildcard.issuerRef`
+# to point at another ClusterIssuer — e.g. `{ name: vault-pki }` to issue
+# from Vault PKI. Useful when external clients trust your Vault root CA
+# but not your selfsigned cluster CA.
 wildcard:
   enabled: false
   name: wildcard-tls
@@ -24,10 +27,17 @@ wildcard:
     - "*.example.com"
   duration: 2160h      # 90 days
   renewBefore: 360h    # renew 15 days before expiry
+  # issuerRef defaults to `{ name: <ca.name>, kind: ClusterIssuer }` when
+  # unset. Set explicitly to route the wildcard through a different
+  # ClusterIssuer (e.g. vault-pki).
+  # issuerRef:
+  #   name: vault-pki
+  #   kind: ClusterIssuer
 
-# Optional second wildcard Certificate issued by the same CA ClusterIssuer.
-# Mirrors `wildcard` shape — useful when a cluster fronts more than one
-# Gateway hostname (e.g. a secondary clusterbook FQDN). Off by default.
+# Optional second wildcard Certificate. Mirrors `wildcard` shape (including
+# the optional `issuerRef` override) — useful when a cluster fronts more
+# than one Gateway hostname (e.g. a secondary clusterbook FQDN). Off by
+# default.
 wildcardSecondary:
   enabled: false
   name: wildcard-secondary-tls
@@ -38,3 +48,6 @@ wildcardSecondary:
     - "*.secondary.example.com"
   duration: 2160h
   renewBefore: 360h
+  # issuerRef:
+  #   name: vault-pki
+  #   kind: ClusterIssuer
