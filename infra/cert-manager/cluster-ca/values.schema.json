@@ -90,6 +90,27 @@
         "renewBefore": {
           "type": "string",
           "minLength": 1
+        },
+        "issuerRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional override for the wildcard Certificate's issuerRef. When unset, the chart defaults to { name: <ca.name>, kind: ClusterIssuer } (selfsigned-chained cluster-ca). Set explicitly to route the wildcard through a different ClusterIssuer (e.g. `{ name: vault-pki }`).",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ]
+            }
+          }
         }
       },
       "required": [
@@ -150,6 +171,27 @@
         "renewBefore": {
           "type": "string",
           "minLength": 1
+        },
+        "issuerRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional override for the wildcard Certificate's issuerRef. When unset, the chart defaults to { name: <ca.name>, kind: ClusterIssuer } (selfsigned-chained cluster-ca). Set explicitly to route the wildcard through a different ClusterIssuer (e.g. `{ name: vault-pki }`).",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ]
+            }
+          }
         }
       },
       "required": [

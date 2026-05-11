@@ -29,8 +29,8 @@ metadata:
 spec:
   secretName: {{ .Values.wildcard.secretName | quote }}
   issuerRef:
-    name: {{ .Values.ca.name | quote }}
-    kind: ClusterIssuer
+    name: {{ (.Values.wildcard.issuerRef).name | default .Values.ca.name | quote }}
+    kind: {{ (.Values.wildcard.issuerRef).kind | default "ClusterIssuer" | quote }}
   commonName: {{ .Values.wildcard.commonName | quote }}
   dnsNames:
     {{- toYaml .Values.wildcard.dnsNames | nindent 4 }}
@@ -47,8 +47,8 @@ metadata:
 spec:
   secretName: {{ .Values.wildcardSecondary.secretName | quote }}
   issuerRef:
-    name: {{ .Values.ca.name | quote }}
-    kind: ClusterIssuer
+    name: {{ (.Values.wildcardSecondary.issuerRef).name | default .Values.ca.name | quote }}
+    kind: {{ (.Values.wildcardSecondary.issuerRef).kind | default "ClusterIssuer" | quote }}
   commonName: {{ .Values.wildcardSecondary.commonName | quote }}
   dnsNames:
     {{- toYaml .Values.wildcardSecondary.dnsNames | nindent 4 }}

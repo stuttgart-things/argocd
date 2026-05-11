@@ -51,6 +51,11 @@ spec:
                 - '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" }}'
               duration: 2160h
               renewBefore: 360h
+            {{- if hasKey .metadata.annotations "clusterbook.stuttgart-things.com/wildcard-issuer-name" }}
+              issuerRef:
+                name: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/wildcard-issuer-name" }}'
+                kind: ClusterIssuer
+            {{- end }}
             {{- if hasKey .metadata.annotations "clusterbook.stuttgart-things.com/fqdn-secondary" }}
             wildcardSecondary:
               enabled: true
@@ -62,6 +67,11 @@ spec:
                 - '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn-secondary" }}'
               duration: 2160h
               renewBefore: 360h
+            {{- if hasKey .metadata.annotations "clusterbook.stuttgart-things.com/wildcard-issuer-name" }}
+              issuerRef:
+                name: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/wildcard-issuer-name" }}'
+                kind: ClusterIssuer
+            {{- end }}
             {{- end }}
       syncPolicy:
         automated:
