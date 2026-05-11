@@ -30,6 +30,25 @@
           "type": "string",
           "minLength": 1
         },
+        "caBundleSecretRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "key"
+          ],
+          "description": "Optional Secret in the cert-manager namespace carrying the Vault server's CA bundle (PEM under the configured key). cert-manager uses it to verify the Vault server's TLS. Typically `{ name: vault-pki-ca, key: ca.crt }` — the Secret produced by argocd.create-vault-issuer or by the AppSet itself.",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
         "auth": {
           "type": "object",
           "additionalProperties": false,
