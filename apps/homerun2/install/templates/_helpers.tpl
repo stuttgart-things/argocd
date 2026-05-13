@@ -8,10 +8,12 @@ homerun2.appName -- per-cluster base name (sha-suffixed) for Argo Applications.
 
 {{/*
 homerun2.kustomizeRepo -- OCI repo URL for a homerun2-<name>-kustomize artifact.
+The `oci://` prefix is required — Argo CD treats `repoURL` without it as a git
+URL and fails with "failed to list refs: repository not found".
 Usage: include "homerun2.kustomizeRepo" "omni-pitcher"
 */}}
 {{- define "homerun2.kustomizeRepo" -}}
-ghcr.io/stuttgart-things/homerun2-{{ . }}-kustomize
+oci://ghcr.io/stuttgart-things/homerun2-{{ . }}-kustomize
 {{- end -}}
 
 {{/*
