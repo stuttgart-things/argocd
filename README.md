@@ -21,12 +21,13 @@ Every catalog entry is a self-contained Kustomize base producing one or more `Ap
 Version columns show what the child `Application` currently pins. `—` in the Version column means the sub-entry ships plain manifests (no upstream chart). Each row links to its per-entry README.
 
 <details>
-<summary><b><code>infra/</code> — platform infrastructure</b> (6 entries)</summary>
+<summary><b><code>infra/</code> — platform infrastructure</b> (7 entries)</summary>
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
 | [`cert-manager`](./infra/cert-manager/) | `install` / `selfsigned` / `cluster-ca` / `vault-pki` | `v1.19.2` + — + — + — | cert-manager chart, self-signed `ClusterIssuer`, CA chain (`cluster-ca` Certificate + ClusterIssuer + one or two wildcards), Vault PKI `ClusterIssuer` (token auth) |
 | [`cilium`](./infra/cilium/) | `chart` / `lb` / `gateway` | `1.18.5` + — + — | CNI with kube-proxy replacement, L2 LoadBalancer IP pool, Gateway API `Gateway` |
+| [`external-secrets`](./infra/external-secrets/) | `install` | `2.4.1` | External Secrets Operator (ESO) — syncs secrets from external stores (Vault, AWS SM, etc.) into Kubernetes `Secret`s via `ClusterSecretStore` / `ExternalSecret` CRDs |
 | [`longhorn`](./infra/longhorn/) | `install` | `1.11.2` | Longhorn distributed block storage; GitOps-friendly defaults (`preUpgradeChecker.jobEnabled: false`, `defaultClassReplicaCount: 1` for single-node-safe install) |
 | [`nfs-csi`](./infra/nfs-csi/) | `chart` / `storageclasses` | `v4.13.1` + — | kubernetes-csi NFS driver + opinionated `StorageClass` set |
 | [`openebs`](./infra/openebs/) | — (single) | `4.4.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
@@ -70,7 +71,7 @@ Catalog entries that configure Argo CD itself rather than installing workloads. 
 </details>
 
 <details>
-<summary><b><code>platforms/</code> — pre-bundled ApplicationSets per cluster role</b> (4 bundles)</summary>
+<summary><b><code>platforms/</code> — pre-bundled ApplicationSets per cluster role</b> (5 bundles)</summary>
 
 Each platform bundle is a kustomize directory of `ApplicationSet`s that live in the `argocd` namespace on the **management cluster** and fan out catalog entries to every cluster `Secret` matching a label gate. Alternative to the per-cluster aggregator-overlay pattern below: instead of every cluster repo composing its own `infra/cicd/apps` overlay, label the cluster Secret with `<bundle>-platform: "true"` and the right ApplicationSets fire automatically.
 
@@ -84,6 +85,7 @@ Selector pattern shared by all bundles:
 | [`platforms/cicd`](./platforms/cicd/) | `cicd-platform: "true"` | 10 appsets — openebs, dapr, kro, argo-rollouts, crossplane, kargo + httproute, tekton + config + dashboard-httproute | Has bootstrap `application.yaml` (mgmt-cluster apply once). The `*-httproute` appsets additionally require `clusterbook.stuttgart-things.com/allocation-ip` Exists — non-clusterbook clusters get the workload but no Gateway API route |
 | [`platforms/network`](./platforms/network/) | `network-platform: "true"` + `clusterbook.stuttgart-things.com/allocation-ip` Exists | 9 appsets — cert-manager (install / selfsigned / cluster-ca), cilium (lb / gateway), trust-manager (install / bundle) by default; opt-in cilium gateway-secondary + cert-manager vault-pki | Clusterbook-aware. Reads the cluster's reserved IP + FQDN from `clusterbook-operator`-set annotations to wire LoadBalancer IPPool + wildcard cert + Gateway hostname. Optional second Gateway from `fqdn-secondary` annotation; optional Vault PKI `ClusterIssuer` from `vault-server`/`vault-pki-path`/`vault-token-secret` annotations |
 | [`platforms/kind`](./platforms/kind/) | `clusterbook.stuttgart-things.com/cluster-type: kind` (no master `kind-platform` label) | base: 4 appsets — cilium (install / lb), cert-manager (install / selfsigned). `expose-external/`: optional overlay adding cluster-CA + cilium gateway for kind clusters that publish their LB IPs via DNS | Tuned for kind networking (native routing on `eth0`/`net0`, tight L2-announcement leases). Per-feature opt-out via `kind-platform/<feature>: "false"` |
+| [`platforms/security`](./platforms/security/) | `security-platform: "true"` + per-component **opt-in** (e.g. `security-platform/external-secrets: "true"`) | 1 appset — external-secrets-install | Has bootstrap `application.yaml`. **Opt-in only** — labelling a cluster `security-platform: "true"` installs nothing on its own; each component needs an explicit `security-platform/<feature>: "true"` because security components require per-cluster prereqs (e.g. ESO needs Vault auth backend wired). `ClusterSecretStore`s are cluster-specific and stay in each cluster's overlay |
 | [`platforms/storage`](./platforms/storage/) | `storage-platform: "true"` | 4 appsets — openebs, longhorn, nfs-csi-install, nfs-csi-storageclasses | Has bootstrap `application.yaml`. openebs is the cluster default SC; longhorn ships alongside but not as default. NFS storage-class appset additionally requires `storage-platform.stuttgart-things.com/nfs-config` Exists; per-cluster `server`/`share`/etc. sourced from cluster-Secret annotations |
 
 When to pick which model:

@@ -1,0 +1,34 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: external-secrets
+
+# Upstream external-secrets/external-secrets Helm chart version.
+chartVersion: 2.4.1
+
+# Install ESO CRDs via the chart (ClusterSecretStore, ExternalSecret, …).
+installCRDs: true
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above
+# (replicaCount, resources, webhook config, feature gates, etc.).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
