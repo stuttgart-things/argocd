@@ -36,6 +36,8 @@ kind: Application
 metadata:
   name: {{ printf "%s-httproute" $appName | quote }}
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/sync-wave: "10"
 spec:
