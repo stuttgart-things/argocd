@@ -17,6 +17,7 @@ spec:
     targetRevision: {{ .Values.demoPitcher.version | quote }}
     path: .
     kustomize:
+      namespace: {{ $ns | quote }}
       patches:
         - target:
             kind: Ingress

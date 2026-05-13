@@ -17,6 +17,7 @@ spec:
     targetRevision: {{ .Values.coreCatcher.kustomizeVersion | quote }}
     path: .
     kustomize:
+      namespace: {{ $ns | quote }}
       patches:
         - target:
             kind: Ingress
