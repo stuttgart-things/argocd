@@ -1,0 +1,39 @@
+---
+# Name of the rendered ClusterSecretStore. ExternalSecrets reference this name
+# via spec.secretStoreRef.name. Pick a stable name per (cluster, Vault KV path)
+# pair — e.g. "vault-homerun2-pr".
+name: ""
+
+# Vault server URL.
+server: ""
+
+# KV mount path on Vault, e.g. "homerun2-pr" or "apps". The KV v2 API path
+# `<mount>/data/<secret>` is what ExternalSecrets resolve against.
+path: ""
+
+# KV API version.
+version: v2
+
+# CA bundle for Vault TLS. Defaults to the `vault-pki-ca` Secret in `cert-manager`,
+# which on stuttgart-things clusters is the CA cert used by the `vault-pki`
+# ClusterIssuer to verify Vault — already present on every Vault-aware cluster.
+caProvider:
+  type: Secret
+  name: vault-pki-ca
+  namespace: cert-manager
+  key: ca.crt
+
+# Vault Kubernetes auth backend on Vault and the cluster-side SA used to log in.
+auth:
+  kubernetes:
+    # Vault auth mount path. Stuttgart-things convention: `<cluster-name>-eso`
+    # (created by clusters/.../vault-k8s-auth/ Terraform). No default — must be
+    # set explicitly to avoid silent mismatches between cluster overlays.
+    mountPath: ""
+    # Vault auth role bound to a read policy on the KV path above.
+    role: eso
+    # Cluster-side SA whose JWT ESO mints and forwards to Vault for login.
+    # Must match `bound_service_account_names`/`...namespaces` on the Vault role.
+    serviceAccountRef:
+      name: eso
+      namespace: external-secrets
