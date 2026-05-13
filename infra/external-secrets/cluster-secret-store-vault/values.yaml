@@ -1,15 +1,19 @@
 ---
+# All four `example-*` / `https://vault.example.com` values below are
+# placeholders — the rendered manifest is non-functional until a consumer
+# overrides them. Real values are cluster- and KV-path-specific.
+
 # Name of the rendered ClusterSecretStore. ExternalSecrets reference this name
 # via spec.secretStoreRef.name. Pick a stable name per (cluster, Vault KV path)
 # pair — e.g. "vault-homerun2-pr".
-name: ""
+name: example-vault-store
 
 # Vault server URL.
-server: ""
+server: https://vault.example.com
 
 # KV mount path on Vault, e.g. "homerun2-pr" or "apps". The KV v2 API path
 # `<mount>/data/<secret>` is what ExternalSecrets resolve against.
-path: ""
+path: example-mount
 
 # KV API version.
 version: v2
@@ -27,9 +31,9 @@ caProvider:
 auth:
   kubernetes:
     # Vault auth mount path. Stuttgart-things convention: `<cluster-name>-eso`
-    # (created by clusters/.../vault-k8s-auth/ Terraform). No default — must be
-    # set explicitly to avoid silent mismatches between cluster overlays.
-    mountPath: ""
+    # (created by clusters/.../vault-k8s-auth/ Terraform). Override per
+    # consumer to avoid silent mismatches between cluster overlays.
+    mountPath: example-cluster-eso
     # Vault auth role bound to a read policy on the KV path above.
     role: eso
     # Cluster-side SA whose JWT ESO mints and forwards to Vault for login.
