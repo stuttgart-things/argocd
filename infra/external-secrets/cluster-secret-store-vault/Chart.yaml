@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: external-secrets-cluster-secret-store-vault
+description: One `ClusterSecretStore` for HashiCorp Vault (k8s-auth, KV v2). Cluster-specific — `auth.kubernetes.mountPath` must match the Vault k8s auth backend mounted for the target cluster.
+type: application
+version: 0.1.0
