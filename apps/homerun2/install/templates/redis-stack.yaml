@@ -2,6 +2,7 @@
 {{- $appName := include "homerun2.appName" . }}
 {{- $rsValues := dict
       "project"      .Values.project
+      "applicationName" (printf "%s-redis-stack-delegate" $appName)
       "destination"  .Values.destination
       "chartVersion" .Values.redisStack.chartVersion
       "auth"         (dict "password" .Values.redisPassword)
