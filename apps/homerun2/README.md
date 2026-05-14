@@ -27,6 +27,7 @@ apps/homerun2/
 │       └── httproute.yaml                     Application "...-httproute"          (sync-wave 10, builds routes from enabled components)
 ├── httproute/                                 multi-HTTPRoute sub-chart (driven by a values list)
 ├── preview-quota/                             Kyverno `ClusterPolicy` auto-generating `ResourceQuota` + `LimitRange` in every `homerun2-pr-*` namespace (PR-preview safety net; requires Kyverno installed — see `infra/kyverno/install`)
+├── preview-secrets/                           Kyverno `ClusterPolicy` auto-generating `ExternalSecret`s in every `homerun2-pr-*` namespace (pulls per-component secrets from Vault via ESO; requires Kyverno + ESO + `ClusterSecretStore`)
 └── preview-sweep/                             Kyverno `ClusterCleanupPolicy` reclaiming empty `homerun2-pr-*` namespace shells left behind after PR close (cron-driven; requires Kyverno)
 ```
 

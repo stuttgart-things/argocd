@@ -1,0 +1,36 @@
+---
+# Name of the rendered ClusterPolicy.
+name: homerun2-preview-secrets
+
+# Namespace name glob — every namespace matching this gets the ExternalSecrets
+# auto-generated. Default matches the PR-preview ApplicationSet's pattern.
+namespacePrefix: "homerun2-pr-*"
+
+# ClusterSecretStore reference used by every generated ExternalSecret. The
+# store + Vault auth setup is created out-of-band (see infra/external-secrets
+# + cluster-secret-store-vault catalog entries, and the per-cluster Vault
+# k8s-auth Terraform module).
+clusterSecretStoreName: vault-homerun2-pr
+
+# How often each generated ExternalSecret re-pulls from Vault.
+refreshInterval: 1m
+
+# Name of the secret in Vault under the ClusterSecretStore's `path`. The
+# default `preview-env` matches the stuttgart-things convention — KV-v2 mount
+# `homerun2-pr/`, secret `preview-env` with fields `redisPassword` +
+# `authToken`. Override per consumer if a different Vault layout is used.
+vaultSecretName: preview-env
+
+# Per-component ExternalSecrets to generate. Each entry produces one
+# ExternalSecret resource per matching namespace, which ESO then materializes
+# as a k8s Secret named `secretName` with `dataKey` = `vaultProperty` from
+# Vault.
+components:
+  - name: omni-pitcher-token
+    secretName: homerun2-omni-pitcher-token
+    dataKey: auth-token
+    vaultProperty: authToken
+  - name: omni-pitcher-redis
+    secretName: homerun2-omni-pitcher-redis
+    dataKey: password
+    vaultProperty: redisPassword
