@@ -43,6 +43,22 @@ spec:
             destination:
               server: '{{ .server }}'
               namespace: kyverno
+            # Extend the cleanup-controller's RBAC so it can delete
+            # Namespaces — needed by `ClusterCleanupPolicy` sweeps that
+            # target abandoned namespace shells. Kyverno's default RBAC
+            # excludes Namespace deletion as a safety-by-default; the
+            # cleanup controller's admission webhook rejects policies
+            # that would otherwise delete a kind it has no permission
+            # for. Granting it here keeps the security-platform bundle
+            # self-contained.
+            extraValues:
+              cleanupController:
+                rbac:
+                  coreClusterRole:
+                    extraResources:
+                      - apiGroups: [""]
+                        resources: ["namespaces"]
+                        verbs: ["get", "list", "watch", "delete"]
       syncPolicy:
         automated:
           prune: true
