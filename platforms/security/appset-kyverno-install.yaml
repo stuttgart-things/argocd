@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kyverno-install-security
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Keep child resources if the cluster opts out later. Without this, dropping
+  # out would delete the child Application and prune the CRDs / namespace it
+  # manages — taking every ClusterPolicy, Policy, PolicyException with it.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            security-platform: "true"
+            security-platform/kyverno: "true"
+  template:
+    metadata:
+      name: kyverno-install-security-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: infra/kyverno/install
+        helm:
+          valuesObject:
+            project: '{{ .name }}'
+            # Override the chart's default child-Application name (sha8 of
+            # destination.server) so the inner Application carries the
+            # `-security` suffix and never collides with a per-cluster overlay
+            # that may also reference infra/kyverno/install.
+            applicationName: kyverno-security-{{ .name }}
+            destination:
+              server: '{{ .server }}'
+              namespace: kyverno
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
