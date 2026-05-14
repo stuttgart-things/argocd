@@ -28,6 +28,7 @@ apps/homerun2/
 ├── httproute/                                 multi-HTTPRoute sub-chart (driven by a values list)
 ├── preview-quota/                             Kyverno `ClusterPolicy` auto-generating `ResourceQuota` + `LimitRange` in every `homerun2-pr-*` namespace (PR-preview safety net; requires Kyverno installed — see `infra/kyverno/install`)
 ├── preview-secrets/                           Kyverno `ClusterPolicy` auto-generating `ExternalSecret`s in every `homerun2-pr-*` namespace (pulls per-component secrets from Vault via ESO; requires Kyverno + ESO + `ClusterSecretStore`)
+├── preview-seed-data/                         Kyverno `ClusterPolicy` generating a one-shot `Job` in every `homerun2-pr-*` namespace that posts a curated event fixture to omni-pitcher's /pitch endpoint (reviewer-visible non-empty stream from the moment the preview is Ready; requires Kyverno + the `homerun2-omni-pitcher-token` Secret)
 └── preview-sweep/                             Kyverno `ClusterCleanupPolicy` reclaiming empty `homerun2-pr-*` namespace shells left behind after PR close (cron-driven; requires Kyverno)
 ```
 

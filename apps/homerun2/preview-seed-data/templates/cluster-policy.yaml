@@ -1,0 +1,75 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+  # Apply to namespaces that already exist when the policy is installed,
+  # not only ones created afterwards.
+  generateExisting: true
+  rules:
+    - name: generate-seed-job
+      match:
+        any:
+          - resources:
+              kinds: ["Namespace"]
+              names: [{{ .Values.namespacePrefix | quote }}]
+      generate:
+        apiVersion: batch/v1
+        kind: Job
+        name: seed-test-events
+        namespace: {{ "{{request.object.metadata.name}}" | quote }}
+        # Job is one-shot — don't recreate it after it completes. Without
+        # this Kyverno would recreate the Job repeatedly (and the events
+        # would be re-posted), which we explicitly don't want.
+        synchronize: false
+        data:
+          spec:
+            ttlSecondsAfterFinished: {{ .Values.jobTtlSecondsAfterFinished }}
+            backoffLimit: 3
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                  - name: seed
+                    image: {{ .Values.image | quote }}
+                    env:
+                      - name: AUTH_TOKEN
+                        valueFrom:
+                          secretKeyRef:
+                            name: {{ .Values.authTokenSecretName | quote }}
+                            key: {{ .Values.authTokenSecretKey | quote }}
+                      - name: PITCHER_URL
+                        value: {{ printf "http://%s:%d" .Values.omniPitcherService (int .Values.omniPitcherPort) | quote }}
+                      - name: EVENTS_JSON
+                        value: {{ toJson .Values.events | quote }}
+                      - name: HEALTH_ATTEMPTS
+                        value: {{ .Values.healthCheck.attempts | quote }}
+                      - name: HEALTH_INTERVAL
+                        value: {{ .Values.healthCheck.intervalSeconds | quote }}
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        set -e
+                        echo "waiting for omni-pitcher /health..."
+                        for i in $(seq 1 "$HEALTH_ATTEMPTS"); do
+                          if curl -sf -o /dev/null "$PITCHER_URL/health"; then
+                            echo "healthy after $i attempts"
+                            break
+                          fi
+                          [ "$i" = "$HEALTH_ATTEMPTS" ] && { echo "timed out"; exit 1; }
+                          sleep "$HEALTH_INTERVAL"
+                        done
+                        echo "posting fixture..."
+                        echo "$EVENTS_JSON" | tr -d '\n' | sed 's/},{/}\n{/g' | tr -d '[]' | while read -r evt; do
+                          [ -z "$evt" ] && continue
+                          code=$(curl -s -o /dev/null -w '%{http_code}' \
+                            -X POST "$PITCHER_URL/pitch" \
+                            -H "Authorization: Bearer $AUTH_TOKEN" \
+                            -H "Content-Type: application/json" \
+                            -d "$evt")
+                          echo "POST /pitch -> $code"
+                          [ "$code" = "200" ] || [ "$code" = "201" ] || [ "$code" = "202" ] || exit 1
+                        done
+                        echo "seed complete"
