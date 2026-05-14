@@ -1,0 +1,5 @@
+apiVersion: v2
+name: homerun2-preview-quota
+description: Kyverno `ClusterPolicy` that auto-generates a `ResourceQuota` + `LimitRange` in every namespace matching `homerun2-pr-*` (or a custom prefix). Bounds per-PR resource use without per-PR Application overhead. Requires Kyverno installed on the target cluster (`infra/kyverno/install`).
+type: application
+version: 0.1.0
