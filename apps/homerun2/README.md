@@ -26,7 +26,8 @@ apps/homerun2/
 │       ├── git-pitcher.yaml                   Application "...-git-pitcher"        (sync-wave 0)
 │       └── httproute.yaml                     Application "...-httproute"          (sync-wave 10, builds routes from enabled components)
 ├── httproute/                                 multi-HTTPRoute sub-chart (driven by a values list)
-└── preview-quota/                             Kyverno `ClusterPolicy` auto-generating `ResourceQuota` + `LimitRange` in every `homerun2-pr-*` namespace (PR-preview safety net; requires Kyverno installed — see `infra/kyverno/install`)
+├── preview-quota/                             Kyverno `ClusterPolicy` auto-generating `ResourceQuota` + `LimitRange` in every `homerun2-pr-*` namespace (PR-preview safety net; requires Kyverno installed — see `infra/kyverno/install`)
+└── preview-sweep/                             Kyverno `ClusterCleanupPolicy` reclaiming empty `homerun2-pr-*` namespace shells left behind after PR close (cron-driven; requires Kyverno)
 ```
 
 ## Profiles → values

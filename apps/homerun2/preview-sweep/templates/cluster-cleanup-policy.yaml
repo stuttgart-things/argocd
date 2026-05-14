@@ -1,0 +1,31 @@
+---
+apiVersion: kyverno.io/v2
+kind: ClusterCleanupPolicy
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+  match:
+    any:
+      - resources:
+          kinds: ["Namespace"]
+          names: [{{ .Values.namespacePrefix | quote }}]
+  context:
+    - name: nsPods
+      apiCall:
+        urlPath: {{ printf "/api/v1/namespaces/%s/pods" "{{ target.metadata.name }}" | quote }}
+        jmesPath: "items[*]"
+  conditions:
+    all:
+      # Skip namespaces that still have running Pods — i.e. live previews.
+      # Only abandoned shells (post-cascade-delete, post-finalizer cleanup)
+      # have zero Pods and become candidates.
+      - key: {{ "{{ nsPods | length(@) }}" | quote }}
+        operator: Equals
+        value: 0
+      # Skip newly-created namespaces — gives the AppSet a moment to
+      # actually deploy workloads before the sweep would otherwise nuke
+      # the empty shell mid-bring-up.
+      - key: {{ "{{ time_since('', '{{ target.metadata.creationTimestamp }}', '') }}" | quote }}
+        operator: GreaterThan
+        value: {{ .Values.maxAge | quote }}
+  schedule: {{ .Values.schedule | quote }}

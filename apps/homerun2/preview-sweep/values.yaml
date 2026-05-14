@@ -1,0 +1,19 @@
+---
+# Name of the rendered ClusterCleanupPolicy.
+name: homerun2-preview-sweep
+
+# Namespace name glob — every namespace matching this is a candidate for
+# the sweep. Default matches the PR-preview ApplicationSet's namespace
+# pattern.
+namespacePrefix: "homerun2-pr-*"
+
+# A namespace is deleted only if it is older than `maxAge` AND empty
+# (no Pods). The "empty" check is what makes this safe for active PRs:
+# a live preview always has at least one Pod, so it never matches.
+# An abandoned namespace shell (left over because `CreateNamespace=true`
+# doesn't track ns for prune) has zero Pods and is reclaimed.
+maxAge: 1h
+
+# Cron schedule for the cleanup controller. Every 30 minutes balances
+# fast reclaim vs. controller load.
+schedule: "*/30 * * * *"
