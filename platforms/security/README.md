@@ -13,6 +13,7 @@ Catalog entries rendered:
 | ApplicationSet                         | Wave | Catalog path                          | Workload namespace | Notes |
 |---|---|---|---|---|
 | `external-secrets-install-security`    | -10  | `infra/external-secrets/install`      | `external-secrets` | External Secrets Operator (ESO) controller + webhook + cert-controller + CRDs (`ClusterSecretStore`, `ExternalSecret`, …). Controller only — `ClusterSecretStore`s are cluster-specific and live in each cluster's overlay |
+| `kyverno-install-security`             | -10  | `infra/kyverno/install`               | `kyverno`          | Kyverno admission controller + background-scan controller + cleanup controller + CRDs (`ClusterPolicy`, `Policy`, `PolicyException`, …). Controller only — actual `ClusterPolicy` / `Policy` resources are cluster-specific and live in each cluster's overlay (same split as ESO above) |
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 
@@ -43,6 +44,7 @@ Why: ESO needs Vault-side prerequisites (Kubernetes auth backend mounted at the 
 | Component opt-in label on the cluster Secret             | Effect |
 |---|---|
 | `security-platform/external-secrets: "true"`             | Enrol the cluster in `external-secrets-install-security` |
+| `security-platform/kyverno: "true"`                      | Enrol the cluster in `kyverno-install-security` |
 
 Selector logic — opt-in appsets:
 
