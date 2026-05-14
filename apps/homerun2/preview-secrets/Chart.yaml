@@ -1,0 +1,5 @@
+apiVersion: v2
+name: homerun2-preview-secrets
+description: Kyverno `ClusterPolicy` that auto-generates `ExternalSecret` resources in every `homerun2-pr-*` namespace, pulling per-component secret values (omni-pitcher's `auth-token` + redis `password`) from Vault via a `ClusterSecretStore`. Replaces the inline `redisPassword` / `authToken` literals on the PR-preview ApplicationSet. Requires Kyverno installed (`infra/kyverno/install`) and ESO with a `ClusterSecretStore` reachable (`infra/external-secrets/install` + `cluster-secret-store-vault`).
+type: application
+version: 0.1.0

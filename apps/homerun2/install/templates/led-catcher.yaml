@@ -31,11 +31,13 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.ledCatcher.version) | indent 12 }}
+{{- if .Values.redisPassword }}
         - target:
             kind: Secret
             name: {{ printf "%s-redis" $name }}
           patch: |
 {{ include "homerun2.redisPasswordPatch" (dict "secretName" (printf "%s-redis" $name) "password" .Values.redisPassword) | indent 12 }}
+{{- end }}
         - target:
             kind: Deployment
             name: {{ $name }}

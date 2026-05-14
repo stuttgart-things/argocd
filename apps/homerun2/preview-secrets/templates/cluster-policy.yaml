@@ -1,0 +1,37 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+  # Apply to namespaces that already exist when the policy is installed,
+  # not only ones created afterwards.
+  generateExisting: true
+  rules:
+    {{- range .Values.components }}
+    - name: generate-externalsecret-{{ .name }}
+      match:
+        any:
+          - resources:
+              kinds: ["Namespace"]
+              names: [{{ $.Values.namespacePrefix | quote }}]
+      generate:
+        apiVersion: external-secrets.io/v1
+        kind: ExternalSecret
+        name: {{ .secretName | quote }}
+        namespace: {{ "{{request.object.metadata.name}}" | quote }}
+        synchronize: true
+        data:
+          spec:
+            refreshInterval: {{ $.Values.refreshInterval | quote }}
+            secretStoreRef:
+              kind: ClusterSecretStore
+              name: {{ $.Values.clusterSecretStoreName | quote }}
+            target:
+              name: {{ .secretName | quote }}
+            data:
+              - secretKey: {{ .dataKey | quote }}
+                remoteRef:
+                  key: {{ $.Values.vaultSecretName | quote }}
+                  property: {{ .vaultProperty | quote }}
+    {{- end }}
