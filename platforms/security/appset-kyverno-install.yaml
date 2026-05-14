@@ -51,10 +51,18 @@ spec:
             # that would otherwise delete a kind it has no permission
             # for. Granting it here keeps the security-platform bundle
             # self-contained.
+            #
+            # Path note: chart values list both `coreClusterRole` and
+            # `clusterRole` under `cleanupController.rbac`, but in
+            # kyverno chart 3.8.0 only the latter is actually consumed
+            # by the cleanup-controller's clusterrole.yaml template.
+            # `coreClusterRole.extraResources` is wired for admission/
+            # background/reports controllers but not cleanup — using
+            # `clusterRole.extraResources` here is the working path.
             extraValues:
               cleanupController:
                 rbac:
-                  coreClusterRole:
+                  clusterRole:
                     extraResources:
                       - apiGroups: [""]
                         resources: ["namespaces"]
