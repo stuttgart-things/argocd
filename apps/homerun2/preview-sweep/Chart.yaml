@@ -1,0 +1,5 @@
+apiVersion: v2
+name: homerun2-preview-sweep
+description: Kyverno `ClusterCleanupPolicy` that periodically deletes empty PR-preview namespaces (matching `homerun2-pr-*` by default) — closes the gap where `CreateNamespace=true` doesn't track namespaces for prune-on-PR-close. Requires Kyverno installed on the target cluster (`infra/kyverno/install`).
+type: application
+version: 0.1.0
