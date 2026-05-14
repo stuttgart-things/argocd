@@ -67,6 +67,21 @@ spec:
                       - apiGroups: [""]
                         resources: ["namespaces"]
                         verbs: ["get", "list", "watch", "delete"]
+              # Background-controller's RBAC needs `external-secrets.io`
+              # CRD verbs so `generate` rules can produce ExternalSecret
+              # resources. Kyverno's admission webhook validates the
+              # background-controller's permissions when a ClusterPolicy
+              # with a `generate` rule is created and rejects the policy
+              # otherwise. Granting it here keeps the security-platform
+              # bundle self-contained for ESO-driven policies (e.g.
+              # `apps/homerun2/preview-secrets`).
+              backgroundController:
+                rbac:
+                  coreClusterRole:
+                    extraResources:
+                      - apiGroups: ["external-secrets.io"]
+                        resources: ["externalsecrets"]
+                        verbs: ["create", "update", "patch", "delete"]
       syncPolicy:
         automated:
           prune: true
