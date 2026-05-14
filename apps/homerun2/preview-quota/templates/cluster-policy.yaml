@@ -1,0 +1,54 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+  # Apply to namespaces that already exist when the policy is installed,
+  # not only ones created afterwards. Important when this lands on a cluster
+  # that already has open PR previews — without it, the quota only applies
+  # to PRs opened later.
+  generateExisting: true
+  rules:
+    - name: generate-resource-quota
+      match:
+        any:
+          - resources:
+              kinds: ["Namespace"]
+              names: [{{ .Values.namespacePrefix | quote }}]
+      generate:
+        apiVersion: v1
+        kind: ResourceQuota
+        name: pr-preview
+        namespace: {{ "{{request.object.metadata.name}}" | quote }}
+        synchronize: true
+        data:
+          spec:
+            hard:
+              requests.cpu: {{ .Values.quota.requestsCpu | quote }}
+              requests.memory: {{ .Values.quota.requestsMemory | quote }}
+              limits.cpu: {{ .Values.quota.limitsCpu | quote }}
+              limits.memory: {{ .Values.quota.limitsMemory | quote }}
+              pods: {{ .Values.quota.pods | quote }}
+    - name: generate-limit-range
+      match:
+        any:
+          - resources:
+              kinds: ["Namespace"]
+              names: [{{ .Values.namespacePrefix | quote }}]
+      generate:
+        apiVersion: v1
+        kind: LimitRange
+        name: pr-preview
+        namespace: {{ "{{request.object.metadata.name}}" | quote }}
+        synchronize: true
+        data:
+          spec:
+            limits:
+              - type: Container
+                default:
+                  cpu: {{ .Values.limitRange.defaultLimitCpu | quote }}
+                  memory: {{ .Values.limitRange.defaultLimitMemory | quote }}
+                defaultRequest:
+                  cpu: {{ .Values.limitRange.defaultRequestCpu | quote }}
+                  memory: {{ .Values.limitRange.defaultRequestMemory | quote }}

@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2-preview-quota chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "namespacePrefix", "quota", "limitRange"],
+  "properties": {
+    "name":            { "type": "string", "minLength": 1 },
+    "namespacePrefix": { "type": "string", "minLength": 1 },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestsCpu", "requestsMemory", "limitsCpu", "limitsMemory", "pods"],
+      "properties": {
+        "requestsCpu":    { "type": "string", "minLength": 1 },
+        "requestsMemory": { "type": "string", "minLength": 1 },
+        "limitsCpu":      { "type": "string", "minLength": 1 },
+        "limitsMemory":   { "type": "string", "minLength": 1 },
+        "pods":           { "type": "string", "minLength": 1 }
+      }
+    },
+    "limitRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaultRequestCpu", "defaultRequestMemory", "defaultLimitCpu", "defaultLimitMemory"],
+      "properties": {
+        "defaultRequestCpu":    { "type": "string", "minLength": 1 },
+        "defaultRequestMemory": { "type": "string", "minLength": 1 },
+        "defaultLimitCpu":      { "type": "string", "minLength": 1 },
+        "defaultLimitMemory":   { "type": "string", "minLength": 1 }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}
