@@ -31,7 +31,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "password": { "type": "string" }
+        "password":                  { "type": "string" },
+        "existingSecret":            { "type": "string" },
+        "existingSecretPasswordKey": { "type": "string", "minLength": 1 }
       }
     },
     "image": {

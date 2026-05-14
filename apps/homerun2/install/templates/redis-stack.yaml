@@ -1,11 +1,26 @@
 {{- if .Values.redisStack.enabled }}
 {{- $appName := include "homerun2.appName" . }}
+{{/*
+auth — start with the inline password from `.Values.redisPassword` (Flux /
+single-cluster path). If `.Values.redisStack.auth.existingSecret` is set,
+add it; Bitnami prefers existingSecret when both fields are present. This
+lets ESO/CSI-managed Secret consumers (e.g. the PR-preview policy that
+generates `redis-stack-auth` per namespace) wire the password without
+embedding a literal in valuesObject.
+*/}}
+{{- $auth := dict "password" .Values.redisPassword }}
+{{- with .Values.redisStack.auth }}
+  {{- if .existingSecret }}
+    {{- $_ := set $auth "existingSecret" .existingSecret }}
+    {{- $_ := set $auth "existingSecretPasswordKey" (default "redis-password" .existingSecretPasswordKey) }}
+  {{- end }}
+{{- end }}
 {{- $rsValues := dict
       "project"      .Values.project
       "applicationName" (printf "%s-redis-stack-delegate" $appName)
       "destination"  .Values.destination
       "chartVersion" .Values.redisStack.chartVersion
-      "auth"         (dict "password" .Values.redisPassword)
+      "auth"         $auth
       "image"        .Values.redisStack.image
       "sentinel"     (dict
         "enabled"       true

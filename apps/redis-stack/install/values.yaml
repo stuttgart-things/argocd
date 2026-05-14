@@ -10,10 +10,14 @@ destination:
 # Upstream stuttgart-things/redis Helm chart (OCI: ghcr.io/stuttgart-things/charts/redis).
 chartVersion: 17.1.4
 
-# Root Redis password. Leave empty and override per-cluster via an ArgoCD Vault Plugin
-# / SOPS overlay. Never inline the literal in values checked into git.
+# Root Redis password. Set `password` for an inline literal (don't check real
+# secrets into git — use an ArgoCD Vault Plugin / SOPS overlay), OR
+# `existingSecret` to point at a Secret populated out-of-band (e.g. by ESO
+# or a Vault CSI driver). Bitnami prefers existingSecret when both are set.
 auth:
-  password: ""                      # pragma: allowlist secret
+  password: ""                       # pragma: allowlist secret
+  existingSecret: ""
+  existingSecretPasswordKey: redis-password
 
 # Redis container image — defaults to the stuttgart-things redis-stack-server mirror
 # which bundles RediSearch/RedisJSON/RedisTimeSeries/RedisBloom.
