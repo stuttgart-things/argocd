@@ -1,8 +1,11 @@
 {{/*
 homerun2.appName -- per-cluster base name (sha-suffixed) for Argo Applications.
+Hashes whichever destination identifier is set: `destination.server` (URL) or
+`destination.name` (Argo-registered cluster name). One of the two must be set.
 */}}
 {{- define "homerun2.appName" -}}
-{{- $defaultName := printf "homerun2-%s" (sha1sum .Values.destination.server | trunc 8) -}}
+{{- $destKey := .Values.destination.server | default .Values.destination.name -}}
+{{- $defaultName := printf "homerun2-%s" (sha1sum $destKey | trunc 8) -}}
 {{- .Values.applicationName | default $defaultName -}}
 {{- end -}}
 

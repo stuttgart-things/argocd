@@ -1,4 +1,5 @@
-{{- $defaultName := printf "redis-stack-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $defaultName := printf "redis-stack-%s" (sha1sum $destKey | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
 {{- $masterScript := `#!/usr/bin/dumb-init /bin/bash
 ### docker entrypoint script, for starting redis stack
@@ -159,7 +160,11 @@ spec:
       valuesObject:
         {{- toYaml $merged | nindent 8 }}
   destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
     server: {{ .Values.destination.server | quote }}
+    {{- end }}
     namespace: {{ .Values.destination.namespace | quote }}
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}

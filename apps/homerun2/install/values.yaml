@@ -8,9 +8,14 @@ catalog:
 # ArgoCD AppProject all rendered Applications belong to.
 project: default
 
-# Where all rendered Applications deploy.
+# Where all rendered Applications deploy. Provide either `server` (cluster URL
+# — typical for single-cluster deploys, e.g. https://kubernetes.default.svc)
+# OR `name` (Argo-registered cluster name — useful for cross-cluster deploys
+# from a management cluster). Mutually exclusive per ArgoCD; the schema
+# enforces oneOf.
 destination:
   server: https://kubernetes.default.svc
+  # name: homerun2-dev
   namespace: homerun2
 
 # Sync policy applied to all rendered Applications.
