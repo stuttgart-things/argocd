@@ -95,8 +95,19 @@ ${CMD} \
 ) }}
 {{- $masterArgs := list "-c" "/opt/bitnami/scripts/merged-start-scripts/start-master.sh" }}
 {{- $replicaArgs := list "-c" "/opt/bitnami/scripts/merged-start-scripts/start-replica.sh" }}
+{{/*
+auth — pass through either an existing Secret reference (for ESO/CSI-managed
+passwords) or an inline literal via `global.redis.password`. Bitnami's chart
+prefers existingSecret over password when both are set.
+*/}}
+{{- $authBlock := dict }}
+{{- if .Values.auth.existingSecret }}
+  {{- $_ := set $authBlock "existingSecret" .Values.auth.existingSecret }}
+  {{- $_ := set $authBlock "existingSecretPasswordKey" (default "redis-password" .Values.auth.existingSecretPasswordKey) }}
+{{- end }}
 {{- $computed := dict
       "global" (dict "redis" (dict "password" .Values.auth.password))
+      "auth"   $authBlock
       "image" (dict
         "registry"   .Values.image.registry
         "repository" .Values.image.repository

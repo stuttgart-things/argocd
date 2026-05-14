@@ -43,6 +43,14 @@
         "enabled":      { "type": "boolean" },
         "chartVersion": { "type": "string", "minLength": 1 },
         "serviceType":  { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret":            { "type": "string" },
+            "existingSecretPasswordKey": { "type": "string", "minLength": 1 }
+          }
+        },
         "persistence": {
           "type": "object",
           "additionalProperties": false,

@@ -59,6 +59,15 @@ redisStack:
   enabled: true
   chartVersion: 17.1.4
   serviceType: ClusterIP
+  # Optional: have redis-stack read its password from a pre-existing Secret
+  # rather than the inline `redisPassword` literal. Useful when ESO / CSI
+  # populates the Secret out-of-band (e.g. the PR-preview Kyverno policy
+  # generates an ExternalSecret per namespace). Leave empty for the inline-
+  # literal path. When set, the same value must be the target Secret name
+  # the ESO/CSI flow materializes.
+  auth:
+    existingSecret: ""
+    existingSecretPasswordKey: redis-password
   persistence:
     enabled: true
     storageClass: standard

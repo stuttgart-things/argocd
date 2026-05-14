@@ -34,3 +34,10 @@ components:
     secretName: homerun2-omni-pitcher-redis
     dataKey: password
     vaultProperty: redisPassword
+  # redis-stack auth Secret consumed by the Bitnami chart's
+  # `auth.existingSecret` path. Key MUST be `redis-password` (Bitnami's
+  # default `auth.existingSecretPasswordKey`); change both if overriding.
+  - name: redis-stack-auth
+    secretName: redis-stack-auth
+    dataKey: redis-password
+    vaultProperty: redisPassword
