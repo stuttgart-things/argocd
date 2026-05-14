@@ -19,11 +19,17 @@
     "destination": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Argo destination for all rendered child Applications. Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. If both are set (e.g. when overriding the default `server` with a `name`), the template prefers `name`; this is intentional so consumers can switch to a name without having to null out the chart's default server.",
       "properties": {
         "server":    { "type": "string", "format": "uri" },
+        "name":      { "type": "string", "minLength": 1 },
         "namespace": { "type": "string", "minLength": 1 }
       },
-      "required": ["server", "namespace"]
+      "required": ["namespace"],
+      "anyOf": [
+        { "required": ["server"] },
+        { "required": ["name"] }
+      ]
     },
     "syncPolicy": { "type": "object", "additionalProperties": true },
     "trustBundleConfigMap":      { "type": "string", "minLength": 1 },

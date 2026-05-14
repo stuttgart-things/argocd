@@ -37,7 +37,11 @@ spec:
           patch: |
 {{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.demoPitcher.version) | indent 12 }}
   destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
     server: {{ .Values.destination.server | quote }}
+    {{- end }}
     namespace: {{ $ns | quote }}
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
