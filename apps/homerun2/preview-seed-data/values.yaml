@@ -1,0 +1,70 @@
+---
+# Name of the rendered ClusterPolicy.
+name: homerun2-preview-seed-data
+
+# Namespace name glob — every namespace matching this gets the seed Job
+# auto-generated. Default matches the PR-preview ApplicationSet's pattern.
+namespacePrefix: "homerun2-pr-*"
+
+# Container image for the seed Job. curlimages/curl ships sh + curl in a
+# tiny rootless container — that's all we need to poll /health then POST
+# events.
+image: curlimages/curl:8.10.1
+
+# Service hostname omni-pitcher exposes inside the PR namespace.
+# `http://<svc>:<port>` — kustomize.namespace rewrites place the Service
+# in the same namespace as the Job, so a relative DNS name works.
+omniPitcherService: homerun2-omni-pitcher
+omniPitcherPort: 80
+
+# Secret + key that hold the bearer token. Must match what
+# `apps/homerun2/preview-secrets` materializes per namespace.
+authTokenSecretName: homerun2-omni-pitcher-token
+authTokenSecretKey: auth-token
+
+# How long the Job's pod waits for /health to return 200 before giving
+# up. omni-pitcher typically boots in 5-15s; redis-stack adds a few more.
+# 60 attempts × 5s = 5 minutes — plenty of headroom for cold-start.
+healthCheck:
+  attempts: 60
+  intervalSeconds: 5
+
+# Auto-clean the completed Job after this many seconds via
+# `ttlSecondsAfterFinished`. 1h keeps it visible for reviewers to inspect
+# logs without leaving a permanent artifact.
+jobTtlSecondsAfterFinished: 3600
+
+# Fixture of events posted to /pitch. Each entry is a full JSON object the
+# omni-pitcher accepts at `POST /pitch`. The Job iterates this list and
+# posts each in sequence.
+events:
+  - title: Deployment Notification
+    message: omni-pitcher PR preview spun up
+    severity: success
+    author: seed-job
+    system: pr-preview
+    tags: deployment,preview
+  - title: Test Alert
+    message: simulated alert from PR-preview seed fixture
+    severity: warning
+    author: seed-job
+    system: pr-preview
+    tags: alert,preview
+  - title: Info Event
+    message: reviewer-visible event 3
+    severity: info
+    author: seed-job
+    system: pr-preview
+    tags: info,preview
+  - title: Critical Event
+    message: simulated critical
+    severity: critical
+    author: seed-job
+    system: pr-preview
+    tags: critical,preview
+  - title: Success Event
+    message: simulated success
+    severity: success
+    author: seed-job
+    system: pr-preview
+    tags: success,preview

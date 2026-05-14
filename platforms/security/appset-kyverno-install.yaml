@@ -91,6 +91,12 @@ spec:
                       - apiGroups: [""]
                         resources: ["resourcequotas", "limitranges"]
                         verbs: ["create", "update", "patch", "delete"]
+                      # Required by `homerun2-preview-seed-data` to generate
+                      # a one-shot Job per PR namespace that posts a curated
+                      # event fixture to omni-pitcher's /pitch endpoint.
+                      - apiGroups: ["batch"]
+                        resources: ["jobs"]
+                        verbs: ["create", "update", "patch", "delete"]
       syncPolicy:
         automated:
           prune: true

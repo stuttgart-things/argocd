@@ -1,0 +1,5 @@
+apiVersion: v2
+name: homerun2-preview-seed-data
+description: Kyverno `ClusterPolicy` that generates a one-shot Job in every `homerun2-pr-*` namespace. The Job waits for `homerun2-omni-pitcher`'s `/health` to return 200, then posts a curated fixture of events to `/pitch` so reviewers see a non-empty stream the moment the preview spins up. Requires Kyverno + the `homerun2-omni-pitcher-token` Secret (materialized by `apps/homerun2/preview-secrets`).
+type: application
+version: 0.1.0
