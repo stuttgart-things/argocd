@@ -94,6 +94,33 @@ Usage: include "homerun2.redisAddrPatch" (dict
 {{- end -}}
 
 {{/*
+homerun2.httpRouteJSONPatch -- emits JSON-Patch ops that replace parentRefs +
+hostnames on a kustomize-rendered HTTPRoute. Used when a component's
+kustomize OCI inlines its own HTTPRoute (Option B from
+stuttgart-things/argocd#116) so Service + HTTPRoute land in the same apply.
+
+JSON-Patch (not strategic merge) because parentRefs is a list with a
+compound identity (name + namespace) and hostnames is a list of strings —
+strategic merge can't reliably replace either.
+
+Usage:
+  include "homerun2.httpRouteJSONPatch" (dict
+    "gateway"  .Values.httpRoute.gateway
+    "hostname" .Values.omniPitcher.hostname)
+*/}}
+{{- define "homerun2.httpRouteJSONPatch" -}}
+- op: replace
+  path: /spec/parentRefs
+  value:
+    - name: {{ .gateway.name | quote }}
+      namespace: {{ .gateway.namespace | quote }}
+- op: replace
+  path: /spec/hostnames
+  value:
+    - {{ .hostname | quote }}
+{{- end -}}
+
+{{/*
 homerun2.deletePatch -- emits a $patch: delete on a target by kind+name.
 Usage: include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" "kind" "Ingress" "name" "homerun2-omni-pitcher")
 */}}
