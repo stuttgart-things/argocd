@@ -112,7 +112,12 @@ Usage:
 - op: replace
   path: /spec/parentRefs
   value:
-    - name: {{ .gateway.name | quote }}
+    # group + kind included so the replace matches the admission-defaulted
+    # live resource (Cilium / Gateway API webhook defaults them in). Skipping
+    # them here keeps the App perpetually OutOfSync.
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .gateway.name | quote }}
       namespace: {{ .gateway.namespace | quote }}
 - op: replace
   path: /spec/hostnames
