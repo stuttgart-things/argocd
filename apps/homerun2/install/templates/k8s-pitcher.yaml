@@ -54,6 +54,12 @@ spec:
             name: {{ printf "%s-token" $name }}
           patch: |
 {{ include "homerun2.authTokenPatch" (dict "secretName" (printf "%s-token" $name) "token" .Values.authToken) | indent 12 }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-token" $name)) | indent 12 }}
 {{- end }}
         - target:
             kind: Deployment

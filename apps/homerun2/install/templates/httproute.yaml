@@ -57,6 +57,15 @@ spec:
     server: {{ .Values.destination.server | quote }}
     {{- end }}
     namespace: {{ .Values.destination.namespace | quote }}
+  # Cilium's gateway controller defaults `weight: 1` on every
+  # `backendRefs[]` element; the chart doesn't render the field
+  # so we'd otherwise sit OutOfSync permanently. See
+  # stuttgart-things/argocd#112.
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      jqPathExpressions:
+        - .spec.rules[].backendRefs[].weight
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
 {{- end }}
