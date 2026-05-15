@@ -86,6 +86,12 @@ omniPitcher:
   enabled: true
   version: v1.6.2
   hostname: omni-pitcher.example.com
+  # Option B from stuttgart-things/argocd#116 — when true, the chart patches
+  # the HTTPRoute shipped inside the omni-pitcher kustomize OCI (parentRef +
+  # hostname) and the standalone homerun2-httproute Application skips
+  # omni-pitcher. Flip to true on consumers (AppSet valuesObject) once they
+  # consume an OCI tag built after stuttgart-things/homerun2-omni-pitcher#125.
+  inlineHttpRoute: false
 
 # core-catcher (Redis Streams consumer + web dashboard).
 coreCatcher:

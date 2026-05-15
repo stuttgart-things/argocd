@@ -31,6 +31,19 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.omniPitcher.version) | indent 12 }}
+{{- if .Values.omniPitcher.inlineHttpRoute }}
+        # Option B from stuttgart-things/argocd#116 — kustomize OCI ships the
+        # HTTPRoute alongside Service so they land atomically. Patch parentRef
+        # + hostname per env; the standalone httproute child Application no
+        # longer renders omni-pitcher (see templates/httproute.yaml).
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |-
+{{ include "homerun2.httpRouteJSONPatch" (dict "gateway" .Values.httpRoute.gateway "hostname" .Values.omniPitcher.hostname) | indent 12 }}
+{{- end }}
 {{- if .Values.authToken }}
         - target:
             kind: Secret
