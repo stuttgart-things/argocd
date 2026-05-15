@@ -9,7 +9,7 @@ namespacePrefix: "homerun2-pr-*"
 # Container image for the seed Job. curlimages/curl ships sh + curl in a
 # tiny rootless container — that's all we need to poll /health then POST
 # events.
-image: curlimages/curl:8.10.1
+image: curlimages/curl:8.20.0
 
 # Service hostname omni-pitcher exposes inside the PR namespace.
 # `http://<svc>:<port>` — kustomize.namespace rewrites place the Service
