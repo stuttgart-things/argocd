@@ -19,4 +19,8 @@ spec:
       backendRefs:
         - name: {{ .backend.name | quote }}
           port: {{ .backend.port }}
+          # Render the Gateway API admission default explicitly so we
+          # don't drift against the cilium-gateway-controller's
+          # post-admission mutation. See stuttgart-things/argocd#114.
+          weight: {{ .backend.weight | default 1 }}
 {{- end }}
