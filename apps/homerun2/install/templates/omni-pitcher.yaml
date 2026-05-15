@@ -26,6 +26,26 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" "kind" "Ingress" "name" $name) | indent 12 }}
+        # Patch the HTTPRoute that omni-pitcher's kustomize OCI now ships
+        # (since stuttgart-things/homerun2-omni-pitcher#125, v1.12.0+).
+        # When httpRoute.enabled is true, override parentRefs + hostnames;
+        # when false (no Gateway API on the target cluster), delete it.
+        # Replaces the per-route entry the standalone `apps/homerun2/httproute`
+        # chart used to render for omni-pitcher — eliminates the
+        # cross-Application race with Cilium's gateway controller (#116).
+{{- if .Values.httpRoute.enabled }}
+        - target:
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.httpRoutePatch" (dict "name" $name "hostname" .Values.omniPitcher.hostname "gateway" .Values.httpRoute.gateway) | indent 12 }}
+{{- else }}
+        - target:
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+{{- end }}
         - target:
             kind: Deployment
             name: {{ $name }}

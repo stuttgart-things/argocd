@@ -106,3 +106,26 @@ Usage: include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" 
 -}}
 {{ toYaml $patch }}
 {{- end -}}
+
+{{/*
+homerun2.httpRoutePatch -- emits a strategic merge patch overriding the
+kustomize-rendered HTTPRoute's parentRefs + hostnames. Used by per-component
+templates when the component's kustomize OCI ships its own HTTPRoute
+(eliminating the cross-Application race with Cilium's gateway controller —
+see stuttgart-things/argocd#116).
+Usage: include "homerun2.httpRoutePatch" (dict
+  "name" "homerun2-omni-pitcher"
+  "hostname" "omni-pr-N.example.com"
+  "gateway" (dict "name" "homerun2-dev-gateway" "namespace" "default"))
+*/}}
+{{- define "homerun2.httpRoutePatch" -}}
+{{- $patch := dict
+      "apiVersion" "gateway.networking.k8s.io/v1"
+      "kind" "HTTPRoute"
+      "metadata" (dict "name" .name)
+      "spec" (dict
+        "parentRefs" (list (dict "name" .gateway.name "namespace" .gateway.namespace))
+        "hostnames" (list .hostname))
+-}}
+{{ toYaml $patch }}
+{{- end -}}

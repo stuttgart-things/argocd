@@ -1,9 +1,18 @@
 {{- if .Values.httpRoute.enabled }}
 {{- $appName := include "homerun2.appName" . }}
 {{- $routes := list }}
-{{- if .Values.omniPitcher.enabled }}
-  {{- $routes = append $routes (dict "name" "homerun2-omni-pitcher" "hostname" .Values.omniPitcher.hostname "backend" (dict "name" "homerun2-omni-pitcher" "port" 80)) }}
-{{- end }}
+{{- /*
+omni-pitcher is intentionally NOT in this list: as of
+stuttgart-things/homerun2-omni-pitcher#125 + v1.12.0, its kustomize OCI
+ships the HTTPRoute alongside the Service. The per-component template
+`apps/homerun2/install/templates/omni-pitcher.yaml` patches that
+HTTPRoute's parentRefs/hostnames (or delete-patches it when
+httpRoute.enabled is false). This eliminates the cross-Application
+race with Cilium's gateway controller (stuttgart-things/argocd#116).
+Requires omni-pitcher kustomize OCI >= v1.12.0 — older pinned versions
+(e.g. v1.8.1 in co-tenanted previews) will not have an HTTPRoute until
+the version pin is bumped.
+*/ -}}
 {{- if .Values.coreCatcher.enabled }}
   {{- $routes = append $routes (dict "name" "homerun2-core-catcher" "hostname" .Values.coreCatcher.hostname "backend" (dict "name" "homerun2-core-catcher" "port" 80)) }}
 {{- end }}
