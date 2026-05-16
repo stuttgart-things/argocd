@@ -113,6 +113,14 @@ scout:
   enabled: true
   version: v0.7.0
   hostname: scout.example.com
+  # Option B from stuttgart-things/argocd#116 — when true, the chart patches
+  # the HTTPRoute shipped inside the scout kustomize OCI (parentRef +
+  # hostname) and the standalone homerun2-httproute Application skips
+  # scout. Flip to true on consumers (AppSet valuesObject) once they
+  # consume a kustomize OCI tag built after
+  # stuttgart-things/homerun2-scout#55 (which enables HTTPRoute rendering
+  # in the kustomize base).
+  inlineHttpRoute: false
 
 # k8s-pitcher (informers/collectors → omni-pitcher). Often deployed in a different
 # namespace from the rest of the stack; override `namespace` if needed.
