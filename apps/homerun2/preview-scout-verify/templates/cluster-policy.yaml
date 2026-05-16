@@ -1,0 +1,91 @@
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+  # Apply to namespaces that already exist when the policy is installed,
+  # not only ones created afterwards.
+  generateExisting: true
+  rules:
+    - name: generate-verify-job
+      match:
+        any:
+          - resources:
+              kinds: ["Namespace"]
+              names: [{{ .Values.namespacePrefix | quote }}]
+      generate:
+        apiVersion: batch/v1
+        kind: Job
+        name: verify-scout-analytics
+        namespace: {{ "{{request.object.metadata.name}}" | quote }}
+        # One-shot — don't recreate after completion. Without this Kyverno
+        # would recreate the Job repeatedly, which we don't want.
+        synchronize: false
+        data:
+          spec:
+            ttlSecondsAfterFinished: {{ .Values.jobTtlSecondsAfterFinished }}
+            backoffLimit: 3
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                  - name: verify
+                    image: {{ .Values.image | quote }}
+                    env:
+                      - name: AUTH_TOKEN
+                        valueFrom:
+                          secretKeyRef:
+                            name: {{ .Values.authTokenSecretName | quote }}
+                            key: {{ .Values.authTokenSecretKey | quote }}
+                      - name: SCOUT_URL
+                        value: {{ printf "http://%s:%d" .Values.scoutService (int .Values.scoutPort) | quote }}
+                      - name: HEALTH_ATTEMPTS
+                        value: {{ .Values.healthCheck.attempts | quote }}
+                      - name: HEALTH_INTERVAL
+                        value: {{ .Values.healthCheck.intervalSeconds | quote }}
+                      - name: AGGREGATION_WAIT
+                        value: {{ .Values.aggregationWaitSeconds | quote }}
+                      - name: MIN_TOTAL
+                        value: {{ .Values.minTotalMessages | quote }}
+                    command:
+                      - sh
+                      - -c
+                      - |
+                        set -e
+                        echo "waiting for scout /health..."
+                        for i in $(seq 1 "$HEALTH_ATTEMPTS"); do
+                          if curl -sf -o /dev/null "$SCOUT_URL/health"; then
+                            echo "healthy after $i attempts"
+                            break
+                          fi
+                          [ "$i" = "$HEALTH_ATTEMPTS" ] && { echo "timed out waiting for /health"; exit 1; }
+                          sleep "$HEALTH_INTERVAL"
+                        done
+
+                        echo "sleeping ${AGGREGATION_WAIT}s for seed Job + one aggregator tick..."
+                        sleep "$AGGREGATION_WAIT"
+
+                        echo "polling /analytics/summary..."
+                        body=$(curl -sf \
+                          -H "Authorization: Bearer $AUTH_TOKEN" \
+                          "$SCOUT_URL/analytics/summary")
+                        echo "summary: $body"
+
+                        # Extract totalMessages without jq (curlimages/curl
+                        # ships sh but no jq). The field is always a bare
+                        # integer immediately after "totalMessages":.
+                        total=$(echo "$body" | sed -n 's/.*"totalMessages":[[:space:]]*\([0-9]\{1,\}\).*/\1/p')
+                        if [ -z "$total" ]; then
+                          echo "could not parse totalMessages from response"
+                          exit 1
+                        fi
+                        echo "totalMessages=$total minTotal=$MIN_TOTAL"
+                        if [ "$total" -lt "$MIN_TOTAL" ]; then
+                          echo "FAIL: scout reported $total messages, expected >= $MIN_TOTAL"
+                          echo "If scout-pr namespace is fresh and the seed Job already completed,"
+                          echo "this likely means omni-pitcher's JSON.SET path is broken or scout's"
+                          echo "RediSearch index is mis-configured."
+                          exit 1
+                        fi
+                        echo "verify complete: scout sees $total messages"

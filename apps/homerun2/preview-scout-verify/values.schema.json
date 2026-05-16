@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2-preview-scout-verify chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "namespacePrefix", "image", "scoutService", "scoutPort", "authTokenSecretName", "authTokenSecretKey", "healthCheck", "aggregationWaitSeconds", "minTotalMessages", "jobTtlSecondsAfterFinished"],
+  "properties": {
+    "name":                       { "type": "string", "minLength": 1 },
+    "namespacePrefix":            { "type": "string", "minLength": 1 },
+    "image":                      { "type": "string", "minLength": 1 },
+    "scoutService":               { "type": "string", "minLength": 1 },
+    "scoutPort":                  { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "authTokenSecretName":        { "type": "string", "minLength": 1 },
+    "authTokenSecretKey":         { "type": "string", "minLength": 1 },
+    "aggregationWaitSeconds":     { "type": "integer", "minimum": 0 },
+    "minTotalMessages":           { "type": "integer", "minimum": 0 },
+    "jobTtlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+    "healthCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attempts", "intervalSeconds"],
+      "properties": {
+        "attempts":        { "type": "integer", "minimum": 1 },
+        "intervalSeconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}
