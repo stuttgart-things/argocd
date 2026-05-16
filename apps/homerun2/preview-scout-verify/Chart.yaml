@@ -1,0 +1,5 @@
+apiVersion: v2
+name: homerun2-preview-scout-verify
+description: Kyverno `ClusterPolicy` that generates a one-shot Job in every `homerun2-scout-pr-*` namespace. The Job waits for `homerun2-scout`'s `/health` to return 200, sleeps one aggregator tick so scout's periodic `FT.AGGREGATE` has run, then GETs `/analytics/summary` with the bearer token and asserts the fixture posted by `preview-seed-data` has made it through omni-pitcher → JSON.SET → RediSearch → scout. Requires Kyverno + the `homerun2-scout-token` Secret (materialized by `apps/homerun2/preview-secrets`).
+type: application
+version: 0.1.0

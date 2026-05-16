@@ -1,0 +1,52 @@
+---
+# Name of the rendered ClusterPolicy.
+name: homerun2-preview-scout-verify
+
+# Namespace name glob — every namespace matching this gets the verify Job
+# auto-generated. Default matches the scout PR-preview ApplicationSet's
+# pattern.
+namespacePrefix: "homerun2-scout-pr-*"
+
+# Container image for the verify Job. curlimages/curl ships sh + curl in a
+# tiny rootless container; we only need polling + a small jq-free numeric
+# extraction via sed/awk.
+image: curlimages/curl:8.20.0
+
+# Service hostname scout exposes inside the PR namespace.
+# kustomize.namespace rewrites place the Service in the same namespace
+# as the Job, so a relative DNS name works.
+scoutService: homerun2-scout
+scoutPort: 80
+
+# Secret + key that hold scout's bearer token. Must match what
+# `apps/homerun2/preview-secrets` materializes per namespace.
+authTokenSecretName: homerun2-scout-token
+authTokenSecretKey: auth-token
+
+# How long the Job's pod waits for /health to return 200 before giving
+# up. scout typically boots in 5-15s; RediSearch index creation adds a
+# few seconds on cold start. 60 attempts × 5s = 5 minutes — plenty of
+# headroom.
+healthCheck:
+  attempts: 60
+  intervalSeconds: 5
+
+# Once /health is green, sleep this many seconds before polling
+# /analytics/summary. Scout's aggregator runs FT.AGGREGATE on a periodic
+# tick (default 60s) and caches the result — the cache is what the
+# handler returns, so we need at least one tick to have elapsed since
+# preview-seed-data posted its fixture. 90s gives the seed Job time to
+# finish posting + one full aggregator interval at the default 60s.
+aggregationWaitSeconds: 90
+
+# Minimum total messages scout's /analytics/summary must report for the
+# verify Job to succeed. Default 1 is intentionally tolerant: the known
+# seed-Job JSON-splitting bug drops the last event (4 of 5 posted), and
+# multiple preview cycles may have replayed messages, so asserting an
+# exact count is brittle. Bump this only if you want a stricter floor.
+minTotalMessages: 1
+
+# Auto-clean the completed Job after this many seconds via
+# `ttlSecondsAfterFinished`. 1h keeps it visible for reviewers to inspect
+# logs without leaving a permanent artifact.
+jobTtlSecondsAfterFinished: 3600
