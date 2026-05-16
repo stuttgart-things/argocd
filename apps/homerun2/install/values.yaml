@@ -99,6 +99,14 @@ coreCatcher:
   version: v0.8.0
   kustomizeVersion: v0.7.1               # may differ from image tag (e.g. -web suffix on older versions)
   hostname: core-catcher.example.com
+  # Option B from stuttgart-things/argocd#116 — when true, the chart patches
+  # the HTTPRoute shipped inside the core-catcher kustomize OCI (parentRef +
+  # hostname) and the standalone homerun2-httproute Application skips
+  # core-catcher. Flip to true on consumers (AppSet valuesObject) once they
+  # consume a kustomize OCI tag built after
+  # stuttgart-things/homerun2-core-catcher#63 (which enables HTTPRoute
+  # rendering in the kustomize base).
+  inlineHttpRoute: false
 
 # scout (web dashboard / monitoring).
 scout:
