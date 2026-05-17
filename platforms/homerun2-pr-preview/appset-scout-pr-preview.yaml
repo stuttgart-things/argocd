@@ -1,0 +1,114 @@
+---
+# Per-PR preview environments for stuttgart-things/homerun2-scout.
+#
+# Fans out across (clusters labelled homerun2-pr-preview: "true") ×
+# (open PRs on homerun2-scout carrying the `preview` label). scout is a
+# RediSearch → web dashboard consumer, so its preview ships with
+# omni-pitcher + redis-stack co-tenanted in the same PR namespace so
+# reviewers can pitch events and see them surface in scout's UI.
+#
+# Decisions from stuttgart-things/homerun2-omni-pitcher#116 step 3:
+#   - namespace: `homerun2-scout-pr-<num>` (image-name-mirrored)
+#   - hostnames: `scout-pr-<num>` for scout, `omni-scout-pr-<num>` for
+#     the co-tenanted omni-pitcher
+#   - omni-pitcher version pinned to v1.8.1 (latest released)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-scout-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  homerun2-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: homerun2-scout
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'homerun2-scout-pr-{{ .number }}'
+      labels:
+        homerun2.stuttgart-things.com/pr: '{{ .number }}'
+        homerun2.stuttgart-things.com/component: scout
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/homerun2/install
+        helm:
+          releaseName: 'homerun2-scout-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'homerun2-scout-pr-{{ .number }}'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'homerun2-scout-pr-{{ .number }}'
+
+            # SUT: scout at the PR's commit. scout's install template uses
+            # a single `version` field for both image tag and kustomize-OCI
+            # targetRevision (unlike core-catcher which separates them).
+            scout:
+              enabled: true
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              hostname: 'scout-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            # Co-tenanted: omni-pitcher pinned to latest released.
+            omniPitcher:
+              enabled: true
+              version: v1.8.1
+              hostname: 'omni-scout-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+
+            redisStack:
+              enabled: true
+              persistence:
+                enabled: false
+              auth:
+                existingSecret: redis-stack-auth
+
+            coreCatcher:  { enabled: false }
+            k8sPitcher:   { enabled: false }
+            lightCatcher: { enabled: false }
+            wledMock:     { enabled: false }
+            demoPitcher:  { enabled: false }
+            ledCatcher:   { enabled: false }
+            gitPitcher:   { enabled: false }
+
+            httpRoute:
+              enabled: true
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
