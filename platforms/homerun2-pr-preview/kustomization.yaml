@@ -5,4 +5,5 @@ resources:
   - appset-omni-pitcher-pr-preview.yaml
   - appset-core-catcher-pr-preview.yaml
   - appset-scout-pr-preview.yaml
+  - appset-demo-pitcher-pr-preview.yaml
   - appset-policies.yaml

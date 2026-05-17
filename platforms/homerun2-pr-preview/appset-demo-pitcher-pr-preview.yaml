@@ -1,0 +1,128 @@
+---
+# Per-PR preview environments for stuttgart-things/homerun2-demo-pitcher.
+#
+# Fans out across (clusters labelled homerun2-pr-preview: "true") ×
+# (open PRs on homerun2-demo-pitcher carrying the `preview` label).
+# demo-pitcher is a web UI for pitching events directly to Redis Streams;
+# its preview ships with core-catcher (web mode) + redis-stack co-tenanted
+# so reviewers can click "Pitch" in demo-pitcher's UI and see the event
+# land in core-catcher's dashboard — full end-to-end UI-to-UI flow.
+#
+# Shape decision (#116, corrected 2026-05-17): NO co-tenanted
+# omni-pitcher. demo-pitcher is itself a pitcher (RedisPitcher writes
+# directly to redis-stack via homerun-library.EnqueueMessageInRedisStreams,
+# the same path omni-pitcher uses) — omni-pitcher in the namespace
+# would be redundant.
+#
+# Decisions from stuttgart-things/homerun2-omni-pitcher#116 step 3:
+#   - namespace: `homerun2-demo-pitcher-pr-<num>` (image-name-mirrored)
+#   - hostnames: `demo-pr-<num>` for demo-pitcher,
+#     `cc-demo-pr-<num>` for the co-tenanted core-catcher
+#   - core-catcher pinned to v2.4.0 (latest released)
+#   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
+#     stuttgart-things repo
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-demo-pitcher-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  homerun2-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: homerun2-demo-pitcher
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'homerun2-demo-pitcher-pr-{{ .number }}'
+      labels:
+        homerun2.stuttgart-things.com/pr: '{{ .number }}'
+        homerun2.stuttgart-things.com/component: demo-pitcher
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/homerun2/install
+        helm:
+          releaseName: 'homerun2-demo-pitcher-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'homerun2-demo-pitcher-pr-{{ .number }}'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'homerun2-demo-pitcher-pr-{{ .number }}'
+
+            # SUT: demo-pitcher at the PR's commit. Same kustomize-OCI tag
+            # for the manifests; the image patch reuses the version field.
+            demoPitcher:
+              enabled: true
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              hostname: 'demo-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            # Co-tenanted: core-catcher in web mode at the latest released
+            # build. Reviewer clicks "Pitch" in demo-pitcher's UI → event
+            # lands in redis-stack → core-catcher consumes and renders.
+            coreCatcher:
+              enabled: true
+              version: v2.4.0
+              kustomizeVersion: v2.4.0
+              hostname: 'cc-demo-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            redisStack:
+              enabled: true
+              persistence:
+                enabled: false
+              auth:
+                existingSecret: redis-stack-auth
+
+            # Everything else off — demo-pitcher's preview is the UI-to-UI
+            # flow, no other components needed.
+            omniPitcher:  { enabled: false }
+            scout:        { enabled: false }
+            k8sPitcher:   { enabled: false }
+            lightCatcher: { enabled: false }
+            wledMock:     { enabled: false }
+            ledCatcher:   { enabled: false }
+            gitPitcher:   { enabled: false }
+
+            httpRoute:
+              enabled: true
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
