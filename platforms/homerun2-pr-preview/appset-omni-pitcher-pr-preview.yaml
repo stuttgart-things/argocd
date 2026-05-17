@@ -1,0 +1,123 @@
+---
+# Per-PR preview environments for stuttgart-things/homerun2-omni-pitcher.
+#
+# Fans out across (clusters labelled homerun2-pr-preview: "true") ×
+# (open PRs on homerun2-omni-pitcher carrying the `preview` label). One
+# parent Application per (cluster, PR) cell, rendering the
+# apps/homerun2/install chart with PR-specific values.
+#
+# Prereqs not declared here:
+#   - Secret `homerun2-omni-pitcher-pat` in argocd ns on the management
+#     cluster (GitHub PAT with repo:status + public_repo). Apply manually:
+#       kubectl -n argocd create secret generic homerun2-omni-pitcher-pat \
+#         --from-literal=token=<ghp_xxx>
+#   - Target cluster registered as an Argo cluster with label
+#     homerun2-pr-preview: "true" (and matching AppProject of same name).
+#   - Vault auth + KV path homerun2-pr/preview-env on that cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-omni-pitcher-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  homerun2-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: homerun2-omni-pitcher
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                # PRs must carry the `preview` label to spin up an env.
+                # Renovate/dependabot bumps don't apply it → no half-empty
+                # previews for branches that pre-date the build-pr workflow.
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'homerun2-pr-{{ .number }}'
+      labels:
+        homerun2.stuttgart-things.com/pr: '{{ .number }}'
+      # Without this finalizer, Argo deletes the Application instantly when
+      # the PR generator drops the entry and orphans the resources it
+      # managed (child Apps + workload pods). With it, Argo runs prune on
+      # every managed resource first, then removes the Application — full
+      # cascading teardown on PR merge/close.
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      # Parent App = the rendered homerun2-install chart. Its output is
+      # more Argo Application CRDs, which must land in argocd ns on the
+      # management cluster (in-cluster from Argo's POV).
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/homerun2/install
+        helm:
+          releaseName: 'homerun2-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'homerun2-pr-{{ .number }}'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'homerun2-pr-{{ .number }}'
+
+            # Per-PR artifacts. CI tags both image + kustomize OCI as
+            # `pr-<number>-<full-sha>`, exactly matching `.head_sha`.
+            omniPitcher:
+              enabled: true
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              hostname: 'omni-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              # Option B from stuttgart-things/argocd#116 — kustomize OCI
+              # ships the HTTPRoute alongside the Service.
+              inlineHttpRoute: true
+
+            redisStack:
+              enabled: true
+              persistence:
+                enabled: false
+              auth:
+                existingSecret: redis-stack-auth
+
+            # Minimal preview: only the service under test + its message bus.
+            coreCatcher:  { enabled: false }
+            scout:        { enabled: false }
+            k8sPitcher:   { enabled: false }
+            lightCatcher: { enabled: false }
+            wledMock:     { enabled: false }
+            demoPitcher:  { enabled: false }
+            ledCatcher:   { enabled: false }
+            gitPitcher:   { enabled: false }
+
+            httpRoute:
+              enabled: true
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

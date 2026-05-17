@@ -1,0 +1,248 @@
+---
+# Matrix-generated Kyverno ClusterPolicy Applications for the homerun2
+# PR-preview machinery.
+#
+# Fans out (clusters with the right label) × (one entry per
+# component+policy) → one Argo Application per cell, pulling from a
+# preview-* chart in this catalog. Collapses 13 near-identical per-file
+# Applications that used to live in the cluster overlay.
+#
+# Add a new component (e.g. light-catcher) by appending rows to the
+# list generator below. Add a new policy type (e.g. preview-foo) by
+# adding rows with `chartPath: apps/homerun2/preview-foo`.
+#
+# Cluster-side residue: the cluster Secret needs the label
+# `homerun2-pr-preview: "true"`. Per-component opt-out is via removing
+# that component's rows here; per-cluster opt-out is via the label.
+#
+# Each row carries `helmValues` — the full Helm values block as a YAML
+# string. Using `values:` (string) rather than `valuesObject` keeps the
+# template uniform across the simple charts (which only need name +
+# namespacePrefix) and the preview-secrets chart (which adds a richer
+# components list).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-pr-preview-policies
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Don't reap the rendered ClusterPolicies if the platform is dropped —
+  # active PR namespaces would lose their ResourceQuota/LimitRange/seed
+  # Job mid-flight. Same pattern as platforms/security AppSets.
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  homerun2-pr-preview: "true"
+          - list:
+              elements:
+                # ----- omni-pitcher -----
+                - releaseName: homerun2-omni-pitcher-preview-quota
+                  component: omni-pitcher
+                  policy: quota
+                  chartPath: apps/homerun2/preview-quota
+                  helmValues: |
+                    name: homerun2-omni-pitcher-preview-quota
+                    namespacePrefix: "homerun2-pr-*"
+
+                - releaseName: homerun2-omni-pitcher-preview-secrets
+                  component: omni-pitcher
+                  policy: secrets
+                  chartPath: apps/homerun2/preview-secrets
+                  helmValues: |
+                    name: homerun2-omni-pitcher-preview-secrets
+                    namespacePrefix: "homerun2-pr-*"
+                    clusterSecretStoreName: vault-homerun2-pr
+                    refreshInterval: 1m
+                    vaultSecretName: preview-env
+                    components:
+                      - name: omni-pitcher-token
+                        secretName: homerun2-omni-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+                      - name: omni-pitcher-redis
+                        secretName: homerun2-omni-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      - name: redis-stack-auth
+                        secretName: redis-stack-auth
+                        dataKey: redis-password
+                        vaultProperty: redisPassword
+
+                - releaseName: homerun2-omni-pitcher-preview-seed-data
+                  component: omni-pitcher
+                  policy: seed-data
+                  chartPath: apps/homerun2/preview-seed-data
+                  helmValues: |
+                    name: homerun2-omni-pitcher-preview-seed-data
+                    namespacePrefix: "homerun2-pr-*"
+
+                - releaseName: homerun2-omni-pitcher-preview-sweep
+                  component: omni-pitcher
+                  policy: sweep
+                  chartPath: apps/homerun2/preview-sweep
+                  helmValues: |
+                    name: homerun2-omni-pitcher-preview-sweep
+                    namespacePrefix: "homerun2-pr-*"
+
+                # ----- core-catcher -----
+                - releaseName: homerun2-core-catcher-preview-quota
+                  component: core-catcher
+                  policy: quota
+                  chartPath: apps/homerun2/preview-quota
+                  helmValues: |
+                    name: homerun2-core-catcher-preview-quota
+                    namespacePrefix: "homerun2-core-catcher-pr-*"
+
+                - releaseName: homerun2-core-catcher-preview-secrets
+                  component: core-catcher
+                  policy: secrets
+                  chartPath: apps/homerun2/preview-secrets
+                  helmValues: |
+                    name: homerun2-core-catcher-preview-secrets
+                    namespacePrefix: "homerun2-core-catcher-pr-*"
+                    clusterSecretStoreName: vault-homerun2-pr
+                    refreshInterval: 1m
+                    vaultSecretName: preview-env
+                    components:
+                      - name: omni-pitcher-token
+                        secretName: homerun2-omni-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+                      - name: omni-pitcher-redis
+                        secretName: homerun2-omni-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      - name: redis-stack-auth
+                        secretName: redis-stack-auth
+                        dataKey: redis-password
+                        vaultProperty: redisPassword
+                      - name: core-catcher-redis
+                        secretName: homerun2-core-catcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+
+                - releaseName: homerun2-core-catcher-preview-seed-data
+                  component: core-catcher
+                  policy: seed-data
+                  chartPath: apps/homerun2/preview-seed-data
+                  helmValues: |
+                    name: homerun2-core-catcher-preview-seed-data
+                    namespacePrefix: "homerun2-core-catcher-pr-*"
+
+                - releaseName: homerun2-core-catcher-preview-sweep
+                  component: core-catcher
+                  policy: sweep
+                  chartPath: apps/homerun2/preview-sweep
+                  helmValues: |
+                    name: homerun2-core-catcher-preview-sweep
+                    namespacePrefix: "homerun2-core-catcher-pr-*"
+
+                # ----- scout -----
+                - releaseName: homerun2-scout-preview-quota
+                  component: scout
+                  policy: quota
+                  chartPath: apps/homerun2/preview-quota
+                  helmValues: |
+                    name: homerun2-scout-preview-quota
+                    namespacePrefix: "homerun2-scout-pr-*"
+
+                - releaseName: homerun2-scout-preview-secrets
+                  component: scout
+                  policy: secrets
+                  chartPath: apps/homerun2/preview-secrets
+                  helmValues: |
+                    name: homerun2-scout-preview-secrets
+                    namespacePrefix: "homerun2-scout-pr-*"
+                    clusterSecretStoreName: vault-homerun2-pr
+                    refreshInterval: 1m
+                    vaultSecretName: preview-env
+                    components:
+                      - name: omni-pitcher-token
+                        secretName: homerun2-omni-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+                      - name: omni-pitcher-redis
+                        secretName: homerun2-omni-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      - name: redis-stack-auth
+                        secretName: redis-stack-auth
+                        dataKey: redis-password
+                        vaultProperty: redisPassword
+                      - name: scout-redis
+                        secretName: homerun2-scout-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+
+                - releaseName: homerun2-scout-preview-seed-data
+                  component: scout
+                  policy: seed-data
+                  chartPath: apps/homerun2/preview-seed-data
+                  helmValues: |
+                    name: homerun2-scout-preview-seed-data
+                    namespacePrefix: "homerun2-scout-pr-*"
+
+                - releaseName: homerun2-scout-preview-sweep
+                  component: scout
+                  policy: sweep
+                  chartPath: apps/homerun2/preview-sweep
+                  helmValues: |
+                    name: homerun2-scout-preview-sweep
+                    namespacePrefix: "homerun2-scout-pr-*"
+
+                # Scout-specific functional test — has no analogue on
+                # omni-pitcher (the SUT itself) or core-catcher (no
+                # analytics endpoint to poll).
+                - releaseName: homerun2-scout-preview-verify
+                  component: scout
+                  policy: verify
+                  chartPath: apps/homerun2/preview-scout-verify
+                  helmValues: |
+                    name: homerun2-scout-preview-verify
+                    namespacePrefix: "homerun2-scout-pr-*"
+  template:
+    metadata:
+      # No `-{{ .name }}` cluster suffix because today only `homerun2-dev`
+      # opts in; keeping the bare releaseName matches the names the
+      # cluster overlay previously used, so the transition is a no-op.
+      # If a second cluster ever opts in, names will collide — add the
+      # suffix back then.
+      name: '{{ .releaseName }}'
+      labels:
+        homerun2.stuttgart-things.com/component: '{{ .component }}'
+        homerun2.stuttgart-things.com/policy: '{{ .policy }}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: '{{ .chartPath }}'
+        helm:
+          releaseName: '{{ .releaseName }}'
+          values: |
+            {{- .helmValues | nindent 12 }}
+      destination:
+        name: '{{ .name }}'
+        namespace: kyverno
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - ServerSideApply=true
