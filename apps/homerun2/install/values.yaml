@@ -154,6 +154,15 @@ demoPitcher:
   # stuttgart-things/homerun2-demo-pitcher#25 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
+  # When set, the chart patches the Deployment to add PITCH_TARGET=http +
+  # OMNI_PITCHER_URL=<this URL>, flipping demo-pitcher's /pitch endpoint
+  # from its default RedisPitcher backend to an HTTPPitcher that posts to
+  # the given omni-pitcher endpoint. Used in PR-preview envs to chain
+  # demo-pitcher → omni-pitcher → Redis so reviewers see the full HTTP
+  # round-trip in the UI (otherwise the UI's "Target Pitcher URL" shows
+  # demo-pitcher's compiled-in fallback http://localhost:4000 and misleads
+  # the reviewer about where pitches actually go).
+  omniPitcherUrl: ""
 
 # led-catcher (Redis Streams consumer → LED display).
 ledCatcher:

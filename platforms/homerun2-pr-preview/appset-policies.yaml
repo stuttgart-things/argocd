@@ -246,6 +246,16 @@ spec:
                         secretName: homerun2-core-catcher-redis
                         dataKey: password
                         vaultProperty: redisPassword
+                      # omni-pitcher co-tenant — added in revised demo-pitcher
+                      # preview shape that chains demo → omni → redis.
+                      - name: omni-pitcher-token
+                        secretName: homerun2-omni-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+                      - name: omni-pitcher-redis
+                        secretName: homerun2-omni-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
 
                 - releaseName: homerun2-demo-pitcher-preview-sweep
                   component: demo-pitcher

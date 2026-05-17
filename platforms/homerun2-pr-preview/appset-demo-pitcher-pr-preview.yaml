@@ -3,22 +3,32 @@
 #
 # Fans out across (clusters labelled homerun2-pr-preview: "true") ×
 # (open PRs on homerun2-demo-pitcher carrying the `preview` label).
-# demo-pitcher is a web UI for pitching events directly to Redis Streams;
-# its preview ships with core-catcher (web mode) + redis-stack co-tenanted
-# so reviewers can click "Pitch" in demo-pitcher's UI and see the event
-# land in core-catcher's dashboard — full end-to-end UI-to-UI flow.
+# demo-pitcher is a web UI for pitching events; its preview ships with
+# omni-pitcher + core-catcher (web mode) + redis-stack co-tenanted.
+# Reviewers click "Pitch" in demo-pitcher's UI → demo POSTs to omni-pitcher
+# (via OMNI_PITCHER_URL env injected by the chart) → omni writes to
+# redis-stack → core-catcher consumes + renders. End-to-end UI-to-UI
+# flow over the real production HTTP topology.
 #
-# Shape decision (#116, corrected 2026-05-17): NO co-tenanted
-# omni-pitcher. demo-pitcher is itself a pitcher (RedisPitcher writes
-# directly to redis-stack via homerun-library.EnqueueMessageInRedisStreams,
-# the same path omni-pitcher uses) — omni-pitcher in the namespace
-# would be redundant.
+# Why omni-pitcher is back (revises the 2026-05-17 "corrected design"
+# in #116): although demo-pitcher ships a RedisPitcher that could write
+# straight to Redis, its UI surfaces "Target Pitcher URL" with the
+# compiled-in fallback http://localhost:4000 whenever PITCH_TARGET=http.
+# Setting PITCH_TARGET=redis silences the UI text but doesn't reflect
+# the production HTTP-API shape that demo-pitcher was designed around.
+# Adding omni-pitcher + redirecting OMNI_PITCHER_URL is closer to how
+# real consumers use demo-pitcher.
 #
 # Decisions from stuttgart-things/homerun2-omni-pitcher#116 step 3:
 #   - namespace: `homerun2-demo-pitcher-pr-<num>` (image-name-mirrored)
-#   - hostnames: `demo-pr-<num>` for demo-pitcher,
-#     `cc-demo-pr-<num>` for the co-tenanted core-catcher
-#   - core-catcher pinned to v2.4.0 (latest released)
+#   - hostnames:
+#     * `demo-pr-<num>`     — demo-pitcher UI
+#     * `omni-demo-pr-<num>` — omni-pitcher (external HTTPRoute kept
+#                              so reviewers can inspect omni's metrics
+#                              or POST directly if useful)
+#     * `cc-demo-pr-<num>`   — core-catcher dashboard
+#   - omni-pitcher pinned to v1.11.1 (latest, Option-B-enabled)
+#   - core-catcher pinned to v0.13.0 (latest released)
 #   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
 #     stuttgart-things repo
 apiVersion: argoproj.io/v1alpha1
@@ -73,21 +83,37 @@ spec:
               name: '{{ .name }}'
               namespace: 'homerun2-demo-pitcher-pr-{{ .number }}'
 
-            # SUT: demo-pitcher at the PR's commit. Same kustomize-OCI tag
-            # for the manifests; the image patch reuses the version field.
+            # SUT: demo-pitcher at the PR's commit. omniPitcherUrl flips
+            # the Deployment env to PITCH_TARGET=http + OMNI_PITCHER_URL=
+            # in-cluster service, so /pitch POSTs to the co-tenanted
+            # omni-pitcher (instead of demo-pitcher's compiled-in fallback
+            # http://localhost:4000 which the UI surfaces). The full chain
+            # is then demo /pitch → omni-pitcher /pitch/generic →
+            # redis-stack stream → core-catcher dashboard, matching the
+            # production HTTP topology end-to-end.
             demoPitcher:
               enabled: true
               version: 'pr-{{ .number }}-{{ .head_sha }}'
               hostname: 'demo-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
               inlineHttpRoute: true
+              omniPitcherUrl: 'http://homerun2-omni-pitcher.homerun2-demo-pitcher-pr-{{ .number }}.svc.cluster.local'
+
+            # Co-tenanted: omni-pitcher pinned to v1.11.1 (latest released,
+            # Option-B-enabled). Receives /pitch POSTs from demo-pitcher's
+            # UI, writes to redis-stack.
+            omniPitcher:
+              enabled: true
+              version: v1.11.1
+              hostname: 'omni-demo-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
 
             # Co-tenanted: core-catcher in web mode at the latest released
-            # build. Reviewer clicks "Pitch" in demo-pitcher's UI → event
-            # lands in redis-stack → core-catcher consumes and renders.
+            # build (v0.13.0). Consumes the redis stream + renders the
+            # dashboard so reviewers can see what landed.
             coreCatcher:
               enabled: true
-              version: v2.4.0
-              kustomizeVersion: v2.4.0
+              version: v0.13.0
+              kustomizeVersion: v0.13.0
               hostname: 'cc-demo-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
               inlineHttpRoute: true
 
@@ -98,9 +124,7 @@ spec:
               auth:
                 existingSecret: redis-stack-auth
 
-            # Everything else off — demo-pitcher's preview is the UI-to-UI
-            # flow, no other components needed.
-            omniPitcher:  { enabled: false }
+            # Everything else off.
             scout:        { enabled: false }
             k8sPitcher:   { enabled: false }
             lightCatcher: { enabled: false }
