@@ -89,11 +89,17 @@ spec:
        demo-pitcher's HTTPPitcher (URL = <endpoint>/<api-path>) hits
        omni-pitcher's actual generic route at /pitch — the demo-pitcher
        default "generic" produces /generic which 404s on omni-pitcher.
+       AUTH_TOKEN comes from the ESO-managed homerun2-demo-pitcher-token
+       Secret (same auth-token data key as omni-pitcher's own token Secret,
+       both populated by Vault preview-env.authToken via the preview-secrets
+       policy) so demo's "Authorization: Bearer …" header matches what
+       omni-pitcher's authMiddleware expects.
        See stuttgart-things/argocd#116 2026-05-17 smoke comments. */ -}}
 {{- $demoExtraEnv = list
       (dict "name" "PITCH_TARGET" "value" "http")
       (dict "name" "OMNI_PITCHER_URL" "value" .Values.demoPitcher.omniPitcherUrl)
       (dict "name" "OMNI_PITCHER_API_PATH" "value" "pitch")
+      (dict "name" "AUTH_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" (printf "%s-token" $name) "key" "auth-token")))
 }}
 {{- end }}
 {{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" $demoExtraEnv) | indent 12 }}
