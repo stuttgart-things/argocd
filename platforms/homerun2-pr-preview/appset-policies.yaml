@@ -208,6 +208,52 @@ spec:
                   helmValues: |
                     name: homerun2-scout-preview-verify
                     namespacePrefix: "homerun2-scout-pr-*"
+
+                # ----- demo-pitcher -----
+                # No seed-data row: demo-pitcher's preview value is "human
+                # clicks the UI to see events flow." A pre-populated fixture
+                # would muddy that — reviewers couldn't tell their click
+                # from the seed batch. (Decision: stuttgart-things/homerun2-
+                # omni-pitcher#116, 2026-05-17 corrected design comment.)
+                - releaseName: homerun2-demo-pitcher-preview-quota
+                  component: demo-pitcher
+                  policy: quota
+                  chartPath: apps/homerun2/preview-quota
+                  helmValues: |
+                    name: homerun2-demo-pitcher-preview-quota
+                    namespacePrefix: "homerun2-demo-pitcher-pr-*"
+
+                - releaseName: homerun2-demo-pitcher-preview-secrets
+                  component: demo-pitcher
+                  policy: secrets
+                  chartPath: apps/homerun2/preview-secrets
+                  helmValues: |
+                    name: homerun2-demo-pitcher-preview-secrets
+                    namespacePrefix: "homerun2-demo-pitcher-pr-*"
+                    clusterSecretStoreName: vault-homerun2-pr
+                    refreshInterval: 1m
+                    vaultSecretName: preview-env
+                    components:
+                      - name: redis-stack-auth
+                        secretName: redis-stack-auth
+                        dataKey: redis-password
+                        vaultProperty: redisPassword
+                      - name: demo-pitcher-redis
+                        secretName: homerun2-demo-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      - name: core-catcher-redis
+                        secretName: homerun2-core-catcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+
+                - releaseName: homerun2-demo-pitcher-preview-sweep
+                  component: demo-pitcher
+                  policy: sweep
+                  chartPath: apps/homerun2/preview-sweep
+                  helmValues: |
+                    name: homerun2-demo-pitcher-preview-sweep
+                    namespacePrefix: "homerun2-demo-pitcher-pr-*"
   template:
     metadata:
       # No `-{{ .name }}` cluster suffix because today only `homerun2-dev`
