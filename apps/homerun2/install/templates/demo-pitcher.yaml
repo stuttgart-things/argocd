@@ -26,16 +26,61 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" "kind" "Ingress" "name" $name) | indent 12 }}
+{{- if .Values.demoPitcher.inlineHttpRoute }}
+        # Option B from stuttgart-things/argocd#116 — kustomize OCI ships the
+        # HTTPRoute alongside Service so they land atomically. Patch parentRef
+        # + hostname per env; the standalone httproute child Application no
+        # longer renders demo-pitcher (see templates/httproute.yaml).
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |-
+{{ include "homerun2.httpRouteJSONPatch" (dict "gateway" .Values.httpRoute.gateway "hostname" .Values.demoPitcher.hostname) | indent 12 }}
+{{- else }}
         - target:
             kind: HTTPRoute
             name: {{ $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+{{- end }}
         - target:
             kind: Deployment
             name: {{ $name }}
           patch: |
 {{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.demoPitcher.version) | indent 12 }}
+{{- if .Values.authToken }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.authTokenPatch" (dict "secretName" (printf "%s-token" $name) "token" .Values.authToken) | indent 12 }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-token" $name)) | indent 12 }}
+{{- end }}
+{{- if .Values.redisPassword }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.redisPasswordPatch" (dict "secretName" (printf "%s-redis" $name) "password" .Values.redisPassword) | indent 12 }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-redis" $name)) | indent 12 }}
+{{- end }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" list) | indent 12 }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}
