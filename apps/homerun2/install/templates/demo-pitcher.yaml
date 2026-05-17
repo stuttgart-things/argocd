@@ -85,11 +85,15 @@ spec:
 {{- /* Flip /pitch from RedisPitcher → HTTPPitcher posting at the given
        omni-pitcher endpoint. Strategic-merge merges container env by
        name, so PITCH_TARGET=http overrides the KCL-baked default (redis)
-       and OMNI_PITCHER_URL gets added. See stuttgart-things/argocd#116
-       2026-05-17 corrected-design / smoke comments. */ -}}
+       and OMNI_PITCHER_URL gets added. OMNI_PITCHER_API_PATH=pitch so
+       demo-pitcher's HTTPPitcher (URL = <endpoint>/<api-path>) hits
+       omni-pitcher's actual generic route at /pitch — the demo-pitcher
+       default "generic" produces /generic which 404s on omni-pitcher.
+       See stuttgart-things/argocd#116 2026-05-17 smoke comments. */ -}}
 {{- $demoExtraEnv = list
       (dict "name" "PITCH_TARGET" "value" "http")
       (dict "name" "OMNI_PITCHER_URL" "value" .Values.demoPitcher.omniPitcherUrl)
+      (dict "name" "OMNI_PITCHER_API_PATH" "value" "pitch")
 }}
 {{- end }}
 {{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" $demoExtraEnv) | indent 12 }}
