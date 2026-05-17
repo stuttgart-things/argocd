@@ -155,7 +155,8 @@
         "enabled":          { "type": "boolean" },
         "version":          { "type": "string", "minLength": 1 },
         "hostname":         { "type": "string", "minLength": 1 },
-        "inlineHttpRoute":  { "type": "boolean" }
+        "inlineHttpRoute":  { "type": "boolean" },
+        "omniPitcherUrl":   { "type": "string" }
       },
       "required": ["enabled"]
     },

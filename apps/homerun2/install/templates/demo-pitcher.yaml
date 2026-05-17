@@ -80,7 +80,19 @@ spec:
             kind: Deployment
             name: {{ $name }}
           patch: |
-{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" list) | indent 12 }}
+{{- $demoExtraEnv := list }}
+{{- if .Values.demoPitcher.omniPitcherUrl }}
+{{- /* Flip /pitch from RedisPitcher → HTTPPitcher posting at the given
+       omni-pitcher endpoint. Strategic-merge merges container env by
+       name, so PITCH_TARGET=http overrides the KCL-baked default (redis)
+       and OMNI_PITCHER_URL gets added. See stuttgart-things/argocd#116
+       2026-05-17 corrected-design / smoke comments. */ -}}
+{{- $demoExtraEnv = list
+      (dict "name" "PITCH_TARGET" "value" "http")
+      (dict "name" "OMNI_PITCHER_URL" "value" .Values.demoPitcher.omniPitcherUrl)
+}}
+{{- end }}
+{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" $demoExtraEnv) | indent 12 }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}
