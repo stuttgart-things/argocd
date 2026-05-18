@@ -92,6 +92,32 @@
       "if": { "properties": { "enabled": { "const": true } } },
       "then": { "required": ["hostname", "gateway"] }
     },
+    "rbac": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional cluster-scoped RBAC for the machinery SA. Without it the SA can't list most kinds and the dashboard error-loops.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ClusterRole + Binding name. Defaults to `<applicationName>-reader`."
+        },
+        "rules": {
+          "type": "array",
+          "description": "ClusterRole rules. apiGroups + resources required; verbs default to get/list/watch.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["apiGroups", "resources"],
+            "properties": {
+              "apiGroups": { "type": "array", "items": { "type": "string" } },
+              "resources": { "type": "array", "items": { "type": "string" } },
+              "verbs":     { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
     "syncPolicy": {
       "type": "object",
       "description": "ArgoCD sync policy applied to all rendered Applications.",

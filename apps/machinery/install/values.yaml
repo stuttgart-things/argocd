@@ -48,6 +48,23 @@ config: {}
   #   {"port":50051,"resources":{...}}
   # fromConfigMap: my-overrides    # alternative: reference an externally-managed ConfigMap
 
+# Optional cluster-scoped RBAC for the machinery ServiceAccount. The KCL
+# base in machinery-kustomize ships only the SA, so machinery has no read
+# access to most resources by default and the dashboard error-loops on
+# any configured kind. List the (group, resource) pairs that match the
+# kinds in `config` so machinery can list/watch them.
+#
+# Leave `rules` empty (the default) to skip the rbac sub-Application
+# entirely — appropriate when something else (Kyverno generate, manual
+# kubectl apply, the base bumped to ship its own RBAC) already covers it.
+rbac:
+  rules: []
+  # rules:
+  #   - apiGroups: ["cert-manager.io"]
+  #     resources: ["certificates"]
+  #   - apiGroups: ["external-secrets.io"]
+  #     resources: ["externalsecrets"]
+
 # Gateway API HTTPRoute sub-Application (opt-in).
 # When enabled, the base's KCL-generated HTTPRoute is pruned via $patch: delete.
 httpRoute:

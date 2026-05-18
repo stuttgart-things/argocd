@@ -1,0 +1,20 @@
+---
+# ClusterRole name. Bound to the machinery ServiceAccount in the
+# destination namespace via a ClusterRoleBinding of the same name.
+name: machinery-reader
+
+# ServiceAccount the ClusterRole is bound to.
+serviceAccount:
+  name: machinery
+  namespace: machinery
+
+# RBAC rules. Each entry is forwarded verbatim into ClusterRole.rules
+# (verbs default to get/list/watch via the template if omitted).
+#
+# Example:
+#   rules:
+#     - apiGroups: ["cert-manager.io"]
+#       resources: ["certificates"]
+#     - apiGroups: ["external-secrets.io"]
+#       resources: ["externalsecrets"]
+rules: []
