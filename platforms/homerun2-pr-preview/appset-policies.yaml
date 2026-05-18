@@ -309,6 +309,17 @@ spec:
                         secretName: homerun2-core-catcher-redis
                         dataKey: password
                         vaultProperty: redisPassword
+                      # git-pitcher polls the GitHub API for each configured
+                      # watch-profile repo. The KCL Deployment wires
+                      # GITHUB_TOKEN from this Secret's token key into the
+                      # container env, and the watch profile uses
+                      # `token: env:GITHUB_TOKEN` to pick it up. Without
+                      # this entry the kustomize OCI's default token=changeme
+                      # ships through and polling 401s on the first request.
+                      - name: git-pitcher-github
+                        secretName: homerun2-git-pitcher-github
+                        dataKey: token
+                        vaultProperty: githubToken
 
                 - releaseName: homerun2-git-pitcher-preview-sweep
                   component: git-pitcher
