@@ -1,0 +1,118 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: velero
+
+# Upstream vmware-tanzu/velero Helm chart version
+# (https://vmware-tanzu.github.io/helm-charts).
+chartVersion: 9.0.0
+
+# Velero plugin image (e.g. for-aws — also used as the MinIO/S3-compatible
+# backend, since velero-plugin-for-aws speaks plain S3). Loaded by the
+# chart's `initContainers` into /target so the velero binary discovers it.
+pluginAws:
+  image: velero/velero-plugin-for-aws
+  tag: 1.14.0
+
+# Secret in the velero namespace carrying the AWS-style credentials INI
+# under key `cloud`. Provisioned out-of-band — either a static Secret
+# (e.g. the Flux equivalent's `pre-release.yaml`) or a synced ExternalSecret
+# (see `infra/velero/cloud-credentials` sibling chart). Velero itself does
+# not create this Secret.
+credentials:
+  existingSecret: cloud-credentials
+
+# Trust-bundle: mount is always present with optional: true (harmless if
+# trust-manager hasn't published the ConfigMap to this namespace).
+# `sslCertDir` is empty by default — Go's crypto/x509 treats unset/""
+# the same as not-set, so system CAs are used. To activate the bundle,
+# set `sslCertDir` to the mountPath (or wherever the bundle is mounted).
+trustBundle:
+  configMapName: cluster-trust-bundle
+  mountPath: /etc/ssl/custom
+sslCertDir: ""
+
+# Default object-storage backup location. The chart renders ONE
+# BackupStorageLocation called `default`. `bucket` and `s3Url` MUST be
+# overridden per cluster — the values below are placeholders that won't
+# resolve.
+backup:
+  bucket: example-velero
+  region: minio
+  s3ForcePathStyle: true
+  s3Url: http://minio.example.com
+  insecureSkipTLSVerify: false
+
+# Default volume-snapshot location. Snapshot creation itself is gated by
+# `snapshotsEnabled` below; this only configures the region for the
+# rendered VolumeSnapshotLocation regardless.
+snapshot:
+  region: minio
+
+# Volume snapshots — off by default. Most consumers do file-system backups
+# via restic/kopia or rely on storage-side snapshots managed elsewhere.
+snapshotsEnabled: false
+
+# Node agent (file-system backup daemon) — off by default. Enable when
+# using restic/kopia FSB for PV data.
+deployNodeAgent: false
+
+# Metrics + Prometheus integration.
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    # Label used by the kube-prometheus-stack PrometheusSpec.serviceMonitorSelector
+    # to pick this ServiceMonitor up. Override if your Prometheus instance
+    # selects on a different label.
+    additionalLabels:
+      release: prometheus
+
+# Velero schedules. Override with concrete schedule definitions
+# (https://vmware-tanzu.github.io/helm-charts/charts/velero — `schedules`).
+schedules: {}
+
+# Upstream upgrade Job — leave off for GitOps installs; the chart's
+# pre-upgrade Job races with the Helm release lifecycle under Argo CD
+# and can leave the release stuck Pending. Run the upgrade Job
+# out-of-band when needed.
+upgradeJob:
+  enabled: false
+
+# Delete CRDs on uninstall. Off — accidental uninstall must not nuke
+# backup metadata.
+cleanUpCRDs: false
+
+# Override the kubectl image used by the chart's pre-install/pre-upgrade
+# CRD hook. Bitnami sunset their free Docker Hub catalogue in late 2025
+# (docker.io/bitnami/kubectl has only `latest` and SHA tags now); working
+# semver tags moved to bitnamilegacy.
+kubectl:
+  image:
+    repository: docker.io/bitnamilegacy/kubectl
+    tag: 1.33.4
+
+# Deep-merged on top of the computed valuesObject passed to the upstream
+# chart. Use for any upstream key not exposed as a first-class value above
+# (resources, nodeSelector, tolerations, extra BackupStorageLocations,
+# restic/kopia tunables, etc.).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

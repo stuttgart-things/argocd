@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: velero-cloud-credentials
+description: ExternalSecret that materialises the `cloud-credentials` Secret consumed by Velero's velero-plugin-for-aws — keys read from a Vault KV path via an existing (Cluster)SecretStore
+type: application
+version: 0.1.0
