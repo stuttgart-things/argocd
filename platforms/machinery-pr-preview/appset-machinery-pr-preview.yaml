@@ -1,0 +1,120 @@
+---
+# Per-PR preview environments for stuttgart-things/machinery.
+#
+# Fans out across (clusters labelled machinery-pr-preview: "true") ×
+# (open PRs on machinery carrying the `preview` label). One parent
+# Application per (cluster, PR) cell, rendering the apps/machinery/install
+# chart with PR-specific values.
+#
+# Reviewer flow:
+#   1. Open a PR on stuttgart-things/machinery, label it `preview`.
+#   2. push-kustomize-pr.yaml in the machinery repo publishes
+#      ghcr.io/stuttgart-things/machinery:pr-<n>-<sha>
+#      ghcr.io/stuttgart-things/machinery-kustomize:pr-<n>-<sha>
+#   3. This AppSet picks the PR up on its next 600s requeue, renders an
+#      Application that deploys those artifacts into namespace
+#      `machinery-pr-<n>` on every labelled cluster.
+#   4. comment-preview-url.yaml in the machinery repo posts the URL on
+#      the PR: https://machinery-pr-<n>.homerun2-dev.…
+#   5. On PR close, Argo prunes the Application (finalizer below) and
+#      cleanup-pr-artifacts.yaml deletes the OCI tags.
+#
+# Prereqs not declared here:
+#   - Secret `homerun2-omni-pitcher-pat` in argocd ns on the management
+#     cluster (reused — the GitHub PAT covers any public stuttgart-things
+#     repo, so we don't mint a dedicated machinery PAT).
+#   - Target cluster registered as an Argo cluster with label
+#     machinery-pr-preview: "true" (and matching AppProject of same name).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: machinery-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  machinery-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: machinery
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                # PRs must carry the `preview` label to spin up an env.
+                # Renovate/dependabot bumps don't apply it → no half-empty
+                # previews for branches that pre-date push-kustomize-pr.
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'machinery-pr-{{ .number }}'
+      labels:
+        machinery.stuttgart-things.com/pr: '{{ .number }}'
+      # Without this finalizer, Argo deletes the Application instantly
+      # when the PR generator drops the entry and orphans the resources
+      # (child Apps + workload pods). With it, Argo runs prune on every
+      # managed resource first — full cascading teardown on PR close.
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      # Parent App = the rendered machinery-install chart. Its output is
+      # more Argo Application CRDs, which must land in argocd ns on the
+      # management cluster (in-cluster from Argo's POV).
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/machinery/install
+        helm:
+          releaseName: 'machinery-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'machinery-pr-{{ .number }}'
+            project: '{{ .name }}'
+            # Target the labelled remote cluster, not the management one.
+            # `.server` from the cluster generator is the cluster API URL
+            # Argo registered for that cluster.
+            destination:
+              server: '{{ .server }}'
+              namespace: 'machinery-pr-{{ .number }}'
+
+            # Per-PR artifacts. push-kustomize-pr.yaml in the machinery
+            # repo tags both image + kustomize OCI as
+            # `pr-<number>-<full-sha>`, exactly matching `.head_sha`.
+            kustomize:
+              repoURL: ghcr.io/stuttgart-things/machinery-kustomize
+              targetRevision: 'pr-{{ .number }}-{{ .head_sha }}'
+            image:
+              repository: ghcr.io/stuttgart-things/machinery
+              tag: 'pr-{{ .number }}-{{ .head_sha }}'
+
+            httpRoute:
+              enabled: true
+              hostname: 'machinery-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
