@@ -14,7 +14,17 @@ platforms/machinery-pr-preview/
 
 ## What gets created per PR
 
-For each open PR on `stuttgart-things/machinery` labelled `preview`, one Argo `Application` named `machinery-pr-<num>` is rendered against every cluster Secret labelled `machinery-pr-preview: "true"`. Each Application:
+For each open PR on `stuttgart-things/machinery` labelled `preview`, two Argo `Application`s are rendered on the management cluster against every cluster Secret labelled `machinery-pr-preview: "true"`:
+
+| Name | Owner | Source | Role |
+|---|---|---|---|
+| `machinery-pr-<num>-platform` | the AppSet | this repo, `apps/machinery/install` | parent — renders the helm chart, which emits the two below |
+| `machinery-pr-<num>` | the platform Application | `ghcr.io/…/machinery-kustomize:pr-<num>-<sha>` | actual machinery Deployment + Service via kustomize OCI |
+| `machinery-pr-<num>-httproute` | the platform Application | this repo, `apps/machinery/httproute` | the Gateway API HTTPRoute |
+
+The `-platform` suffix on the parent exists to avoid a name collision with the chart-rendered child (the chart uses `applicationName` as-is without a per-component suffix). See the inline comment in `appset-machinery-pr-preview.yaml`.
+
+Each per-PR install:
 
 - Deploys into namespace `machinery-pr-<num>` on the target cluster
 - Pulls image `ghcr.io/stuttgart-things/machinery:pr-<num>-<head_sha>`
