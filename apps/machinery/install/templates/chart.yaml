@@ -82,6 +82,14 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
+  # Without this, deleting the parent App leaves the workloads on the
+  # destination cluster orphaned: the parent's finalizer prunes the child
+  # Application CRDs from argocd ns instantly, taking their reference to
+  # the destination resources with them. Finalizer here makes Argo prune
+  # the kustomize-rendered Deployment/Service/etc. before this App is
+  # removed.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: {{ .Values.project | quote }}
   source:
