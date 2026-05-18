@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: machinery-rbac
+description: ClusterRole + ClusterRoleBinding granting the machinery ServiceAccount read access to the resource kinds it watches. Loaded as a sub-Application by apps/machinery/install when `rbac.rules` is set.
+type: application
+version: 0.1.0
