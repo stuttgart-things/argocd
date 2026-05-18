@@ -272,6 +272,51 @@ spec:
                   helmValues: |
                     name: homerun2-demo-pitcher-preview-sweep
                     namespacePrefix: "homerun2-demo-pitcher-pr-*"
+
+                # ----- git-pitcher -----
+                # No seed-data row: git-pitcher's own polling produces events
+                # from the configured Git fixture repos on its interval, so
+                # the preview namespace gets populated without a separate
+                # seed Job. (Decision: stuttgart-things/homerun2-git-pitcher#25.)
+                - releaseName: homerun2-git-pitcher-preview-quota
+                  component: git-pitcher
+                  policy: quota
+                  chartPath: apps/homerun2/preview-quota
+                  helmValues: |
+                    name: homerun2-git-pitcher-preview-quota
+                    namespacePrefix: "homerun2-git-pitcher-pr-*"
+
+                - releaseName: homerun2-git-pitcher-preview-secrets
+                  component: git-pitcher
+                  policy: secrets
+                  chartPath: apps/homerun2/preview-secrets
+                  helmValues: |
+                    name: homerun2-git-pitcher-preview-secrets
+                    namespacePrefix: "homerun2-git-pitcher-pr-*"
+                    clusterSecretStoreName: vault-homerun2-pr
+                    refreshInterval: 1m
+                    vaultSecretName: preview-env
+                    components:
+                      - name: redis-stack-auth
+                        secretName: redis-stack-auth
+                        dataKey: redis-password
+                        vaultProperty: redisPassword
+                      - name: git-pitcher-redis
+                        secretName: homerun2-git-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      - name: core-catcher-redis
+                        secretName: homerun2-core-catcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+
+                - releaseName: homerun2-git-pitcher-preview-sweep
+                  component: git-pitcher
+                  policy: sweep
+                  chartPath: apps/homerun2/preview-sweep
+                  helmValues: |
+                    name: homerun2-git-pitcher-preview-sweep
+                    namespacePrefix: "homerun2-git-pitcher-pr-*"
   template:
     metadata:
       # No `-{{ .name }}` cluster suffix because today only `homerun2-dev`

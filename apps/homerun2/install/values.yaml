@@ -174,6 +174,15 @@ ledCatcher:
 gitPitcher:
   enabled: false
   version: v0.5.0
+  hostname: git-pitcher.example.com
+  # Option B from stuttgart-things/argocd#116 — when true, the chart patches
+  # the HTTPRoute shipped inside the git-pitcher kustomize OCI (parentRef +
+  # hostname) and the standalone homerun2-httproute Application skips
+  # git-pitcher. Flip to true on consumers (AppSet valuesObject) once they
+  # consume a kustomize OCI tag built after
+  # stuttgart-things/homerun2-git-pitcher#27 (which enables HTTPRoute
+  # rendering in the kustomize base).
+  inlineHttpRoute: false
 
 # Gateway API HTTPRoutes for every enabled component that exposes one.
 httpRoute:
