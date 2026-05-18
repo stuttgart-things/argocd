@@ -22,7 +22,7 @@ kustomize:
 # Clusterbook container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/clusterbook
-  tag: 1.25.2
+  tag: 1.25.3
 
 # PowerDNS integration — patched into the clusterbook-config ConfigMap rendered by the base.
 # When enabled, the pdns sub-Application also provisions the clusterbook-pdns Secret.
