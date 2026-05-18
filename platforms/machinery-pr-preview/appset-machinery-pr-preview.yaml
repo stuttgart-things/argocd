@@ -56,7 +56,16 @@ spec:
               requeueAfterSeconds: 600
   template:
     metadata:
-      name: 'machinery-pr-{{ .number }}'
+      # `-platform` suffix on the AppSet's parent Application so it does
+      # not collide with the chart-rendered child Application, which is
+      # named via `valuesObject.applicationName: machinery-pr-<n>`.
+      # Without the suffix both would be `machinery-pr-<n>` in argocd ns
+      # and the parent's spec.source (github) would overwrite the child's
+      # spec.source (the kustomize OCI), leaving machinery undeployed.
+      # apps/machinery/install's helm chart uses `applicationName` as-is
+      # (no per-component suffix like the homerun2 chart adds), so the
+      # disambiguation has to happen here.
+      name: 'machinery-pr-{{ .number }}-platform'
       labels:
         machinery.stuttgart-things.com/pr: '{{ .number }}'
       # Without this finalizer, Argo deletes the Application instantly
