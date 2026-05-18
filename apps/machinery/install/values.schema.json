@@ -47,6 +47,18 @@
       },
       "required": ["repository", "tag"]
     },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional MACHINERY_CONFIG injection. Without this set, machinery runs with its built-in defaultConfig().",
+      "properties": {
+        "fromConfigMap": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of a ConfigMap in the destination namespace carrying a `config.json` key. Mounted at /etc/machinery; MACHINERY_CONFIG points at /etc/machinery/config.json."
+        }
+      }
+    },
     "httpRoute": {
       "type": "object",
       "additionalProperties": false,
