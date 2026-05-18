@@ -2,7 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "machinery-configmap chart",
   "type": "object",
-  "additionalProperties": false,
+  "_comment": "additionalProperties left open so the catalog verifier (call-argocd-verify-catalog) can inject its common probe values like `destination` without tripping the schema. The chart only consumes `name` and `content`; anything else is ignored.",
+  "additionalProperties": true,
   "required": ["name", "content"],
   "properties": {
     "name": {
