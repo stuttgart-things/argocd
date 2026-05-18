@@ -50,13 +50,26 @@
     "config": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional MACHINERY_CONFIG injection. Without this set, machinery runs with its built-in defaultConfig().",
+      "description": "Optional MACHINERY_CONFIG injection. Set `content` for inline JSON, or `fromConfigMap` to reference one materialized out-of-band. Both unset = machinery uses its built-in defaultConfig().",
       "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the materialized ConfigMap. Defaults to `machinery-config`. Only meaningful with `content`."
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Inline JSON config (machinery's config.json schema). The chart auto-creates a ConfigMap via the apps/machinery/configmap sub-Application."
+        },
         "fromConfigMap": {
           "type": "string",
           "minLength": 1,
-          "description": "Name of a ConfigMap in the destination namespace carrying a `config.json` key. Mounted at /etc/machinery; MACHINERY_CONFIG points at /etc/machinery/config.json."
+          "description": "Name of a ConfigMap pre-existing in the destination namespace carrying a `config.json` key. Use instead of `content` when something else (ESO / Kyverno / manual) populates the ConfigMap."
         }
+      },
+      "not": {
+        "required": ["content", "fromConfigMap"]
       }
     },
     "httpRoute": {

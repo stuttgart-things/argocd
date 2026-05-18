@@ -1,0 +1,15 @@
+---
+# Name of the ConfigMap to materialize. Must match the value the
+# Deployment patch in apps/machinery/install/templates/chart.yaml
+# mounts at /etc/machinery.
+name: machinery-config
+
+# The full machinery config.json content as a YAML string. Format is
+# documented in stuttgart-things/machinery's README "Config File"
+# section — drop-in examples live in that repo's `examples/configs/`.
+content: |
+  {
+    "port": 50051,
+    "httpPort": 8080,
+    "resources": {}
+  }
