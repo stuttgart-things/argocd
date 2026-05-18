@@ -1,0 +1,62 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys (the *host* cluster that runs the
+# vcluster pods). Each vcluster lives in its own namespace on the host.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: vcluster-dev
+
+# Helm release name AND the in-cluster service name vcluster exposes its API
+# server on. Drives the kubeconfig server URL
+# (https://<vclusterName>.<namespace>.svc:443) and vcluster's resource naming.
+vclusterName: vcluster-dev
+
+# Upstream loft-sh vcluster Helm chart (https://charts.loft.sh, chart `vcluster`).
+# Match this to the `vcluster` CLI version you intend to use against the cluster.
+# As of vcluster 0.20+ the only supported control-plane distro is k8s (real
+# kube-apiserver + etcd) — k3s/k0s were removed. The chart picks a sensible
+# distro automatically; advanced overrides go via `extraValues`.
+chartVersion: 0.33.1
+
+# Persistence for the control-plane StatefulSet PVC (holds the etcd state).
+# Disable only for ephemeral throwaway vclusters.
+persistence:
+  enabled: true
+  storageClass: ""   # "" → host cluster default StorageClass
+  size: 5Gi
+
+# How to reach the vcluster API server from outside the host cluster. Pick
+# exactly one of: ClusterIP (in-cluster only), NodePort, LoadBalancer.
+# ArgoCD registration uses the in-cluster Service URL by default, so ClusterIP
+# is fine when the management ArgoCD runs on the same host cluster.
+service:
+  type: ClusterIP
+
+# Sync behavior between virtual <-> host clusters. Defaults to vcluster's
+# out-of-the-box mapping (pods/services/PVCs/endpoints synced to host; nodes,
+# CSI, ingresses faked virtually). Override via extraValues if you need to
+# enable host-Ingress sync, real-nodes mode, etc.
+sync: {}
+
+# Deep-merged on top of the computed valuesObject passed to the upstream
+# vcluster chart. Use for any upstream key not exposed as a first-class
+# value above (e.g. controlPlane.proxy, exportKubeConfig, plugins,
+# controlPlane.distro.k8s.version to pin the Kubernetes version, …).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "vcluster app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "vclusterName", "chartVersion"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple host clusters."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Argo destination for the rendered Application (the host cluster). Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required.",
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["namespace"],
+      "anyOf": [
+        { "required": ["server"] },
+        { "required": ["name"] }
+      ]
+    },
+    "vclusterName": { "type": "string", "minLength": 1 },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "storageClass": { "type": "string" },
+        "size":         { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" }
+      },
+      "required": ["enabled"]
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] }
+      },
+      "required": ["type"]
+    },
+    "sync": {
+      "type": "object",
+      "description": "Deep-merged into the upstream chart's `sync` block. Leave empty for vcluster defaults.",
+      "additionalProperties": true
+    },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed valuesObject passed to the upstream vcluster chart.",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

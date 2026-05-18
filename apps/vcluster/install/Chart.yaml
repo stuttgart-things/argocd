@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: vcluster-install
+description: App-of-apps chart packaging the loft-sh vcluster Helm chart (k3s control-plane distro by default). Renders one ArgoCD Application per consumer invocation.
+type: application
+version: 0.1.0
+appVersion: "0.33.1"

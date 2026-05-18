@@ -1,0 +1,55 @@
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $defaultName := printf "vcluster-%s-%s" .Values.vclusterName (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+controlPlane block — persistence for the StatefulSet PVC + Service type for
+the vcluster API. Distro selection is left to the upstream chart's defaults
+(vcluster 0.20+ only supports k8s); pin a Kubernetes version or tweak the
+distro image via `extraValues.controlPlane.distro.k8s.*` if needed.
+*/}}
+{{- $pvc := dict
+      "enabled" .Values.persistence.enabled
+      "size"    .Values.persistence.size
+}}
+{{- if .Values.persistence.storageClass }}
+  {{- $_ := set $pvc "storageClass" .Values.persistence.storageClass }}
+{{- end }}
+{{- $controlPlane := dict
+      "statefulSet" (dict
+        "persistence" (dict "volumeClaim" $pvc)
+      )
+      "service" (dict "spec" (dict "type" .Values.service.type))
+}}
+{{- $computed := dict "controlPlane" $controlPlane }}
+{{- if .Values.sync }}
+  {{- $_ := set $computed "sync" .Values.sync }}
+{{- end }}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://charts.loft.sh
+    chart: vcluster
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: {{ .Values.vclusterName | quote }}
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
