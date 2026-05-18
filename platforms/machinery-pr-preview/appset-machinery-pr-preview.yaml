@@ -108,6 +108,25 @@ spec:
               repository: ghcr.io/stuttgart-things/machinery
               tag: 'pr-{{ .number }}-{{ .head_sha }}'
 
+            # Inline MACHINERY_CONFIG. Mirrors examples/configs/platforms.json
+            # in stuttgart-things/machinery — gives the preview a watch set
+            # that maps onto the stuttgart-things Crossplane XRs (Storage /
+            # Network / Security platforms, AnsibleRun) rather than the
+            # binary's default trio. Swap to a different example any time
+            # the review surface changes.
+            config:
+              content: |
+                {
+                  "port": 50051,
+                  "httpPort": 8080,
+                  "resources": {
+                    "StoragePlatform":    { "group": "resources.stuttgart-things.com", "version": "v1alpha1", "resource": "storageplatforms",    "statusFields": ["status.installed", "status.observedVersion"], "infoFields": [{"label":"Provider","path":"spec.provider"},{"label":"Version","path":"spec.version"}] },
+                    "NetworkIntegration": { "group": "resources.stuttgart-things.com", "version": "v1alpha1", "resource": "networkintegrations", "statusFields": ["status.installed", "status.observedVersion"], "infoFields": [{"label":"Provider","path":"spec.provider"},{"label":"Version","path":"spec.version"}] },
+                    "SecurityPlatform":   { "group": "resources.stuttgart-things.com", "version": "v1alpha1", "resource": "securityplatforms",   "statusFields": ["status.installed", "status.observedVersion"] },
+                    "AnsibleRun":         { "group": "resources.stuttgart-things.com", "version": "v1alpha1", "resource": "ansibleruns",         "connectionField": "status.lastRunTime", "statusFields": ["status.phase", "status.observedGeneration"], "infoFields": [{"label":"Playbook","path":"spec.playbook"},{"label":"Inventory","path":"spec.inventory"}] }
+                  }
+                }
+
             httpRoute:
               enabled: true
               hostname: 'machinery-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'

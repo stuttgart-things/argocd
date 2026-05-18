@@ -26,14 +26,27 @@ image:
   repository: ghcr.io/stuttgart-things/machinery
   tag: 1.5.0
 
-# Optional MACHINERY_CONFIG ConfigMap. When `fromConfigMap` names a ConfigMap
-# (e.g. one materialized by a Kyverno policy or pre-applied in the namespace),
-# the chart patches the Deployment to mount it at /etc/machinery and sets
-# MACHINERY_CONFIG=/etc/machinery/config.json. The ConfigMap must have a
-# `config.json` key carrying the JSON described in machinery's README.
-# Leave unset to run with machinery's built-in defaultConfig().
+# Optional MACHINERY_CONFIG. Two opt-in paths:
+#
+#   config.content        Inline JSON. The chart materializes a ConfigMap
+#                         (via the apps/machinery/configmap sub-Application)
+#                         in the destination namespace, then patches the
+#                         Deployment to mount it. Use this when you want
+#                         the config to ship alongside the Application.
+#
+#   config.fromConfigMap  Name of a ConfigMap with a `config.json` key,
+#                         materialized out-of-band (Kyverno generate,
+#                         ESO, pre-applied YAML, …). The chart only does
+#                         the mount + env-var.
+#
+# Drop-in JSON examples live in stuttgart-things/machinery's
+# `examples/configs/`. Leave the block empty (the default) to run with
+# machinery's built-in defaultConfig().
 config: {}
-  # fromConfigMap: machinery-config-overrides
+  # name: machinery-config         # name of the materialized ConfigMap (defaults to machinery-config)
+  # content: |                     # inline JSON; chart auto-creates the ConfigMap
+  #   {"port":50051,"resources":{...}}
+  # fromConfigMap: my-overrides    # alternative: reference an externally-managed ConfigMap
 
 # Gateway API HTTPRoute sub-Application (opt-in).
 # When enabled, the base's KCL-generated HTTPRoute is pruned via $patch: delete.

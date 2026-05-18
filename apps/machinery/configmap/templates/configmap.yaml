@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.name | quote }}
+data:
+  config.json: |
+{{ .Values.content | indent 4 }}

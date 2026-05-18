@@ -12,14 +12,26 @@ mis-configure it. Mirrors the `homerun2.kustomizeRepo` helper.
 {{- $kustomizeRepo = printf "oci://%s" $kustomizeRepo -}}
 {{- end }}
 {{/*
-Build the Deployment container piecemeal so the MACHINERY_CONFIG env +
-volume only appear when `config.fromConfigMap` names a ConfigMap that
-actually carries a `config.json` key. Without that gate, machinery
-starts with MACHINERY_CONFIG=/etc/machinery/config.json, reads it as a
-path, finds nothing, and crashes (`reading config file: open
+Build the Deployment container piecemeal so MACHINERY_CONFIG only appears
+when there's actually a ConfigMap to point at. Without that gate,
+machinery starts with MACHINERY_CONFIG=/etc/machinery/config.json, reads
+it as a path, finds nothing, and crashes (`reading config file: open
 /etc/machinery/config.json: no such file or directory`). The default
 (unset) leaves machinery to run with its built-in defaultConfig().
+
+Two opt-in paths:
+  config.fromConfigMap: <name>   point at a ConfigMap created out-of-band
+  config.content: <json string>  inline JSON, chart materializes a
+                                 ConfigMap via the configmap sub-Application
 */}}
+{{- $cmName := "" }}
+{{- if .Values.config }}
+{{-   if .Values.config.content }}
+{{-     $cmName = default "machinery-config" .Values.config.name }}
+{{-   else if .Values.config.fromConfigMap }}
+{{-     $cmName = .Values.config.fromConfigMap }}
+{{-   end }}
+{{- end }}
 {{- $container := dict
       "name" "machinery"
       "image" (printf "%s:%s" .Values.image.repository .Values.image.tag)
@@ -29,7 +41,7 @@ path, finds nothing, and crashes (`reading config file: open
       )
 }}
 {{- $podSpec := dict "containers" (list $container) }}
-{{- if and .Values.config .Values.config.fromConfigMap }}
+{{- if $cmName }}
 {{- $_ := set $container "env" (list (dict "name" "MACHINERY_CONFIG" "value" "/etc/machinery/config.json")) }}
 {{- $_ := set $container "volumeMounts" (list (dict
       "name"      "machinery-config"
@@ -38,7 +50,7 @@ path, finds nothing, and crashes (`reading config file: open
 )) }}
 {{- $_ := set $podSpec "volumes" (list (dict
       "name" "machinery-config"
-      "configMap" (dict "name" .Values.config.fromConfigMap)
+      "configMap" (dict "name" $cmName)
 )) }}
 {{- end }}
 {{- $deployPatch := dict

@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: machinery-configmap
+description: ConfigMap carrying machinery's config.json — loaded as a sub-Application by apps/machinery/install when `config.content` is set.
+type: application
+version: 0.1.0
