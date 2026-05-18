@@ -1,0 +1,33 @@
+---
+# Bootstrap Application for the machinery PR-preview platform bundle.
+# Apply once on the management cluster (the one running Argo CD):
+#   kubectl apply -f platforms/machinery-pr-preview/application.yaml
+#
+# It renders platforms/machinery-pr-preview/ via kustomize (the
+# kustomization.yaml in that directory lists the ApplicationSet).
+# The AppSet then fans out to every cluster Secret labelled
+# `machinery-pr-preview: "true"`.
+#
+# This file itself is intentionally NOT listed in kustomization.yaml so
+# the rendered set does not contain the bootstrap Application (no
+# self-reference).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: machinery-pr-preview-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: platforms/machinery-pr-preview
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
