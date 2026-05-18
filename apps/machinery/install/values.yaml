@@ -14,7 +14,9 @@ destination:
   namespace: machinery
 
 # Machinery OCI kustomize base (ghcr.io/stuttgart-things/machinery-kustomize).
-# Argo CD 2.13+ resolves oci:// repoURLs as kustomize sources.
+# The chart prepends `oci://` automatically if missing — Argo CD 2.13+ needs
+# the prefix to treat the repoURL as a kustomize OCI source rather than git
+# (without it Argo reports "failed to list refs: repository not found").
 kustomize:
   repoURL: ghcr.io/stuttgart-things/machinery-kustomize
   targetRevision: 1.3.0
