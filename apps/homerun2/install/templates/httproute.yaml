@@ -38,6 +38,13 @@
 {{- if .Values.ledCatcher.enabled }}
   {{- $routes = append $routes (dict "name" "homerun2-led-catcher" "hostname" .Values.ledCatcher.hostname "backend" (dict "name" "homerun2-led-catcher" "port" 80)) }}
 {{- end }}
+{{- /* git-pitcher inlines its HTTPRoute in the kustomize OCI when
+       gitPitcher.inlineHttpRoute is set; the standalone Application below
+       skips it in that case (templates/git-pitcher.yaml patches it
+       directly). See stuttgart-things/argocd#116. */ -}}
+{{- if and .Values.gitPitcher.enabled (not .Values.gitPitcher.inlineHttpRoute) }}
+  {{- $routes = append $routes (dict "name" "homerun2-git-pitcher" "hostname" .Values.gitPitcher.hostname "backend" (dict "name" "homerun2-git-pitcher" "port" 80)) }}
+{{- end }}
 {{- if eq (len $routes) 0 }}
 {{- /* Nothing to render — every route-bearing component is disabled */ -}}
 {{- else }}
