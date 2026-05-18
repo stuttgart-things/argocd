@@ -1,0 +1,29 @@
+---
+# Name of the rendered ExternalSecret (cluster-unique within the namespace
+# below). The materialised target Secret is hard-coded to `cloud-credentials`
+# because that is the name Velero's `velero-plugin-for-aws` expects via the
+# umbrella chart's `credentials.existingSecret`.
+name: velero-cloud-credentials
+
+# Namespace the ExternalSecret (and the rendered target Secret) live in.
+# Must match the namespace Velero runs in (see `infra/velero/install`
+# `destination.namespace`).
+namespace: velero
+
+# How often ESO re-reads the upstream secret and refreshes the target Secret.
+refreshInterval: 1h
+
+# Reference to the existing (Cluster)SecretStore. Default `vault-cluster`
+# matches the convention from `infra/external-secrets/cluster-secret-store-vault`.
+secretStoreRef:
+  name: vault-cluster
+  kind: ClusterSecretStore
+
+# Vault KV path holding the S3 access/secret keys (KV v2 path).
+secretPath: kv/data/velero/s3
+
+# Property names inside the KV entry. These are what `velero-plugin-for-aws`
+# expects when it parses the rendered INI under the `cloud` key.
+properties:
+  accessKey: access_key
+  secretKey: secret_key

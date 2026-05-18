@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: velero-install
+description: App-of-apps chart packaging the upstream Velero Helm chart with GitOps-friendly defaults
+type: application
+version: 0.1.0
+appVersion: "9.0.0"

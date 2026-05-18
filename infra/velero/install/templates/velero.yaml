@@ -1,0 +1,73 @@
+{{- $computed := dict }}
+{{- $_ := set $computed "initContainers" (list (dict
+    "name" "velero-plugin-for-aws"
+    "image" (printf "%s:%s" .Values.pluginAws.image .Values.pluginAws.tag)
+    "imagePullPolicy" "IfNotPresent"
+    "volumeMounts" (list (dict "name" "plugins" "mountPath" "/target")))) }}
+{{- $_ := set $computed "credentials" (dict
+    "useSecret" true
+    "existingSecret" .Values.credentials.existingSecret) }}
+{{- $_ := set $computed "extraVolumes" (list (dict
+    "name" "trust-bundle"
+    "configMap" (dict
+        "name" .Values.trustBundle.configMapName
+        "optional" true))) }}
+{{- $_ := set $computed "extraVolumeMounts" (list (dict
+    "name" "trust-bundle"
+    "mountPath" .Values.trustBundle.mountPath
+    "readOnly" true)) }}
+{{- $_ := set $computed "configuration" (dict
+    "extraEnvVars" (dict "SSL_CERT_DIR" (.Values.sslCertDir | default ""))
+    "backupStorageLocation" (list (dict
+        "name" "default"
+        "provider" "aws"
+        "bucket" .Values.backup.bucket
+        "default" true
+        "config" (dict
+            "region" .Values.backup.region
+            "s3ForcePathStyle" (.Values.backup.s3ForcePathStyle | toString)
+            "s3Url" .Values.backup.s3Url
+            "insecureSkipTLSVerify" (.Values.backup.insecureSkipTLSVerify | toString))))
+    "volumeSnapshotLocation" (list (dict
+        "name" "default"
+        "provider" "aws"
+        "config" (dict "region" .Values.snapshot.region)))) }}
+{{- $_ := set $computed "snapshotsEnabled" .Values.snapshotsEnabled }}
+{{- $_ := set $computed "deployNodeAgent" .Values.deployNodeAgent }}
+{{- $_ := set $computed "metrics" (dict
+    "enabled" .Values.metrics.enabled
+    "serviceMonitor" (dict
+        "enabled" .Values.metrics.serviceMonitor.enabled
+        "additionalLabels" (.Values.metrics.serviceMonitor.additionalLabels | default dict))) }}
+{{- $_ := set $computed "schedules" (.Values.schedules | default dict) }}
+{{- $_ := set $computed "upgradeJob" (dict "enabled" .Values.upgradeJob.enabled) }}
+{{- $_ := set $computed "cleanUpCRDs" .Values.cleanUpCRDs }}
+{{- $_ := set $computed "kubectl" (dict "image" (dict
+    "repository" .Values.kubectl.image.repository
+    "tag" .Values.kubectl.image.tag)) }}
+
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+{{- $defaultName := printf "velero-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://vmware-tanzu.github.io/helm-charts
+    chart: velero
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: velero
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "velero install app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion", "backup"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "pluginAws": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": { "type": "string", "minLength": 1 },
+        "tag":   { "type": "string", "minLength": 1 }
+      },
+      "required": ["image", "tag"]
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret": { "type": "string", "minLength": 1 }
+      },
+      "required": ["existingSecret"]
+    },
+    "trustBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "configMapName": { "type": "string", "minLength": 1 },
+        "mountPath":     { "type": "string", "minLength": 1 }
+      },
+      "required": ["configMapName", "mountPath"]
+    },
+    "sslCertDir": { "type": "string" },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bucket":                 { "type": "string", "minLength": 1 },
+        "region":                 { "type": "string", "minLength": 1 },
+        "s3ForcePathStyle":       { "type": "boolean" },
+        "s3Url":                  { "type": "string", "format": "uri" },
+        "insecureSkipTLSVerify":  { "type": "boolean" }
+      },
+      "required": ["bucket", "s3Url"]
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "region": { "type": "string", "minLength": 1 }
+      },
+      "required": ["region"]
+    },
+    "snapshotsEnabled":  { "type": "boolean" },
+    "deployNodeAgent":   { "type": "boolean" },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "serviceMonitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled":          { "type": "boolean" },
+            "additionalLabels": { "type": "object", "additionalProperties": { "type": "string" } }
+          },
+          "required": ["enabled"]
+        }
+      },
+      "required": ["enabled"]
+    },
+    "schedules": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "upgradeJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      },
+      "required": ["enabled"]
+    },
+    "cleanUpCRDs": { "type": "boolean" },
+    "kubectl": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag":        { "type": "string", "minLength": 1 }
+          },
+          "required": ["repository", "tag"]
+        }
+      },
+      "required": ["image"]
+    },
+    "extraValues": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
