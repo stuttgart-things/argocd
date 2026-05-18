@@ -22,7 +22,7 @@ kustomize:
 # Machinery container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/machinery
-  tag: 1.3.0
+  tag: 1.3.2
 
 # Gateway API HTTPRoute sub-Application (opt-in).
 # When enabled, the base's KCL-generated HTTPRoute is pruned via $patch: delete.
