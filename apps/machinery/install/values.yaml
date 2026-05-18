@@ -26,6 +26,15 @@ image:
   repository: ghcr.io/stuttgart-things/machinery
   tag: 1.5.0
 
+# Optional MACHINERY_CONFIG ConfigMap. When `fromConfigMap` names a ConfigMap
+# (e.g. one materialized by a Kyverno policy or pre-applied in the namespace),
+# the chart patches the Deployment to mount it at /etc/machinery and sets
+# MACHINERY_CONFIG=/etc/machinery/config.json. The ConfigMap must have a
+# `config.json` key carrying the JSON described in machinery's README.
+# Leave unset to run with machinery's built-in defaultConfig().
+config: {}
+  # fromConfigMap: machinery-config-overrides
+
 # Gateway API HTTPRoute sub-Application (opt-in).
 # When enabled, the base's KCL-generated HTTPRoute is pruned via $patch: delete.
 httpRoute:

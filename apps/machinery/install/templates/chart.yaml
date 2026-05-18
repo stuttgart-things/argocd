@@ -11,32 +11,41 @@ mis-configure it. Mirrors the `homerun2.kustomizeRepo` helper.
 {{- if not (hasPrefix "oci://" $kustomizeRepo) -}}
 {{- $kustomizeRepo = printf "oci://%s" $kustomizeRepo -}}
 {{- end }}
+{{/*
+Build the Deployment container piecemeal so the MACHINERY_CONFIG env +
+volume only appear when `config.fromConfigMap` names a ConfigMap that
+actually carries a `config.json` key. Without that gate, machinery
+starts with MACHINERY_CONFIG=/etc/machinery/config.json, reads it as a
+path, finds nothing, and crashes (`reading config file: open
+/etc/machinery/config.json: no such file or directory`). The default
+(unset) leaves machinery to run with its built-in defaultConfig().
+*/}}
+{{- $container := dict
+      "name" "machinery"
+      "image" (printf "%s:%s" .Values.image.repository .Values.image.tag)
+      "ports" (list
+        (dict "name" "grpc" "containerPort" 50051 "protocol" "TCP")
+        (dict "name" "http" "containerPort" 8080  "protocol" "TCP")
+      )
+}}
+{{- $podSpec := dict "containers" (list $container) }}
+{{- if and .Values.config .Values.config.fromConfigMap }}
+{{- $_ := set $container "env" (list (dict "name" "MACHINERY_CONFIG" "value" "/etc/machinery/config.json")) }}
+{{- $_ := set $container "volumeMounts" (list (dict
+      "name"      "machinery-config"
+      "mountPath" "/etc/machinery"
+      "readOnly"  true
+)) }}
+{{- $_ := set $podSpec "volumes" (list (dict
+      "name" "machinery-config"
+      "configMap" (dict "name" .Values.config.fromConfigMap)
+)) }}
+{{- end }}
 {{- $deployPatch := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"
       "metadata" (dict "name" "machinery")
-      "spec" (dict "template" (dict "spec" (dict
-        "containers" (list
-          (dict
-            "name" "machinery"
-            "image" (printf "%s:%s" .Values.image.repository .Values.image.tag)
-            "env" (list (dict "name" "MACHINERY_CONFIG" "value" "/etc/machinery/config.json"))
-            "ports" (list
-              (dict "name" "grpc" "containerPort" 50051 "protocol" "TCP")
-              (dict "name" "http" "containerPort" 8080  "protocol" "TCP")
-            )
-            "volumeMounts" (list (dict
-              "name"      "machinery-config"
-              "mountPath" "/etc/machinery"
-              "readOnly"  true
-            ))
-          )
-        )
-        "volumes" (list (dict
-          "name" "machinery-config"
-          "configMap" (dict "name" "machinery-config" "optional" true)
-        ))
-      )))
+      "spec" (dict "template" (dict "spec" $podSpec))
 }}
 {{- $svcPatch := dict
       "apiVersion" "v1"
@@ -68,6 +77,15 @@ spec:
     targetRevision: {{ .Values.kustomize.targetRevision | quote }}
     path: .
     kustomize:
+      # The machinery-kustomize OCI base bakes `namespace: machinery` into
+      # every resource (the KCL schema's default). Without overriding here,
+      # Argo's destination.namespace is ignored for resources that carry
+      # an explicit namespace, so they all land in `machinery` regardless
+      # of what the consumer asked for — breaking per-PR previews (HTTPRoute
+      # in pr-N can't reach Service in `machinery`) and colliding multiple
+      # tenants. Kustomize's `namespace:` rewrites it on every resource
+      # (and renames the Namespace object itself).
+      namespace: {{ .Values.destination.namespace | quote }}
       patches:
         - target:
             kind: Deployment
