@@ -1,5 +1,16 @@
 {{- $defaultName := printf "machinery-%s" (sha1sum .Values.destination.server | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+Argo CD 2.13+ treats an `oci://`-prefixed repoURL as a kustomize OCI source
+and any other prefix as git. Without the prefix Argo falls back to go-git
+and reports "failed to list refs: repository not found", even for public
+ghcr packages. Tolerate both forms in values so the user can't silently
+mis-configure it. Mirrors the `homerun2.kustomizeRepo` helper.
+*/}}
+{{- $kustomizeRepo := .Values.kustomize.repoURL -}}
+{{- if not (hasPrefix "oci://" $kustomizeRepo) -}}
+{{- $kustomizeRepo = printf "oci://%s" $kustomizeRepo -}}
+{{- end }}
 {{- $deployPatch := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"
@@ -53,7 +64,7 @@ metadata:
 spec:
   project: {{ .Values.project | quote }}
   source:
-    repoURL: {{ .Values.kustomize.repoURL | quote }}
+    repoURL: {{ $kustomizeRepo | quote }}
     targetRevision: {{ .Values.kustomize.targetRevision | quote }}
     path: .
     kustomize:
