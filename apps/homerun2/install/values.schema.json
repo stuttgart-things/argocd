@@ -103,7 +103,8 @@
         "version":          { "type": "string", "minLength": 1 },
         "kustomizeVersion": { "type": "string", "minLength": 1 },
         "hostname":         { "type": "string", "minLength": 1 },
-        "inlineHttpRoute":  { "type": "boolean" }
+        "inlineHttpRoute":  { "type": "boolean" },
+        "redisStream":      { "type": "string" }
       },
       "required": ["enabled"]
     },

@@ -107,6 +107,13 @@ coreCatcher:
   # stuttgart-things/homerun2-core-catcher#63 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
+  # Optional override for REDIS_STREAM (the stream name core-catcher
+  # consumes). When empty, the kustomize base default (messages) is
+  # used. Set this when co-tenanting with a producer that writes to a
+  # different stream — e.g. git-pitcher's feat/14 changed its default
+  # to `homerun`, so the git-pitcher PR-preview AppSet pins
+  # coreCatcher.redisStream: homerun to keep them aligned.
+  redisStream: ""
 
 # scout (web dashboard / monitoring).
 scout:

@@ -90,12 +90,20 @@ spec:
             # Co-tenanted: core-catcher in web mode at the latest released
             # build (v0.13.0). Consumes the redis stream + renders the
             # dashboard so reviewers can see what git-pitcher produced.
+            #
+            # redisStream pinned to `homerun` because git-pitcher's
+            # feat/14 (stuttgart-things/homerun2-git-pitcher#16) made
+            # `homerun` git-pitcher's default stream — core-catcher's
+            # kustomize base still defaults to `messages`, so without
+            # this override the dashboard reads from an empty stream
+            # while git-pitcher writes to a different one.
             coreCatcher:
               enabled: true
               version: v0.13.0
               kustomizeVersion: v0.13.0
               hostname: 'cc-git-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
               inlineHttpRoute: true
+              redisStream: homerun
 
             redisStack:
               enabled: true
