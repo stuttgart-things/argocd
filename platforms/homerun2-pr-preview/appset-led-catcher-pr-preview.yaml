@@ -13,11 +13,15 @@
 # Decisions from stuttgart-things/homerun2-omni-pitcher#116 step 3:
 #   - namespace: `homerun2-led-catcher-pr-<num>` (image-name-mirrored)
 #   - hostnames:
-#     * `led-pr-<num>`       — led-catcher web simulator
-#     * `omni-led-pr-<num>`   — co-tenanted omni-pitcher (distinct
-#                              from `omni-pr-<num>`, `omni-cc-pr-<num>`,
-#                              `omni-scout-pr-<num>`, `omni-demo-pr-<num>`)
+#     * `led-pr-<num>`         — led-catcher web simulator
+#     * `omni-led-pr-<num>`    — co-tenanted omni-pitcher (distinct
+#                                 from `omni-pr-<num>`, `omni-cc-pr-<num>`,
+#                                 `omni-scout-pr-<num>`, `omni-demo-pr-<num>`)
+#     * `demo-led-pr-<num>`    — co-tenanted demo-pitcher UI so reviewers
+#                                 can compose + send custom messages and
+#                                 see them surface on the LED simulator
 #   - omni-pitcher pinned to v1.11.1 (latest released, Option-B-enabled)
+#   - demo-pitcher pinned to v1.4.0 (chart default)
 #   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
 #     stuttgart-things repo
 apiVersion: argoproj.io/v1alpha1
@@ -74,11 +78,8 @@ spec:
 
             # SUT: led-catcher at the PR's commit. `inlineHttpRoute: true`
             # opts into Option B (kustomize OCI ships HTTPRoute alongside
-            # Service) — requires the install chart's `ledCatcher` block
-            # to support this flag (follow-up: parity with scout/core-
-            # catcher/demo-pitcher). Until that lands, the standalone
-            # homerun2-httproute Application will also emit a route for
-            # led-catcher; both will reconcile to the same shape.
+            # Service); the chart patches parentRef + hostname per env (see
+            # apps/homerun2/install/templates/led-catcher.yaml).
             ledCatcher:
               enabled: true
               version: 'pr-{{ .number }}-{{ .head_sha }}'
@@ -86,13 +87,28 @@ spec:
               inlineHttpRoute: true
 
             # Co-tenanted: omni-pitcher pinned to v1.11.1 (latest released,
-            # Option-B-enabled). Receives /pitch POSTs from the seed Job
-            # and any manual reviewer pitches, writes to redis-stack.
+            # Option-B-enabled). Receives /pitch POSTs from the seed Job and
+            # any manual reviewer pitches (via demo-pitcher UI or direct
+            # curl), writes to redis-stack.
             omniPitcher:
               enabled: true
               version: v1.11.1
               hostname: 'omni-led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
               inlineHttpRoute: true
+
+            # Co-tenanted: demo-pitcher UI. Pinned to v1.4.0 (chart default).
+            # omniPitcherUrl flips the Deployment env to PITCH_TARGET=http +
+            # OMNI_PITCHER_URL=<in-cluster service> so the UI's "Pitch"
+            # button POSTs to the co-tenanted omni-pitcher (instead of the
+            # compiled-in localhost:4000 fallback the UI otherwise surfaces).
+            # Full chain: demo /pitch → omni-pitcher /pitch/generic →
+            # redis-stack stream → led-catcher web simulator.
+            demoPitcher:
+              enabled: true
+              version: v1.4.0
+              hostname: 'demo-led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+              omniPitcherUrl: 'http://homerun2-omni-pitcher.homerun2-led-catcher-pr-{{ .number }}.svc.cluster.local'
 
             # Co-tenanted: redis-stack. Same ESO-managed password Secret
             # the preview-secrets policy materializes per namespace.
@@ -109,7 +125,6 @@ spec:
             k8sPitcher:   { enabled: false }
             lightCatcher: { enabled: false }
             wledMock:     { enabled: false }
-            demoPitcher:  { enabled: false }
             gitPitcher:   { enabled: false }
 
             httpRoute:

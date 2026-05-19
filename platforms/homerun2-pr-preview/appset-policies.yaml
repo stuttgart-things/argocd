@@ -372,6 +372,18 @@ spec:
                         secretName: homerun2-led-catcher-redis
                         dataKey: password
                         vaultProperty: redisPassword
+                      # demo-pitcher co-tenant — its HTTPPitcher reads
+                      # AUTH_TOKEN from this Secret to authenticate against
+                      # omni-pitcher's /pitch endpoint. Same vault property
+                      # as omni-pitcher-token so both sides share the token.
+                      - name: demo-pitcher-token
+                        secretName: homerun2-demo-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+                      - name: demo-pitcher-redis
+                        secretName: homerun2-demo-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
 
                 - releaseName: homerun2-led-catcher-preview-seed-data
                   component: led-catcher
