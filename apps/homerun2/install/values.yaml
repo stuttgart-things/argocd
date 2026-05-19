@@ -176,6 +176,14 @@ ledCatcher:
   enabled: false
   version: v0.1.1
   hostname: led-catcher.example.com
+  # Option B from stuttgart-things/argocd#116 — when true, the chart patches
+  # the HTTPRoute shipped inside the led-catcher kustomize OCI (parentRef +
+  # hostname) and the standalone homerun2-httproute Application skips
+  # led-catcher. Flip to true on consumers (AppSet valuesObject) once they
+  # consume a kustomize OCI tag built after
+  # stuttgart-things/homerun2-led-catcher#32 (which enables HTTPRoute
+  # rendering in the kustomize base).
+  inlineHttpRoute: false
 
 # git-pitcher (watches Git repos → Redis Streams).
 gitPitcher:
