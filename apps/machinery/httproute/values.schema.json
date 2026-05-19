@@ -77,6 +77,10 @@
       "type": "object",
       "additionalProperties": true,
       "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "nudgeAfterSync": {
+      "type": "boolean",
+      "description": "When true (default), render a PostSync Job + SA + Role + RoleBinding per route that re-annotates the HTTPRoute after each sync. Forces Cilium's gateway-controller to re-reconcile against a warm Service cache; works around its stale BackendNotFound latching."
     }
   }
 }

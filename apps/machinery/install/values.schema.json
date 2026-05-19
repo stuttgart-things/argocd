@@ -86,6 +86,10 @@
             "namespace": { "type": "string", "minLength": 1 }
           },
           "required": ["name", "namespace"]
+        },
+        "nudgeAfterSync": {
+          "type": "boolean",
+          "description": "Pass-through to the httproute sub-chart's PostSync nudge hook. Defaults to true. See values.yaml for the rationale."
         }
       },
       "required": ["enabled"],
