@@ -7,4 +7,5 @@ resources:
   - appset-scout-pr-preview.yaml
   - appset-demo-pitcher-pr-preview.yaml
   - appset-git-pitcher-pr-preview.yaml
+  - appset-led-catcher-pr-preview.yaml
   - appset-policies.yaml

@@ -328,6 +328,66 @@ spec:
                   helmValues: |
                     name: homerun2-git-pitcher-preview-sweep
                     namespacePrefix: "homerun2-git-pitcher-pr-*"
+
+                # ----- led-catcher -----
+                # Consumer (Redis Streams → LED matrix + HTMX simulator).
+                # Co-tenants omni-pitcher + redis-stack in its preview ns
+                # so the seed-data Job's pitches reach the simulator UI.
+                - releaseName: homerun2-led-catcher-preview-quota
+                  component: led-catcher
+                  policy: quota
+                  chartPath: apps/homerun2/preview-quota
+                  helmValues: |
+                    name: homerun2-led-catcher-preview-quota
+                    namespacePrefix: "homerun2-led-catcher-pr-*"
+
+                - releaseName: homerun2-led-catcher-preview-secrets
+                  component: led-catcher
+                  policy: secrets
+                  chartPath: apps/homerun2/preview-secrets
+                  helmValues: |
+                    name: homerun2-led-catcher-preview-secrets
+                    namespacePrefix: "homerun2-led-catcher-pr-*"
+                    clusterSecretStoreName: vault-homerun2-pr
+                    refreshInterval: 1m
+                    vaultSecretName: preview-env
+                    components:
+                      - name: omni-pitcher-token
+                        secretName: homerun2-omni-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+                      - name: omni-pitcher-redis
+                        secretName: homerun2-omni-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      - name: redis-stack-auth
+                        secretName: redis-stack-auth
+                        dataKey: redis-password
+                        vaultProperty: redisPassword
+                      # led-catcher's Redis client reads from
+                      # `homerun2-led-catcher-redis` (key `password`) —
+                      # name + key derived from kcl/secret.k in the SUT
+                      # repo.
+                      - name: led-catcher-redis
+                        secretName: homerun2-led-catcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+
+                - releaseName: homerun2-led-catcher-preview-seed-data
+                  component: led-catcher
+                  policy: seed-data
+                  chartPath: apps/homerun2/preview-seed-data
+                  helmValues: |
+                    name: homerun2-led-catcher-preview-seed-data
+                    namespacePrefix: "homerun2-led-catcher-pr-*"
+
+                - releaseName: homerun2-led-catcher-preview-sweep
+                  component: led-catcher
+                  policy: sweep
+                  chartPath: apps/homerun2/preview-sweep
+                  helmValues: |
+                    name: homerun2-led-catcher-preview-sweep
+                    namespacePrefix: "homerun2-led-catcher-pr-*"
   template:
     metadata:
       # No `-{{ .name }}` cluster suffix because today only `homerun2-dev`
