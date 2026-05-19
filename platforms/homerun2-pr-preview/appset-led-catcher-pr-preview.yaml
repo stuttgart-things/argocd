@@ -96,7 +96,10 @@ spec:
               hostname: 'omni-led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
               inlineHttpRoute: true
 
-            # Co-tenanted: demo-pitcher UI. Pinned to v1.4.0 (chart default).
+            # Co-tenanted: demo-pitcher UI. Pinned to v1.8.1 — the chart's
+            # default of v1.4.0 predates demo-pitcher's kustomize OCI
+            # publishing, so it 404s on the ghcr.io lookup. v1.8.1 is the
+            # current latest release with both image + kustomize OCI.
             # omniPitcherUrl flips the Deployment env to PITCH_TARGET=http +
             # OMNI_PITCHER_URL=<in-cluster service> so the UI's "Pitch"
             # button POSTs to the co-tenanted omni-pitcher (instead of the
@@ -105,7 +108,7 @@ spec:
             # redis-stack stream → led-catcher web simulator.
             demoPitcher:
               enabled: true
-              version: v1.4.0
+              version: v1.8.1
               hostname: 'demo-led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
               inlineHttpRoute: true
               omniPitcherUrl: 'http://homerun2-omni-pitcher.homerun2-led-catcher-pr-{{ .number }}.svc.cluster.local'
