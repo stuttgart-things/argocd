@@ -27,7 +27,7 @@ Two opt-in paths:
 {{- $cmName := "" }}
 {{- if .Values.config }}
 {{-   if .Values.config.content }}
-{{-     $cmName = default "machinery-config" .Values.config.name }}
+{{-     $cmName = default "machinery-config-file" .Values.config.name }}
 {{-   else if .Values.config.fromConfigMap }}
 {{-     $cmName = .Values.config.fromConfigMap }}
 {{-   end }}

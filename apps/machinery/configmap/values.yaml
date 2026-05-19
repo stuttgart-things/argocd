@@ -2,7 +2,14 @@
 # Name of the ConfigMap to materialize. Must match the value the
 # Deployment patch in apps/machinery/install/templates/chart.yaml
 # mounts at /etc/machinery.
-name: machinery-config
+#
+# Distinct from `machinery-config`: the KCL base in machinery-kustomize
+# already ships an env-vars ConfigMap under that name (LOG_LEVEL etc.,
+# consumed via envFrom). Re-using it here would have two Applications
+# racing to overwrite the same object on every sync, leaving whichever
+# wrote last live. machinery's own KCL uses `machinery-config-file` for
+# the file-mode ConfigMap (see kcl/configmap.k), so we mirror that.
+name: machinery-config-file
 
 # The full machinery config.json content as a YAML string. Format is
 # documented in stuttgart-things/machinery's README "Config File"

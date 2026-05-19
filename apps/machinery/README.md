@@ -28,7 +28,7 @@ apps/machinery/
 Argo CD Kustomize source against `oci://ghcr.io/stuttgart-things/machinery-kustomize` at `.Values.kustomize.targetRevision`. The install chart emits Kustomize `patches` equivalent to the flux version's `spec.patches`:
 
 - **Deployment image override** — `ghcr.io/stuttgart-things/machinery:<tag>` from `.Values.image`
-- **Deployment env + volumes** — `MACHINERY_CONFIG=/etc/machinery/config.json` + `machinery-config` ConfigMap mounted at `/etc/machinery` (optional)
+- **Deployment env + volumes** — `MACHINERY_CONFIG=/etc/machinery/config.json` + `machinery-config-file` ConfigMap mounted at `/etc/machinery` (optional; distinct from the env-vars `machinery-config` ConfigMap shipped by the KCL base)
 - **Deployment ports** — `grpc:50051` + `http:8080`
 - **Service ports** — `grpc:50051` + `http:8080`
 - **HTTPRoute delete** — when `httpRoute.enabled: true`, the KCL-generated HTTPRoute in the base is pruned (we ship our own via the sub-Application below)

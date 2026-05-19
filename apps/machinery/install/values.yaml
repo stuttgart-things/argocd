@@ -43,7 +43,7 @@ image:
 # `examples/configs/`. Leave the block empty (the default) to run with
 # machinery's built-in defaultConfig().
 config: {}
-  # name: machinery-config         # name of the materialized ConfigMap (defaults to machinery-config)
+  # name: machinery-config-file    # name of the materialized ConfigMap (defaults to machinery-config-file; must NOT collide with the env-vars ConfigMap `machinery-config` the KCL base ships)
   # content: |                     # inline JSON; chart auto-creates the ConfigMap
   #   {"port":50051,"resources":{...}}
   # fromConfigMap: my-overrides    # alternative: reference an externally-managed ConfigMap

@@ -1,7 +1,7 @@
 {{- if and .Values.config .Values.config.content }}
 {{- $defaultName := printf "machinery-%s" (sha1sum .Values.destination.server | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
-{{- $cmName := default "machinery-config" .Values.config.name }}
+{{- $cmName := default "machinery-config-file" .Values.config.name }}
 ---
 # Materializes the ConfigMap that the Deployment patch in chart.yaml
 # mounts at /etc/machinery. Runs at sync-wave -10 so the ConfigMap
