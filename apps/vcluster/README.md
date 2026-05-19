@@ -35,6 +35,8 @@ kind: Application
 metadata:
   name: vcluster-dev
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
@@ -61,6 +63,8 @@ spec:
 ```
 
 The outer `destination.server` is the **management cluster** (where the rendered child Application lives, in the `argocd` namespace). The inner `destination.server` under `helm.values` is the **host cluster** where the vcluster pods run.
+
+> **Why the finalizer?** When the consumer Application is reconciled by Flux (Kustomization in a cluster repo), deleting the file removes the Application CR directly — ArgoCD's `syncPolicy.automated.prune` never gets a chance to run, leaving the vcluster Helm release orphaned on the host. `resources-finalizer.argocd.argoproj.io` blocks CR deletion until ArgoCD has cascade-pruned its managed resources (the rendered inner Application, then the vcluster pods/PVCs/Service). The inner Application emitted by `install/templates/chart.yaml` carries the same finalizer, so the cascade reaches all the way to the upstream Helm release. Omit only if you never delete via Flux/`kubectl delete` and always use `argocd app delete` (which has its own cascade flag).
 
 ## Registering the vcluster with ArgoCD
 
