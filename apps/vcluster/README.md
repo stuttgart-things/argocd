@@ -66,6 +66,8 @@ The outer `destination.server` is the **management cluster** (where the rendered
 
 Once the vcluster is `Healthy / Synced` in ArgoCD, register it as a destination cluster so ArgoCD can deploy *into* the vcluster. vcluster authenticates with mTLS (client cert + key), not a bearer token — the recipes below extract those three credential fields (CA, client cert, client key) from the kubeconfig vcluster emits.
 
+> **Important — drop the `.svc` suffix.** vcluster's server cert SANs cover `<vclusterName>` and `<vclusterName>.<namespace>` but **not** `<vclusterName>.<namespace>.svc`. Using the `.svc` form makes ArgoCD's strict TLS verification fail with `x509: certificate is valid for ..., not vcluster-dev.vcluster-dev.svc`. The shorter `<vclusterName>.<namespace>` form resolves in-cluster via the DNS search path and matches the cert SAN — use it everywhere below.
+
 ### Step 1 — generate the kubeconfig (both options)
 
 `vcluster connect` builds a default kubeconfig pointing at `https://localhost:<random>` for use with a local port-forward. For ArgoCD-from-inside-the-cluster, rewrite the server URL to the in-cluster Service hostname with `--server=`:
@@ -75,16 +77,16 @@ export KUBECONFIG=<host-cluster-kubeconfig>
 kubectl -n vcluster-dev rollout status statefulset/vcluster-dev --timeout=5m
 
 vcluster connect vcluster-dev -n vcluster-dev \
-  --server=https://vcluster-dev.vcluster-dev.svc \
+  --server=https://vcluster-dev.vcluster-dev \
   --print > /tmp/vcluster-dev.kubeconfig
 ```
 
-Smoke-test (from a pod in the same cluster — local `kubectl` cannot resolve the `.svc` name, that's expected):
+Smoke-test (from a pod in the same cluster — local `kubectl` cannot resolve the in-cluster Service name, that's expected):
 
 ```bash
 kubectl -n argocd run vc-probe --rm -i --restart=Never \
   --image=alpine/curl:latest -- \
-  curl -sk --max-time 5 https://vcluster-dev.vcluster-dev.svc/version
+  curl -sk --max-time 5 https://vcluster-dev.vcluster-dev/version
 ```
 
 A `gitVersion: "v1.35.0"`-shaped JSON response means DNS + TLS + API are all reachable from the ArgoCD namespace.
@@ -110,7 +112,7 @@ metadata:
 type: Opaque
 stringData:
   name: vcluster-dev
-  server: https://vcluster-dev.vcluster-dev.svc
+  server: https://vcluster-dev.vcluster-dev
   config: |
     ${CONFIG_JSON}
 EOF
