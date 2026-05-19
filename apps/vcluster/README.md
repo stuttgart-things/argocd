@@ -68,7 +68,11 @@ Once the vcluster is `Healthy / Synced` in ArgoCD, register it as a destination 
 
 > **Important — drop the `.svc` suffix.** vcluster's server cert SANs cover `<vclusterName>` and `<vclusterName>.<namespace>` but **not** `<vclusterName>.<namespace>.svc`. Using the `.svc` form makes ArgoCD's strict TLS verification fail with `x509: certificate is valid for ..., not vcluster-dev.vcluster-dev.svc`. The shorter `<vclusterName>.<namespace>` form resolves in-cluster via the DNS search path and matches the cert SAN — use it everywhere below.
 
-### Step 1 — generate the kubeconfig (both options)
+### Step 1 — obtain the credentials
+
+Two equivalent ways: the `vcluster` CLI (rewrites the server URL for you), or reading the auto-created Secret directly from the host cluster (no CLI dependency — useful for ESO, ArgoCD-as-source, helm hooks, CI).
+
+#### Option A — `vcluster connect` (CLI)
 
 `vcluster connect` builds a default kubeconfig pointing at `https://localhost:<random>` for use with a local port-forward. For ArgoCD-from-inside-the-cluster, rewrite the server URL to the in-cluster Service hostname with `--server=`:
 
@@ -81,7 +85,27 @@ vcluster connect vcluster-dev -n vcluster-dev \
   --print > /tmp/vcluster-dev.kubeconfig
 ```
 
-Smoke-test (from a pod in the same cluster — local `kubectl` cannot resolve the in-cluster Service name, that's expected):
+#### Option B — host-cluster Secret (no CLI)
+
+vcluster creates a Secret `vc-<vclusterName>` in its own namespace on the host cluster, holding the same admin credentials. Read it directly:
+
+```bash
+export KUBECONFIG=<host-cluster-kubeconfig>
+kubectl -n vcluster-dev rollout status statefulset/vcluster-dev --timeout=5m
+
+kubectl -n vcluster-dev get secret vc-vcluster-dev \
+  -o jsonpath='{.data.config}' | base64 -d > /tmp/vcluster-dev.kubeconfig
+```
+
+The Secret contains: `certificate-authority`, `client-certificate`, `client-key`, `config` (full kubeconfig — `server` field hard-codes `https://localhost:8443`), `token`.
+
+For Step 2 below, only the three TLS fields (`caData` / `certData` / `keyData`) are consumed — the kubeconfig's `server` URL is irrelevant; you set the ArgoCD-facing server explicitly when you build the cluster Secret. So both options feed Step 2 identically.
+
+> **Why two options?** Option A is faster on the CLI. Option B has no `vcluster` binary dependency and uses pure `kubectl get secret` — easier to wire into External Secrets Operator, an ArgoCD `repo-server` plugin, a job, or any tooling that already speaks the Kubernetes API. RBAC scope is the same in both cases: whoever runs this needs `get` on Secrets in the vcluster's host namespace.
+
+#### Smoke-test
+
+From a pod in the same cluster — local `kubectl` cannot resolve the in-cluster Service name, that's expected:
 
 ```bash
 kubectl -n argocd run vc-probe --rm -i --restart=Never \
