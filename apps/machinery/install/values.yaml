@@ -67,12 +67,21 @@ rbac:
 
 # Gateway API HTTPRoute sub-Application (opt-in).
 # When enabled, the base's KCL-generated HTTPRoute is pruned via $patch: delete.
+#
+# nudgeAfterSync: render a PostSync Job per route that re-annotates
+# the HTTPRoute after each Argo sync. Works around Cilium gateway-
+# controller's tendency to latch onto a stale BackendNotFound when
+# it reconciles before the backend Service is in its informer cache.
+# Default on — surfaced on every fresh preview env spin-up. Set to
+# `false` for long-lived deployments where the cache is steady-state
+# and you don't want a Job + SA + Role + Binding per sync.
 httpRoute:
   enabled: true
   hostname: machinery.example.com
   gateway:
     name: cilium-gateway
     namespace: default
+  nudgeAfterSync: true
 
 # Sync policy applied to all rendered Applications.
 syncPolicy:

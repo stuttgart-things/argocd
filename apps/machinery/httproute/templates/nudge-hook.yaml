@@ -1,0 +1,117 @@
+{{- if .Values.nudgeAfterSync }}
+{{- range .Values.routes }}
+---
+# Cilium's gateway-controller occasionally latches a stale
+# ResolvedRefs=False/BackendNotFound verdict on a freshly-created
+# HTTPRoute: it reconciles before the backend Service makes it into
+# the controller's informer cache and never retries (no Service-watch
+# on routes already in that state). Argo sync-waves only order
+# `kubectl apply`, not controller-cache hydration, so the race is
+# real even though every individual sync looks healthy.
+#
+# A PostSync Job that re-annotates the HTTPRoute is the smallest fix
+# we can ship at the Argo layer: by the time this hook fires the
+# parent kustomize App's Deployment is Ready (Argo waited at
+# sync-wave 0 before starting wave 10's httproute App), so the
+# Service+EndpointSlices definitely exist. The annotation bumps
+# resourceVersion → Cilium re-reconciles → finds the backend.
+#
+# Hook-delete-policy: HookSucceeded keeps the cluster clean of stale
+# Jobs after each sync; only the latest failure (if any) sticks
+# around for debugging.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: machinery-httproute-nudge
+        app.kubernetes.io/managed-by: argocd
+    spec:
+      serviceAccountName: {{ printf "%s-nudge" .name | quote }}
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nudge
+          image: bitnami/kubectl:1.31
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - kubectl
+            - -n
+            - {{ $.Values.namespace | quote }}
+            - annotate
+            - httproute
+            - {{ .name | quote }}
+            - --overwrite
+            # The annotation key is namespaced to this project so
+            # it doesn't collide with anything Cilium / Argo set.
+            # Value is the sync timestamp — different per sync so
+            # Cilium always sees a change.
+            - reconcile.machinery.stuttgart-things.com/nudged-at={{ now | unixEpoch }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ printf "%s-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+rules:
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    resourceNames: [{{ .name | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-nudge" .name | quote }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ printf "%s-nudge" .name | quote }}
+    namespace: {{ $.Values.namespace | quote }}
+{{- end }}
+{{- end }}

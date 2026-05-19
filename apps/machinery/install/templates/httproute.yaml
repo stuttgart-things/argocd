@@ -1,9 +1,18 @@
 {{- if .Values.httpRoute.enabled }}
 {{- $defaultName := printf "machinery-%s" (sha1sum .Values.destination.server | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
+{{/* Pass nudgeAfterSync through to the sub-chart. Default on
+(matches the sub-chart's own default); set httpRoute.nudgeAfterSync:
+false in install values to disable the PostSync Job for long-lived
+deployments where Cilium's cache is steady-state. */}}
+{{- $nudge := true }}
+{{- if hasKey .Values.httpRoute "nudgeAfterSync" }}
+{{-   $nudge = .Values.httpRoute.nudgeAfterSync }}
+{{- end }}
 {{- $routesValues := dict
       "namespace" .Values.destination.namespace
       "gateway" .Values.httpRoute.gateway
+      "nudgeAfterSync" $nudge
       "routes" (list
         (dict "name" "machinery" "hostname" .Values.httpRoute.hostname "backend" (dict "name" "machinery" "port" 8080))
       )

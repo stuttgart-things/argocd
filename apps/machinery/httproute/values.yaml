@@ -9,3 +9,14 @@ routes:
     backend:
       name: machinery
       port: 8080
+
+# Post-sync hook that re-annotates each rendered HTTPRoute to force
+# Cilium's gateway-controller to reconcile against an already-warm
+# Service cache. Without it, freshly-created routes can latch onto a
+# stale BackendNotFound verdict (see templates/nudge-hook.yaml for
+# the full mechanism). Default on — preview envs (machinery-pr-*)
+# hit this race every spin-up otherwise. Opt out by setting `false`
+# on long-lived deployments where the controller cache is steady-
+# state and you don't want a per-sync Job + SA + Role + Binding
+# created in the destination namespace.
+nudgeAfterSync: true
