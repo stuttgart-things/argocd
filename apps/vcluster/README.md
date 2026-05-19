@@ -64,33 +64,84 @@ The outer `destination.server` is the **management cluster** (where the rendered
 
 ## Registering the vcluster with ArgoCD
 
-Once the vcluster is `Healthy / Synced` in ArgoCD, register it as a destination cluster so ArgoCD can deploy *into* the vcluster.
+Once the vcluster is `Healthy / Synced` in ArgoCD, register it as a destination cluster so ArgoCD can deploy *into* the vcluster. vcluster authenticates with mTLS (client cert + key), not a bearer token — the recipes below extract those three credential fields (CA, client cert, client key) from the kubeconfig vcluster emits.
 
-### Option A — `vcluster` CLI + `argocd cluster add` (simplest)
+### Step 1 — generate the kubeconfig (both options)
+
+`vcluster connect` builds a default kubeconfig pointing at `https://localhost:<random>` for use with a local port-forward. For ArgoCD-from-inside-the-cluster, rewrite the server URL to the in-cluster Service hostname with `--server=`:
 
 ```bash
-# 1. Wait for the vcluster pod to be ready on the host cluster
-export KUBECONFIG=/home/sthings/.kube/platform-sthings
+export KUBECONFIG=<host-cluster-kubeconfig>
 kubectl -n vcluster-dev rollout status statefulset/vcluster-dev --timeout=5m
 
-# 2. Generate a kubeconfig context pointing at the vcluster (creates a new
-#    context vcluster_vcluster-dev_vcluster-dev_<host> in $KUBECONFIG)
-vcluster connect vcluster-dev -n vcluster-dev --update-current=true \
-  --server=https://vcluster-dev.vcluster-dev.svc
-
-# 3. Register with ArgoCD using the in-cluster service URL (so ArgoCD reaches
-#    the vcluster via the host's internal service network, not via port-forward).
-#    Run from inside the management cluster context or via `argocd login` first.
-argocd cluster add vcluster_vcluster-dev_vcluster-dev_<host> \
-  --name vcluster-dev \
-  --server-side-apply
+vcluster connect vcluster-dev -n vcluster-dev \
+  --server=https://vcluster-dev.vcluster-dev.svc \
+  --print > /tmp/vcluster-dev.kubeconfig
 ```
 
-If you'd rather hand-craft the cluster Secret, the API endpoint is `https://vcluster-dev.vcluster-dev.svc:443`, and the bearer token + CA can be extracted from the kubeconfig vcluster emits.
+Smoke-test (from a pod in the same cluster — local `kubectl` cannot resolve the `.svc` name, that's expected):
 
-### Option B — declarative cluster Secret in this repo (GitOps registration)
+```bash
+kubectl -n argocd run vc-probe --rm -i --restart=Never \
+  --image=alpine/curl:latest -- \
+  curl -sk --max-time 5 https://vcluster-dev.vcluster-dev.svc/version
+```
 
-Create a `Secret` of type `argocd.argoproj.io/secret-type: cluster` in the `argocd` namespace, with `server` pointing at the in-cluster vcluster Service and `config` containing the bearer token + CA. This is the GitOps-pure path but requires sealing/encrypting the token (SOPS, External Secrets, ArgoCD Vault Plugin). Out of scope for this entry — see [`infra/external-secrets/cluster-secret-store-vault`](../../infra/external-secrets/) for a Vault-backed approach.
+A `gitVersion: "v1.35.0"`-shaped JSON response means DNS + TLS + API are all reachable from the ArgoCD namespace.
+
+### Step 2a — one-shot apply (quick, not in git)
+
+Extract the three base64 credential fields from the kubeconfig and apply an ArgoCD cluster Secret directly:
+
+```bash
+CA=$(grep "certificate-authority-data:" /tmp/vcluster-dev.kubeconfig | awk '{print $2}')
+CERT=$(grep "client-certificate-data:"    /tmp/vcluster-dev.kubeconfig | awk '{print $2}')
+KEY=$(grep "client-key-data:"             /tmp/vcluster-dev.kubeconfig | awk '{print $2}')
+CONFIG_JSON=$(printf '{"tlsClientConfig":{"caData":"%s","certData":"%s","keyData":"%s"}}' "$CA" "$CERT" "$KEY")
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vcluster-dev
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+type: Opaque
+stringData:
+  name: vcluster-dev
+  server: https://vcluster-dev.vcluster-dev.svc
+  config: |
+    ${CONFIG_JSON}
+EOF
+
+shred -u /tmp/vcluster-dev.kubeconfig
+```
+
+The vcluster appears in **ArgoCD → Settings → Clusters** as `vcluster-dev` within seconds. Survives nothing — if the host cluster is rebuilt, re-run.
+
+### Step 2b — SOPS-encrypted in the cluster repo (GitOps, durable)
+
+For setups with Flux + SOPS (age) reconciling the cluster directory — the standard `stuttgart-things/stuttgart-things` cluster repo pattern — commit the encrypted Secret alongside the Application:
+
+```bash
+# 1. Build the same Secret manifest as in step 2a, but write to a file
+# 2. Encrypt with the cluster's age recipient (find it in any existing
+#    SOPS-encrypted file in the cluster repo, e.g. .sops.age field or
+#    homerun2-dev/kubeconfig.yaml)
+sops --encrypt --age <age-recipient-pubkey> \
+  vcluster-dev-cluster-secret.plain.yaml \
+  > clusters/<cluster-path>/argocd/vcluster-dev-cluster-secret.yaml
+
+shred -u vcluster-dev-cluster-secret.plain.yaml /tmp/vcluster-dev.kubeconfig
+git add clusters/<cluster-path>/argocd/vcluster-dev-cluster-secret.yaml
+git commit -m "feat(<cluster>): SOPS-encrypted ArgoCD cluster Secret for vcluster-dev"
+git push
+```
+
+Flux's `kustomize-controller` (patched with `decryption.provider: sops, secretRef.name: sops-age` in the cluster's `FluxInstance`) decrypts on reconcile and applies the Secret. If you applied the Secret manually in step 2a first, Flux adopts ownership on the next sync — no conflict.
+
+> **Note**: SOPS is the chosen flow for this repo because Flux is already wired up for it. Alternatives like sealed-secrets, External Secrets + Vault, or ArgoCD Vault Plugin work too — pick the one your reconciler already supports.
 
 ## Using the vcluster from ArgoCD
 
@@ -100,7 +151,7 @@ Once registered, drop the vcluster name into any other catalog entry's `destinat
 helm:
   values: |
     destination:
-      name: vcluster-dev         # registered cluster name (Option A above)
+      name: vcluster-dev         # registered cluster name from step 2
       namespace: my-workload
 ```
 
