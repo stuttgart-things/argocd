@@ -19,6 +19,10 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
+  # See chart.yaml — without the finalizer the ClusterRole + Binding on
+  # the destination cluster are orphaned when the parent App is deleted.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: {{ .Values.project | quote }}
   source:
