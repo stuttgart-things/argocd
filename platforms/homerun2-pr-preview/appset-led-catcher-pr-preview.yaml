@@ -1,0 +1,132 @@
+---
+# Per-PR preview environments for stuttgart-things/homerun2-led-catcher.
+#
+# Fans out across (clusters labelled homerun2-pr-preview: "true") ×
+# (open PRs on homerun2-led-catcher carrying the `preview` label).
+# led-catcher is a Redis Streams → 64x64 RGB LED matrix consumer with
+# an embedded HTMX web simulator. Its preview ships with omni-pitcher
+# + redis-stack co-tenanted so reviewers can pitch events and see them
+# surface in the web simulator (and on real hardware if the PR is wired
+# to one). A seed-data Job posts an initial fixture so the simulator
+# isn't empty on first load.
+#
+# Decisions from stuttgart-things/homerun2-omni-pitcher#116 step 3:
+#   - namespace: `homerun2-led-catcher-pr-<num>` (image-name-mirrored)
+#   - hostnames:
+#     * `led-pr-<num>`       — led-catcher web simulator
+#     * `omni-led-pr-<num>`   — co-tenanted omni-pitcher (distinct
+#                              from `omni-pr-<num>`, `omni-cc-pr-<num>`,
+#                              `omni-scout-pr-<num>`, `omni-demo-pr-<num>`)
+#   - omni-pitcher pinned to v1.11.1 (latest released, Option-B-enabled)
+#   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
+#     stuttgart-things repo
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-led-catcher-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  homerun2-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: homerun2-led-catcher
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'homerun2-led-catcher-pr-{{ .number }}'
+      labels:
+        homerun2.stuttgart-things.com/pr: '{{ .number }}'
+        homerun2.stuttgart-things.com/component: led-catcher
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/homerun2/install
+        helm:
+          releaseName: 'homerun2-led-catcher-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'homerun2-led-catcher-pr-{{ .number }}'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'homerun2-led-catcher-pr-{{ .number }}'
+
+            # SUT: led-catcher at the PR's commit. `inlineHttpRoute: true`
+            # opts into Option B (kustomize OCI ships HTTPRoute alongside
+            # Service) — requires the install chart's `ledCatcher` block
+            # to support this flag (follow-up: parity with scout/core-
+            # catcher/demo-pitcher). Until that lands, the standalone
+            # homerun2-httproute Application will also emit a route for
+            # led-catcher; both will reconcile to the same shape.
+            ledCatcher:
+              enabled: true
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              hostname: 'led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            # Co-tenanted: omni-pitcher pinned to v1.11.1 (latest released,
+            # Option-B-enabled). Receives /pitch POSTs from the seed Job
+            # and any manual reviewer pitches, writes to redis-stack.
+            omniPitcher:
+              enabled: true
+              version: v1.11.1
+              hostname: 'omni-led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            # Co-tenanted: redis-stack. Same ESO-managed password Secret
+            # the preview-secrets policy materializes per namespace.
+            redisStack:
+              enabled: true
+              persistence:
+                enabled: false
+              auth:
+                existingSecret: redis-stack-auth
+
+            # Everything else off.
+            coreCatcher:  { enabled: false }
+            scout:        { enabled: false }
+            k8sPitcher:   { enabled: false }
+            lightCatcher: { enabled: false }
+            wledMock:     { enabled: false }
+            demoPitcher:  { enabled: false }
+            gitPitcher:   { enabled: false }
+
+            httpRoute:
+              enabled: true
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
