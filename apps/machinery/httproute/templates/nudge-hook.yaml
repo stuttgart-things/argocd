@@ -46,7 +46,15 @@ spec:
           type: RuntimeDefault
       containers:
         - name: nudge
-          image: bitnami/kubectl:1.31
+          # Chainguard kubectl image. The cluster pulls cgr.dev for
+          # machinery's own base (cgr.dev/chainguard/static), so the
+          # registry is known-reachable. `bitnami/kubectl` was the
+          # initial choice but Broadcom shrunk Bitnami's free catalog
+          # in early 2026 and stripped version-only tags, leaving
+          # `:1.31` 404. `:latest` here tracks Chainguard's tip,
+          # which is fine for an ephemeral PostSync nudge — no API
+          # surface to break.
+          image: cgr.dev/chainguard/kubectl:latest
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
