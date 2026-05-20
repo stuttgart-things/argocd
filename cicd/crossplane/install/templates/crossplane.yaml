@@ -4,7 +4,7 @@
 }}
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
-{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $destKey := .Values.destination.name | default .Values.destination.server }}
 {{- $defaultName := printf "crossplane-%s" (sha1sum $destKey | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
 ---
