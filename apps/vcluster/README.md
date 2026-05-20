@@ -77,12 +77,11 @@ The CLI handles port-forwarding and writes a ready-to-use kubeconfig:
 ```bash
 export KUBECONFIG=<host-cluster-kubeconfig>
 vcluster connect vcluster-dev -n vcluster-dev \
-  --kube-config $HOME/.kube/vcluster-dev \
-  --kube-config-context-name vcluster-dev \
-  --background-proxy
+  --background-proxy \
+  --print > $HOME/.kube/vcluster-dev
 ```
 
-`--background-proxy` keeps the port-forward running in a sidecar container (survives shell exit). Then:
+`--background-proxy` keeps the port-forward running in a sidecar container (survives shell exit). `--print` writes the kubeconfig to stdout — captured here into a dedicated file rather than letting `vcluster connect` mutate the host kubeconfig context (the older `--kube-config` / `--kube-config-context-name` flags were deprecated in vcluster 0.33). Then:
 
 ```bash
 export KUBECONFIG=$HOME/.kube/vcluster-dev
