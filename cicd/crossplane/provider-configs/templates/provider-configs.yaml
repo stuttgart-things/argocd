@@ -4,6 +4,9 @@ apiVersion: {{ .apiVersion }}
 kind: {{ .kind | default "ProviderConfig" }}
 metadata:
   name: {{ .name | quote }}
+  {{- with .namespace }}
+  namespace: {{ . | quote }}
+  {{- end }}
 spec:
   {{- toYaml .spec | nindent 2 }}
 {{- end }}

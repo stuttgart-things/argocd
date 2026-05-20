@@ -141,7 +141,9 @@ Each entry in `services` becomes a `provider-aws-<service>` Provider CR pinned t
 
 ## provider-configs/
 
-Plain Helm chart rendering `ProviderConfig` resources for any installed Provider. Every Crossplane provider ships its own `ProviderConfig` CRD with its own apiGroup (`helm.crossplane.io/v1beta1`, `kubernetes.crossplane.io/v1alpha1`, `aws.upbound.io/v1beta1`, …), so this chart doesn't try to abstract them — it emits them opaquely from a values list.
+Plain Helm chart rendering `ProviderConfig` / `ClusterProviderConfig` resources for any installed Provider. Every Crossplane provider ships its own ProviderConfig CRD with its own apiGroup (`helm.m.crossplane.io/v1beta1`, `kubernetes.m.crossplane.io/v1alpha1`, `aws.upbound.io/v1beta1`, …), so this chart doesn't try to abstract them — it emits them opaquely from a values list.
+
+provider-kubernetes v1.2+ and provider-helm v1.x ship **namespaced** `Object` / `Release` resources under `*.m.crossplane.io`. Those namespaced resources reference `kind: ClusterProviderConfig` in the same apiGroup, not `ProviderConfig`. The v2 namespaced XR default can only compose those namespaced resources, so the chart's defaults target the v2 (m.*) ClusterProviderConfig API surface — set `kind: ProviderConfig` explicitly in `configs` only if you also need the legacy v1 non-namespaced shape for the cluster-scoped Object (`kubernetes.crossplane.io/v1alpha2`).
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -168,29 +170,34 @@ spec:
 
 ### provider-configs defaults
 
-| Name | apiVersion | Credentials |
-|---|---|---|
-| `default` | `helm.crossplane.io/v1beta1` | `InjectedIdentity` (local cluster, the SA crossplane runs as) |
-| `default` | `kubernetes.crossplane.io/v1alpha1` | `InjectedIdentity` (local cluster) |
+| Name | apiVersion | Kind | Credentials |
+|---|---|---|---|
+| `in-cluster` | `helm.m.crossplane.io/v1beta1` | `ClusterProviderConfig` | `InjectedIdentity` (local cluster, the SA crossplane runs as) |
+| `in-cluster` | `kubernetes.m.crossplane.io/v1alpha1` | `ClusterProviderConfig` | `InjectedIdentity` (local cluster) |
+| `in-cluster` | `opentofu.m.upbound.io/v1beta1` | `ClusterProviderConfig` | Empty creds list + kubernetes backend (state in-cluster). Skeleton — add a provider block + creds to make it useful. |
 
-`InjectedIdentity` works when the Provider has cluster-admin-ish permissions on the cluster it runs in — sufficient for in-cluster dev work. For external targets or cloud APIs, override the list:
+Name `in-cluster` matches the `providerConfigRef: in-cluster` convention used in the stuttgart-things Compositions (e.g. [`crossplane/configurations/k8s/volume-claim`](https://github.com/stuttgart-things/crossplane/tree/main/configurations/k8s/volume-claim)).
+
+`InjectedIdentity` works for helm + kubernetes when the Provider has cluster-admin-ish permissions on the cluster it runs in — sufficient for in-cluster dev work. provider-opentofu has no equivalent injected mode; the default ships a syntactically valid skeleton (k8s backend, empty creds, no provider block) and consumers must override with their actual terraform config. See [`provider-opentofu/examples/namespaced/clusterproviderconfig.yaml`](https://github.com/upbound/provider-opentofu/blob/main/examples/namespaced/clusterproviderconfig.yaml) for a GCP-credentialed shape. For other external targets or cloud APIs, override the list:
 
 ```yaml
 helm:
   values: |
     configs:
       # Keep the local-helm default
-      - name: default
-        apiVersion: helm.crossplane.io/v1beta1
+      - name: in-cluster
+        apiVersion: helm.m.crossplane.io/v1beta1
+        kind: ClusterProviderConfig
         spec:
           credentials:
             source: InjectedIdentity
 
-      # Add a kubernetes ProviderConfig pointing at a remote cluster.
+      # Add a kubernetes ClusterProviderConfig pointing at a remote cluster.
       # The secret `provider-kubernetes-target-kubeconfig` (created out-of-band
       # by ESO, SOPS, or whatever flow you use) must exist in crossplane-system.
       - name: target-cluster
-        apiVersion: kubernetes.crossplane.io/v1alpha1
+        apiVersion: kubernetes.m.crossplane.io/v1alpha1
+        kind: ClusterProviderConfig
         spec:
           credentials:
             source: Secret
@@ -200,6 +207,7 @@ helm:
               key: kubeconfig
 
       # AWS family — one ProviderConfig referenced by every provider-aws-*
+      # (provider-aws-* is still on the v1 non-namespaced API surface as of v1.x)
       - name: default
         apiVersion: aws.upbound.io/v1beta1
         spec:
