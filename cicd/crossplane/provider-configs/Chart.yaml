@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: crossplane-provider-configs
+description: Renders one or more Crossplane ProviderConfig resources from a values list
+type: application
+version: 0.1.0
+appVersion: "2.2.1"
