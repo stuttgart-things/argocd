@@ -5,6 +5,19 @@
 #   name:       Provider resource name
 #   package:    full xpkg reference including tag
 #   apiVersion: optional — defaults to pkg.crossplane.io/v1
+#   rbac:       optional. When set, the chart additionally emits:
+#                 1. a DeploymentRuntimeConfig pinning the provider Pod to a
+#                    stable ServiceAccount name (= the Provider name), so that
+#                    bindings written against it survive package upgrades, and
+#                 2. a ClusterRoleBinding granting `rbac.clusterRole` to that
+#                    SA in `crossplane-system`.
+#               Needed when the provider talks to the local Kubernetes API via
+#               `InjectedIdentity` ProviderConfig (helm/kubernetes/opentofu) —
+#               without it, every Composition fails with `forbidden`. Drop the
+#               `rbac` field on providers that don't talk to the local API
+#               (cloud providers using Secret-based creds), or pick a tighter
+#               ClusterRole than `cluster-admin` if your security posture
+#               requires it.
 #
 # Defaults cover the stuttgart-things baseline (helm + kubernetes + opentofu).
 # Single-package providers go in this list. For cloud-family providers that
@@ -13,15 +26,23 @@
 providers:
   - name: provider-helm
     package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
+    rbac:
+      clusterRole: cluster-admin
   - name: provider-kubernetes
     package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1
+    rbac:
+      clusterRole: cluster-admin
   - name: provider-opentofu
     package: xpkg.upbound.io/upbound/provider-opentofu:v1.1.2
+    rbac:
+      clusterRole: cluster-admin
 
 # AWS family sugar. Upbound publishes one xpkg per AWS service under
 # xpkg.upbound.io/upbound/provider-aws-<service>:<version>. Each enabled
 # service expands to a `provider-aws-<service>` Provider CR pinned to
-# `version`. Disabled by default — opt in per cluster.
+# `version`. Disabled by default — opt in per cluster. AWS providers use
+# Secret-based credentials (not InjectedIdentity), so no RBAC binding is
+# emitted for them.
 awsFamily:
   enabled: false
   version: v1.1.0

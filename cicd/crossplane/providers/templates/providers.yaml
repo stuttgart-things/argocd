@@ -6,6 +6,36 @@ metadata:
   name: {{ .name | quote }}
 spec:
   package: {{ .package | quote }}
+  {{- if .rbac }}
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: {{ .name | quote }}
+  {{- end }}
+{{- if .rbac }}
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: {{ .name | quote }}
+spec:
+  serviceAccountTemplate:
+    metadata:
+      name: {{ .name | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "crossplane-%s" .name | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .rbac.clusterRole | quote }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .name | quote }}
+    namespace: crossplane-system
+{{- end }}
 {{- end }}
 {{- if .Values.awsFamily.enabled }}
 {{- $ver := .Values.awsFamily.version }}
