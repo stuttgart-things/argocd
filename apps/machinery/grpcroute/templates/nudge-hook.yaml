@@ -1,17 +1,18 @@
 {{- if .Values.nudgeAfterSync }}
 {{- range .Values.routes }}
 ---
-# Mirror of the HTTPRoute nudge hook in apps/machinery/httproute. Cilium's
-# gateway-controller hits the same stale-`ResolvedRefs` race on freshly-
-# created GRPCRoutes (same controller, same informer-cache ordering) — a
-# PostSync re-annotate forces a re-reconcile against a warm Service cache.
+# Mirror of the HTTPRoute nudge hook in apps/machinery/httproute.
+# Cilium's gateway-controller hits the same stale-`ResolvedRefs` race
+# on freshly-created GRPCRoutes (same controller, same informer-cache
+# ordering). See the httproute template for the architectural notes
+# on why this is a Sync hook (not PostSync) — same Catch-22 applies.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ printf "%s-grpc-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 spec:
   backoffLimit: 2
@@ -80,7 +81,7 @@ metadata:
   name: {{ printf "%s-grpc-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -89,7 +90,7 @@ metadata:
   name: {{ printf "%s-grpc-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 rules:
   - apiGroups: ["gateway.networking.k8s.io"]
@@ -103,7 +104,7 @@ metadata:
   name: {{ printf "%s-grpc-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 roleRef:
   apiGroup: rbac.authorization.k8s.io

@@ -9,12 +9,21 @@
 # `kubectl apply`, not controller-cache hydration, so the race is
 # real even though every individual sync looks healthy.
 #
-# A PostSync Job that re-annotates the HTTPRoute is the smallest fix
-# we can ship at the Argo layer: by the time this hook fires the
-# parent kustomize App's Deployment is Ready (Argo waited at
-# sync-wave 0 before starting wave 10's httproute App), so the
-# Service+EndpointSlices definitely exist. The annotation bumps
-# resourceVersion → Cilium re-reconciles → finds the backend.
+# A Job that re-annotates the HTTPRoute is the smallest fix we can
+# ship at the Argo layer — the annotation bumps resourceVersion →
+# Cilium re-reconciles → finds the backend.
+#
+# **Sync** hook (not PostSync) on purpose: PostSync would wait for
+# the route to be Healthy before firing, but the route can't reach
+# Healthy without this nudge — a Catch-22 that left preview envs
+# stuck for hours (stuttgart-things/argocd#164 first attempted a
+# PostSync retry loop in #168; this version moves to Sync after
+# observing the deadlock on machinery-pr-71).
+#
+# The container's retry loop tolerates the route not existing yet
+# (early iterations may hit "Error: NotFound" on annotate; those
+# print to stderr and the loop continues until ResolvedRefs=True
+# or the 180s deadline elapses).
 #
 # Hook-delete-policy: HookSucceeded keeps the cluster clean of stale
 # Jobs after each sync; only the latest failure (if any) sticks
@@ -25,7 +34,7 @@ metadata:
   name: {{ printf "%s-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 spec:
   backoffLimit: 2
@@ -107,7 +116,7 @@ metadata:
   name: {{ printf "%s-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -116,7 +125,7 @@ metadata:
   name: {{ printf "%s-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 rules:
   - apiGroups: ["gateway.networking.k8s.io"]
@@ -130,7 +139,7 @@ metadata:
   name: {{ printf "%s-nudge" .name | quote }}
   namespace: {{ $.Values.namespace | quote }}
   annotations:
-    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
 roleRef:
   apiGroup: rbac.authorization.k8s.io
