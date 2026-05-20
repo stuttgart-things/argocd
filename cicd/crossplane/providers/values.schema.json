@@ -31,6 +31,19 @@
               "pkg.crossplane.io/v1",
               "pkg.crossplane.io/v1beta1"
             ]
+          },
+          "rbac": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "clusterRole"
+            ],
+            "properties": {
+              "clusterRole": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }

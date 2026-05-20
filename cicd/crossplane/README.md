@@ -104,11 +104,11 @@ spec:
 
 ### providers defaults
 
-| Provider | apiVersion | Package |
-|---|---|---|
-| `provider-helm` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0` |
-| `provider-kubernetes` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1` |
-| `provider-opentofu` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/upbound/provider-opentofu:v1.1.2` |
+| Provider | apiVersion | Package | RBAC |
+|---|---|---|---|
+| `provider-helm` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0` | `cluster-admin` |
+| `provider-kubernetes` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1` | `cluster-admin` |
+| `provider-opentofu` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/upbound/provider-opentofu:v1.1.2` | `cluster-admin` |
 
 Override the list — or add additional providers — via `helm.values`:
 
@@ -118,9 +118,24 @@ helm:
     providers:
       - name: provider-helm
         package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
+        rbac:
+          clusterRole: cluster-admin
       - name: provider-vsphere
         package: ghcr.io/acme/provider-vsphere:v0.1.0
+        # No rbac block — vsphere talks to vSphere API, not local kube API,
+        # so no in-cluster ServiceAccount permissions needed.
 ```
+
+#### Stable ServiceAccount + RBAC
+
+`InjectedIdentity` ProviderConfigs (the default in `provider-configs/`) make the provider Pod talk to the local Kubernetes API as its own ServiceAccount — which has no permissions by default, so every Composition fails with `forbidden`. To fix this **without** chasing the per-revision SA hash (`provider-kubernetes-f6665ef36536` etc.), an entry's optional `rbac` block tells the chart to additionally emit:
+
+1. A `DeploymentRuntimeConfig.pkg.crossplane.io/v1beta1` pinning the provider Pod to a stable ServiceAccount name (= the Provider's name). The Provider gets a `runtimeConfigRef` pointing at it.
+2. A `ClusterRoleBinding` granting `rbac.clusterRole` to that ServiceAccount in `crossplane-system`.
+
+`cluster-admin` is the default for the baseline helm/kubernetes/opentofu providers because they need broad in-cluster authority to manage arbitrary resources. Tighten the ClusterRole per cluster if your security posture requires it (provider-kubernetes needs `get/list/watch/create/update/patch/delete` on the kinds it's expected to manage; provider-helm needs the same plus permissions to manage `Release`-owned objects, which in practice is broad).
+
+Cloud providers using Secret-based credentials (AWS family, Azure, GCP) don't talk to the local kube API for their workload, so skip the `rbac` block for those entries.
 
 ### AWS family
 
