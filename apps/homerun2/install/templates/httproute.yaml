@@ -22,7 +22,11 @@
 {{- if and .Values.scout.enabled (not .Values.scout.inlineHttpRoute) }}
   {{- $routes = append $routes (dict "name" "homerun2-scout" "hostname" .Values.scout.hostname "backend" (dict "name" "homerun2-scout" "port" 80)) }}
 {{- end }}
-{{- if .Values.lightCatcher.enabled }}
+{{- /* light-catcher inlines its HTTPRoute in the kustomize OCI when
+       lightCatcher.inlineHttpRoute is set; the standalone Application below
+       skips it in that case (templates/light-catcher.yaml patches it
+       directly). See stuttgart-things/argocd#116. */ -}}
+{{- if and .Values.lightCatcher.enabled (not .Values.lightCatcher.inlineHttpRoute) }}
   {{- $routes = append $routes (dict "name" "homerun2-light-catcher" "hostname" .Values.lightCatcher.hostname "backend" (dict "name" "homerun2-light-catcher" "port" 80)) }}
 {{- end }}
 {{- if .Values.wledMock.enabled }}

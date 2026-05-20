@@ -1,0 +1,161 @@
+---
+# Per-PR preview environments for stuttgart-things/homerun2-light-catcher.
+#
+# Fans out across (clusters labelled homerun2-pr-preview: "true") ×
+# (open PRs on homerun2-light-catcher carrying the `preview` label).
+# light-catcher is a Redis Streams → WLED HTTP consumer; its preview
+# ships with omni-pitcher + demo-pitcher + wled-mock + redis-stack
+# co-tenanted in the same PR namespace. Reviewers click "Pitch" in
+# demo-pitcher's UI → demo POSTs to omni-pitcher → omni writes to
+# redis-stack → light-catcher consumes + sends WLED effects to the
+# wled-mock dashboard (visible at the wled-light-pr-<num> hostname).
+# End-to-end UI-to-UI flow over the real production HTTP topology.
+#
+# Decisions from stuttgart-things/homerun2-omni-pitcher#116 step 3:
+#   - namespace: `homerun2-light-catcher-pr-<num>` (image-name-mirrored)
+#   - hostnames:
+#     * `light-pr-<num>`      — light-catcher health endpoint
+#     * `omni-light-pr-<num>` — co-tenanted omni-pitcher (distinct from
+#                                 the per-component omni-* hostnames in
+#                                 other previews)
+#     * `demo-light-pr-<num>` — co-tenanted demo-pitcher UI so reviewers
+#                                 can compose + send custom messages and
+#                                 see them surface on the wled-mock UI
+#     * `wled-light-pr-<num>` — co-tenanted wled-mock dashboard so the
+#                                 effects light-catcher emits are
+#                                 visually verifiable per PR
+#   - omni-pitcher pinned to v1.11.1 (latest released, Option-B-enabled)
+#   - demo-pitcher pinned to v1.8.1 (latest released)
+#   - wled-mock pinned to v0.3.0 (chart default; ships from the
+#     homerun2-light-catcher repo's kcl-wled-mock module)
+#   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
+#     stuttgart-things repo
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-light-catcher-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  homerun2-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: homerun2-light-catcher
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'homerun2-light-catcher-pr-{{ .number }}'
+      labels:
+        homerun2.stuttgart-things.com/pr: '{{ .number }}'
+        homerun2.stuttgart-things.com/component: light-catcher
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/homerun2/install
+        helm:
+          releaseName: 'homerun2-light-catcher-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'homerun2-light-catcher-pr-{{ .number }}'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'homerun2-light-catcher-pr-{{ .number }}'
+
+            # SUT: light-catcher at the PR's commit. `inlineHttpRoute: true`
+            # opts into Option B (kustomize OCI ships HTTPRoute alongside
+            # Service); the chart patches parentRef + hostname per env (see
+            # apps/homerun2/install/templates/light-catcher.yaml).
+            lightCatcher:
+              enabled: true
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              hostname: 'light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            # Co-tenanted: omni-pitcher pinned to v1.11.1 (latest released,
+            # Option-B-enabled). Receives /pitch POSTs from demo-pitcher (UI
+            # or direct curl), writes to redis-stack.
+            omniPitcher:
+              enabled: true
+              version: v1.11.1
+              hostname: 'omni-light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            # Co-tenanted: demo-pitcher UI. omniPitcherUrl flips the
+            # Deployment env to PITCH_TARGET=http +
+            # OMNI_PITCHER_URL=<in-cluster service> so the UI's "Pitch"
+            # button POSTs to the co-tenanted omni-pitcher (instead of the
+            # compiled-in localhost:4000 fallback the UI otherwise surfaces).
+            # Full chain: demo /pitch → omni-pitcher /pitch/generic →
+            # redis-stack stream → light-catcher → wled-mock dashboard.
+            demoPitcher:
+              enabled: true
+              version: v1.8.1
+              hostname: 'demo-light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+              omniPitcherUrl: 'http://homerun2-omni-pitcher.homerun2-light-catcher-pr-{{ .number }}.svc.cluster.local'
+
+            # Co-tenanted: wled-mock dashboard so light-catcher's WLED
+            # effects land visibly per PR. The kustomize OCI ships from
+            # the homerun2-light-catcher repo's kcl-wled-mock module and
+            # exposes Service `homerun2-wled-mock` (port 80) — the same
+            # endpoint baked into light-catcher's default profile.
+            wledMock:
+              enabled: true
+              version: v0.3.0
+              hostname: 'wled-light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+
+            # Co-tenanted: redis-stack. Same ESO-managed password Secret
+            # the preview-secrets policy materializes per namespace.
+            redisStack:
+              enabled: true
+              persistence:
+                enabled: false
+              auth:
+                existingSecret: redis-stack-auth
+
+            # Everything else off.
+            coreCatcher:  { enabled: false }
+            scout:        { enabled: false }
+            k8sPitcher:   { enabled: false }
+            ledCatcher:   { enabled: false }
+            gitPitcher:   { enabled: false }
+
+            httpRoute:
+              enabled: true
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

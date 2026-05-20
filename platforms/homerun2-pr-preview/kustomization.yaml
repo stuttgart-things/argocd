@@ -8,4 +8,5 @@ resources:
   - appset-demo-pitcher-pr-preview.yaml
   - appset-git-pitcher-pr-preview.yaml
   - appset-led-catcher-pr-preview.yaml
+  - appset-light-catcher-pr-preview.yaml
   - appset-policies.yaml

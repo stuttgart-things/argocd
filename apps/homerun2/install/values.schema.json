@@ -133,9 +133,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":  { "type": "boolean" },
-        "version":  { "type": "string", "minLength": 1 },
-        "hostname": { "type": "string", "minLength": 1 }
+        "enabled":         { "type": "boolean" },
+        "version":         { "type": "string", "minLength": 1 },
+        "hostname":        { "type": "string", "minLength": 1 },
+        "inlineHttpRoute": { "type": "boolean" }
       },
       "required": ["enabled"]
     },

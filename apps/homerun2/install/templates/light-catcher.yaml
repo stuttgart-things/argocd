@@ -26,11 +26,25 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" "kind" "Ingress" "name" $name) | indent 12 }}
+{{- if .Values.lightCatcher.inlineHttpRoute }}
+        # Option B from stuttgart-things/argocd#116 — kustomize OCI ships the
+        # HTTPRoute alongside Service so they land atomically. Patch parentRef
+        # + hostname per env; the standalone httproute child Application no
+        # longer renders light-catcher (see templates/httproute.yaml).
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |-
+{{ include "homerun2.httpRouteJSONPatch" (dict "gateway" .Values.httpRoute.gateway "hostname" .Values.lightCatcher.hostname) | indent 12 }}
+{{- else }}
         - target:
             kind: HTTPRoute
             name: {{ $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+{{- end }}
         - target:
             kind: Deployment
             name: {{ $name }}
