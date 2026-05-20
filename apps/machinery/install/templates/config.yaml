@@ -12,8 +12,16 @@ $MACHINERY_AUTH_TOKEN) sees exactly what the caller chose. */}}
 {{- if and .Values.auth .Values.auth.enabled }}
 {{-   $parsed := fromJson .Values.config.content }}
 {{-   $auth := dict "enabled" true }}
-{{-   if .Values.auth.token }}{{- $_ := set $auth "token" .Values.auth.token }}{{- end }}
-{{-   if .Values.auth.tokenFile }}{{- $_ := set $auth "tokenFile" .Values.auth.tokenFile }}{{- end }}
+{{/* When tokenSecretRef is set, the chart auto-derives tokenFile from
+tokenMountPath — the user shouldn't have to keep them in sync. Inline
+`token` is dropped in this branch (would defeat the Secret mount). */}}
+{{-   if and .Values.auth.tokenSecretRef .Values.auth.tokenSecretRef.name }}
+{{-     $mountPath := default "/var/run/machinery-auth/token" .Values.auth.tokenMountPath }}
+{{-     $_ := set $auth "tokenFile" (default $mountPath .Values.auth.tokenFile) }}
+{{-   else }}
+{{-     if .Values.auth.token }}{{- $_ := set $auth "token" .Values.auth.token }}{{- end }}
+{{-     if .Values.auth.tokenFile }}{{- $_ := set $auth "tokenFile" .Values.auth.tokenFile }}{{- end }}
+{{-   end }}
 {{-   if .Values.auth.tokenEnvVar }}{{- $_ := set $auth "tokenEnvVar" .Values.auth.tokenEnvVar }}{{- end }}
 {{-   $_ := set $parsed "auth" $auth }}
 {{-   $cfgJSON = toJson $parsed }}

@@ -41,18 +41,43 @@ Two opt-in paths:
       )
 }}
 {{- $podSpec := dict "containers" (list $container) }}
+{{- $envVars := list }}
+{{- $volumes := list }}
+{{- $volumeMounts := list }}
 {{- if $cmName }}
-{{- $_ := set $container "env" (list (dict "name" "MACHINERY_CONFIG" "value" "/etc/machinery/config.json")) }}
-{{- $_ := set $container "volumeMounts" (list (dict
-      "name"      "machinery-config"
-      "mountPath" "/etc/machinery"
-      "readOnly"  true
-)) }}
-{{- $_ := set $podSpec "volumes" (list (dict
-      "name" "machinery-config"
-      "configMap" (dict "name" $cmName)
-)) }}
+{{-   $envVars = append $envVars (dict "name" "MACHINERY_CONFIG" "value" "/etc/machinery/config.json") }}
+{{-   $volumes = append $volumes (dict "name" "machinery-config" "configMap" (dict "name" $cmName)) }}
+{{-   $volumeMounts = append $volumeMounts (dict
+        "name"      "machinery-config"
+        "mountPath" "/etc/machinery"
+        "readOnly"  true
+) }}
 {{- end }}
+{{/* Auth Secret mount (machinery#70/#71). When auth.tokenSecretRef.name
+is set, append a read-only Secret volume + subPath mount. Independent
+of the config ConfigMap mount; safe to stack. The matching tokenFile
+in MACHINERY_CONFIG is rendered by config.yaml against the same
+default mount path. */}}
+{{- if and .Values.auth .Values.auth.enabled .Values.auth.tokenSecretRef .Values.auth.tokenSecretRef.name }}
+{{-   $secretKey := default "token" .Values.auth.tokenSecretRef.key }}
+{{-   $mountPath := default "/var/run/machinery-auth/token" .Values.auth.tokenMountPath }}
+{{-   $volumes = append $volumes (dict
+        "name" "auth-token"
+        "secret" (dict
+          "secretName" .Values.auth.tokenSecretRef.name
+          "items" (list (dict "key" $secretKey "path" "token"))
+        )
+) }}
+{{-   $volumeMounts = append $volumeMounts (dict
+        "name"      "auth-token"
+        "mountPath" $mountPath
+        "subPath"   "token"
+        "readOnly"  true
+) }}
+{{- end }}
+{{- if $envVars }}{{- $_ := set $container "env" $envVars }}{{- end }}
+{{- if $volumeMounts }}{{- $_ := set $container "volumeMounts" $volumeMounts }}{{- end }}
+{{- if $volumes }}{{- $_ := set $podSpec "volumes" $volumes }}{{- end }}
 {{- $deployPatch := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"

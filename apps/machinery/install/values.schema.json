@@ -126,11 +126,23 @@
       "description": "gRPC bearer-token auth (machinery#56). When enabled:true, the chart folds these fields into the rendered MACHINERY_CONFIG JSON. Default off.",
       "properties": {
         "enabled":     { "type": "boolean" },
-        "token":       { "type": "string", "minLength": 1, "description": "Inline token; test/dev/preview only — visible in the ConfigMap." },
-        "tokenFile":   { "type": "string", "minLength": 1, "description": "Path to a Secret-mounted token file. Secret-mounting itself is tracked in the follow-up KCL change." },
-        "tokenEnvVar": { "type": "string", "minLength": 1, "description": "Custom env var name; machinery defaults to MACHINERY_AUTH_TOKEN when this is unset." }
+        "token":       { "type": "string", "minLength": 1, "description": "Inline token; test/dev/preview only — visible in the ConfigMap. Mutually exclusive with tokenSecretRef." },
+        "tokenFile":   { "type": "string", "minLength": 1, "description": "Path to an out-of-band-mounted token file. Auto-derived from tokenMountPath when tokenSecretRef is set; only set explicitly if using a custom mount mechanism (Kyverno, ESO, manual)." },
+        "tokenEnvVar": { "type": "string", "minLength": 1, "description": "Custom env var name; machinery defaults to MACHINERY_AUTH_TOKEN when this is unset." },
+        "tokenSecretRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Reference an out-of-band-materialized Secret containing the token. The chart patches the Deployment to mount it read-only and sets tokenFile to tokenMountPath. Mutually exclusive with `token` (would defeat the purpose).",
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "description": "Secret name in destination.namespace." },
+            "key":  { "type": "string", "minLength": 1, "description": "Key in the Secret carrying the token bytes; default `token`." }
+          },
+          "required": ["name"]
+        },
+        "tokenMountPath": { "type": "string", "minLength": 1, "description": "Path the Secret is mounted at inside the Pod. Default `/var/run/machinery-auth/token`. Only meaningful with tokenSecretRef." }
       },
-      "required": ["enabled"]
+      "required": ["enabled"],
+      "not": { "required": ["token", "tokenSecretRef"] }
     },
     "rbac": {
       "type": "object",
