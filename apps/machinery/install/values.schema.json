@@ -120,6 +120,18 @@
       "if": { "properties": { "enabled": { "const": true } } },
       "then": { "required": ["hostname", "gateway"] }
     },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "gRPC bearer-token auth (machinery#56). When enabled:true, the chart folds these fields into the rendered MACHINERY_CONFIG JSON. Default off.",
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "token":       { "type": "string", "minLength": 1, "description": "Inline token; test/dev/preview only — visible in the ConfigMap." },
+        "tokenFile":   { "type": "string", "minLength": 1, "description": "Path to a Secret-mounted token file. Secret-mounting itself is tracked in the follow-up KCL change." },
+        "tokenEnvVar": { "type": "string", "minLength": 1, "description": "Custom env var name; machinery defaults to MACHINERY_AUTH_TOKEN when this is unset." }
+      },
+      "required": ["enabled"]
+    },
     "rbac": {
       "type": "object",
       "additionalProperties": false,

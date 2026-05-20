@@ -158,6 +158,18 @@ spec:
               gateway:
                 name: homerun2-dev-gateway
                 namespace: default
+
+            # Exercise the gRPC bearer-token gate (machinery#56) on every
+            # preview env. Inline token is fine here — this is a non-
+            # production env behind the homerun2-dev gateway, the token
+            # is rotateable per PR by re-syncing, and previous machinery
+            # builds (without the auth field in Config) silently ignore
+            # the extra JSON key. To call gRPC: `grpcurl -H 'authorization:
+            # Bearer machinery-preview-grpc-token' …`. The HTMX dashboard
+            # is unaffected (in-process calls bypass the interceptor).
+            auth:
+              enabled: true
+              token: machinery-preview-grpc-token
       syncPolicy:
         automated:
           prune: true

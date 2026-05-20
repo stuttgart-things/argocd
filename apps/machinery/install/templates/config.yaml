@@ -2,6 +2,22 @@
 {{- $defaultName := printf "machinery-%s" (sha1sum .Values.destination.server | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
 {{- $cmName := default "machinery-config-file" .Values.config.name }}
+{{/* Fold the structured `auth:` values block (machinery#56) into the
+rendered config JSON when enabled. Keeps `config.content` as the
+free-form catch-all; consumers can still inline auth there if they
+prefer. The auth block only carries fields that are actually set, so
+machinery's resolution order (token → tokenFile → tokenEnvVar →
+$MACHINERY_AUTH_TOKEN) sees exactly what the caller chose. */}}
+{{- $cfgJSON := .Values.config.content }}
+{{- if and .Values.auth .Values.auth.enabled }}
+{{-   $parsed := fromJson .Values.config.content }}
+{{-   $auth := dict "enabled" true }}
+{{-   if .Values.auth.token }}{{- $_ := set $auth "token" .Values.auth.token }}{{- end }}
+{{-   if .Values.auth.tokenFile }}{{- $_ := set $auth "tokenFile" .Values.auth.tokenFile }}{{- end }}
+{{-   if .Values.auth.tokenEnvVar }}{{- $_ := set $auth "tokenEnvVar" .Values.auth.tokenEnvVar }}{{- end }}
+{{-   $_ := set $parsed "auth" $auth }}
+{{-   $cfgJSON = toJson $parsed }}
+{{- end }}
 ---
 # Materializes the ConfigMap that the Deployment patch in chart.yaml
 # mounts at /etc/machinery. Runs at sync-wave -10 so the ConfigMap
@@ -29,7 +45,7 @@ spec:
       releaseName: machinery-configmap
       valuesObject:
         name: {{ $cmName | quote }}
-        content: {{ .Values.config.content | quote }}
+        content: {{ $cfgJSON | quote }}
   destination:
     server: {{ .Values.destination.server | quote }}
     namespace: {{ .Values.destination.namespace | quote }}
