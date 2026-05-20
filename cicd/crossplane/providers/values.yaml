@@ -1,0 +1,28 @@
+---
+# Crossplane Provider packages to install.
+#
+# Each entry under `providers`:
+#   name:       Provider resource name
+#   package:    full xpkg reference including tag
+#   apiVersion: optional — defaults to pkg.crossplane.io/v1
+#
+# Defaults cover the stuttgart-things baseline (helm + kubernetes + opentofu).
+# Single-package providers go in this list. For cloud-family providers that
+# publish one xpkg per service (AWS, Azure, GCP), prefer a dedicated family
+# block — see `awsFamily` below — to avoid listing every service by hand.
+providers:
+  - name: provider-helm
+    package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
+  - name: provider-kubernetes
+    package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1
+  - name: provider-opentofu
+    package: xpkg.upbound.io/upbound/provider-opentofu:v1.1.2
+
+# AWS family sugar. Upbound publishes one xpkg per AWS service under
+# xpkg.upbound.io/upbound/provider-aws-<service>:<version>. Each enabled
+# service expands to a `provider-aws-<service>` Provider CR pinned to
+# `version`. Disabled by default — opt in per cluster.
+awsFamily:
+  enabled: false
+  version: v1.1.0
+  services: []

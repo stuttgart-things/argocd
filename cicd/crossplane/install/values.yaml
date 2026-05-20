@@ -8,19 +8,24 @@ destination:
   namespace: crossplane-system
 
 # Upstream crossplane/crossplane Helm chart version.
-chartVersion: "2.2.0"
+chartVersion: "2.2.1"
 
-# Crossplane runtime args. `--enable-usages` exposes the Usage API.
+# Crossplane runtime args.
+#   --enable-usages      exposes the Usage API
+#   --enable-operations  alpha; required for Operations, CronOperations and
+#                        WatchOperations APIs. Safe to leave on — the
+#                        controllers only act when matching CRs exist.
 args:
   - "--debug"
   - "--enable-usages"
+  - "--enable-operations"
 
-# Provider packages installed alongside Crossplane. Each entry is a full
-# xpkg reference including tag.
-providerPackages:
-  - xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
-  - xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1
-  - xpkg.upbound.io/upbound/provider-opentofu:v1.1.0
+# Provider packages installed via this chart's pass-through to the upstream
+# `crossplane/crossplane` chart's `provider.packages` field. Left empty by
+# default — install providers through the separate `cicd/crossplane/providers`
+# chart so providers can be bumped independently of Crossplane core. Override
+# here only for one-off setups that don't use the providers chart.
+providerPackages: []
 
 # Deep-merged on top of the computed valuesObject passed to the upstream chart.
 # Use for any upstream key not exposed above (resources, nodeSelector, image

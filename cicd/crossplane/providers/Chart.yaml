@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: crossplane-providers
+description: Renders one or more Crossplane Provider resources from a values list, with optional AWS-family expansion
+type: application
+version: 0.1.0
+appVersion: "2.2.1"

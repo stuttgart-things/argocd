@@ -1,0 +1,21 @@
+{{- range .Values.providers }}
+---
+apiVersion: {{ .apiVersion | default "pkg.crossplane.io/v1" }}
+kind: Provider
+metadata:
+  name: {{ .name | quote }}
+spec:
+  package: {{ .package | quote }}
+{{- end }}
+{{- if .Values.awsFamily.enabled }}
+{{- $ver := .Values.awsFamily.version }}
+{{- range .Values.awsFamily.services }}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aws-{{ . }}
+spec:
+  package: xpkg.upbound.io/upbound/provider-aws-{{ . }}:{{ $ver }}
+{{- end }}
+{{- end }}

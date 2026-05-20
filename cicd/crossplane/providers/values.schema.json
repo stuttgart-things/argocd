@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "crossplane-providers chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "providers"
+  ],
+  "properties": {
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "package"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "package": {
+            "type": "string",
+            "minLength": 1
+          },
+          "apiVersion": {
+            "type": "string",
+            "enum": [
+              "pkg.crossplane.io/v1",
+              "pkg.crossplane.io/v1beta1"
+            ]
+          }
+        }
+      }
+    },
+    "awsFamily": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "version",
+        "services"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}
