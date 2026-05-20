@@ -141,6 +141,14 @@ lightCatcher:
   enabled: false
   version: v0.3.0
   hostname: light-catcher.example.com
+  # Option B from stuttgart-things/argocd#116 — when true, the chart patches
+  # the HTTPRoute shipped inside the light-catcher kustomize OCI (parentRef +
+  # hostname) and the standalone homerun2-httproute Application skips
+  # light-catcher. Flip to true on consumers (AppSet valuesObject) once they
+  # consume a kustomize OCI tag built after
+  # stuttgart-things/homerun2-light-catcher#16 (which enables HTTPRoute
+  # rendering in the kustomize base).
+  inlineHttpRoute: false
 
 # wled-mock (mock WLED device + dashboard, for dev/testing).
 wledMock:
