@@ -1,12 +1,13 @@
 # cicd/crossplane
 
-Catalog entries for [Crossplane](https://crossplane.io/) plus the stuttgart-things opinionated stack of composition Functions and Configurations. Three independently deployable pieces — consumers create one ArgoCD `Application` per piece they need, each pointing at a Helm chart in this directory.
+Catalog entries for [Crossplane](https://crossplane.io/) plus the stuttgart-things opinionated stack of composition Functions, Providers, and Configurations. Four independently deployable pieces — consumers create one ArgoCD `Application` per piece they need, each pointing at a Helm chart in this directory.
 
 ## Layout
 
 ```
 cicd/crossplane/
 ├── install/      app-of-apps — renders Application "crossplane" (sync-wave -10)
+├── providers/    plain Helm chart — renders Crossplane Provider resources
 ├── functions/    plain Helm chart — renders Crossplane Function resources
 ├── configs/      plain Helm chart — renders Crossplane Configuration resources
 └── README.md
@@ -17,10 +18,11 @@ Matrix of typical consumer shapes:
 | Want | Applications to create |
 |---|---|
 | Crossplane only | `install` |
-| Crossplane + Functions | `install`, `functions` |
-| Crossplane + Functions + stuttgart-things Configurations | `install`, `functions`, `configs` |
+| Crossplane + Providers | `install`, `providers` |
+| Crossplane + Providers + Functions | `install`, `providers`, `functions` |
+| Crossplane + Providers + Functions + stuttgart-things Configurations | `install`, `providers`, `functions`, `configs` |
 
-`install/` is app-of-apps (wraps the upstream Helm chart). `functions/` and `configs/` are plain Helm charts — the consumer-owned `Application` IS the outer wrapper; there's no upstream Helm chart to re-wrap.
+`install/` is app-of-apps (wraps the upstream Helm chart). `providers/`, `functions/` and `configs/` are plain Helm charts — the consumer-owned `Application` IS the outer wrapper; there's no upstream Helm chart to re-wrap.
 
 ## install/
 
@@ -44,11 +46,10 @@ spec:
         destination:
           server: https://<cluster-api>:6443
           namespace: crossplane-system
-        providerPackages:
-          - xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
-          - xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1
-          - xpkg.upbound.io/upbound/provider-opentofu:v1.1.0
-          - xpkg.upbound.io/upbound/provider-aws-ec2:v1.1.0
+        # providerPackages defaults to [] — install providers via the separate
+        # `providers/` chart. Populate this list only for one-off setups that
+        # don't use the providers chart.
+        providerPackages: []
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
@@ -67,11 +68,74 @@ See `install/values.yaml` / `install/values.schema.json` for the full contract.
 |---|---|---|
 | `project` | `default` | ArgoCD AppProject for the rendered Application |
 | `destination.server` / `namespace` | `https://kubernetes.default.svc` / `crossplane-system` | Target workload cluster + namespace |
-| `chartVersion` | `2.2.0` | Upstream crossplane chart version |
-| `args` | `[--debug, --enable-usages]` | Crossplane runtime args |
-| `providerPackages` | helm + kubernetes + opentofu | Provider xpkgs installed alongside Crossplane |
+| `chartVersion` | `2.2.1` | Upstream crossplane chart version |
+| `args` | `[--debug, --enable-usages, --enable-operations]` | Crossplane runtime args. `--enable-operations` enables the alpha Operations / CronOperations / WatchOperations APIs |
+| `providerPackages` | `[]` | Provider xpkgs to install via the upstream chart. Empty by default — install providers through `providers/` instead so they version independently of core. Set non-empty here only for one-off setups |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
 | `syncPolicy` | automated + retry | Applied to the rendered child Application |
+
+## providers/
+
+Plain Helm chart rendering `pkg.crossplane.io/v1.Provider` resources from a list, plus optional sugar for the AWS family (Upbound ships one xpkg per AWS service). Consumer `Application` points at `cicd/crossplane/providers` directly — no app-of-apps wrapper.
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crossplane-providers
+  namespace: argocd
+spec:
+  project: my-cluster
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: cicd/crossplane/providers
+    # Optional — the chart ships with the helm + kubernetes + opentofu
+    # baseline. Override `providers` and/or `awsFamily` to taste.
+  destination:
+    server: https://<cluster-api>:6443
+    namespace: crossplane-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+```
+
+### providers defaults
+
+| Provider | apiVersion | Package |
+|---|---|---|
+| `provider-helm` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0` |
+| `provider-kubernetes` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1` |
+| `provider-opentofu` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/upbound/provider-opentofu:v1.1.2` |
+
+Override the list — or add additional providers — via `helm.values`:
+
+```yaml
+helm:
+  values: |
+    providers:
+      - name: provider-helm
+        package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
+      - name: provider-vsphere
+        package: ghcr.io/acme/provider-vsphere:v0.1.0
+```
+
+### AWS family
+
+Upbound publishes the AWS provider as ~50 service-scoped xpkgs (`provider-aws-ec2`, `provider-aws-s3`, `provider-aws-iam`, …). Listing each by hand is noisy, so the chart exposes a small `awsFamily` block:
+
+```yaml
+helm:
+  values: |
+    awsFamily:
+      enabled: true
+      version: v1.1.0       # applied to every service
+      services: [ec2, s3, iam, eks]
+```
+
+Each entry in `services` becomes a `provider-aws-<service>` Provider CR pinned to `awsFamily.version`. Disabled by default. Combine freely with the flat `providers` list — `providers: []` + `awsFamily.enabled: true` is a valid AWS-only set.
+
+`ProviderConfig` resources and provider credentials Secrets live with the consumer, not in this chart — they're per-cluster, often per-environment, and typically SOPS-encrypted.
 
 ## functions/
 
@@ -104,10 +168,11 @@ spec:
 
 | Function | apiVersion | Package |
 |---|---|---|
-| `function-auto-ready` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-auto-ready:v0.6.0` |
-| `function-go-templating` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-go-templating:v0.11.3` |
-| `function-kcl` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/function-kcl:v0.12.0` |
-| `function-patch-and-transform` | `pkg.crossplane.io/v1beta1` | `xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.9.3` |
+| `function-auto-ready` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-auto-ready:v0.6.4` |
+| `function-go-templating` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-go-templating:v0.12.0` |
+| `function-kcl` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/function-kcl:v0.12.1` |
+| `function-patch-and-transform` | `pkg.crossplane.io/v1beta1` | `xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.10.5` |
+| `function-environment-configs` | `pkg.crossplane.io/v1` | `xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.0` |
 
 Override the whole list via `helm.values`:
 
@@ -208,7 +273,7 @@ spec:
         syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Repeat the pattern for `functions/` and `configs/` — their consumer Application targets the workload cluster directly (no inner app-of-apps wrapping), so `destination.server` is `{{server}}` rather than `https://kubernetes.default.svc`.
+Repeat the pattern for `providers/`, `functions/` and `configs/` — their consumer Application targets the workload cluster directly (no inner app-of-apps wrapping), so `destination.server` is `{{server}}` rather than `https://kubernetes.default.svc`.
 
 ## Related
 

@@ -11,11 +11,14 @@
 # Defaults cover the stuttgart-things opinionated stack for most Compositions.
 functions:
   - name: function-auto-ready
-    package: xpkg.crossplane.io/crossplane-contrib/function-auto-ready:v0.6.0
+    package: xpkg.crossplane.io/crossplane-contrib/function-auto-ready:v0.6.4
   - name: function-go-templating
-    package: xpkg.crossplane.io/crossplane-contrib/function-go-templating:v0.11.3
+    package: xpkg.crossplane.io/crossplane-contrib/function-go-templating:v0.12.0
   - name: function-kcl
     apiVersion: pkg.crossplane.io/v1
-    package: xpkg.upbound.io/crossplane-contrib/function-kcl:v0.12.0
+    package: xpkg.upbound.io/crossplane-contrib/function-kcl:v0.12.1
   - name: function-patch-and-transform
-    package: xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.9.3
+    package: xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.10.5
+  - name: function-environment-configs
+    apiVersion: pkg.crossplane.io/v1
+    package: xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.0
