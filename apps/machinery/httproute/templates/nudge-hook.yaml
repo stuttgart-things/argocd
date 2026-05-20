@@ -61,19 +61,38 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          # Poll-and-annotate loop instead of a one-shot annotate. The
+          # PostSync hook fires after the Application reports Healthy,
+          # which can be ~2 minutes after the route resource lands —
+          # long enough that callers hitting the preview URL see 502s
+          # before the first annotate. Each iteration re-annotates
+          # (forcing Cilium to re-reconcile) then checks ResolvedRefs;
+          # exits 0 once True or fails after 180s. See
+          # stuttgart-things/argocd#164.
           command:
-            - kubectl
-            - -n
-            - {{ $.Values.namespace | quote }}
-            - annotate
-            - httproute
-            - {{ .name | quote }}
-            - --overwrite
-            # The annotation key is namespaced to this project so
-            # it doesn't collide with anything Cilium / Argo set.
-            # Value is the sync timestamp — different per sync so
-            # Cilium always sees a change.
-            - reconcile.machinery.stuttgart-things.com/nudged-at={{ now | unixEpoch }}
+            - /bin/sh
+            - -c
+            - |
+              set -u
+              NS={{ $.Values.namespace | quote }}
+              NAME={{ .name | quote }}
+              KIND=httproute
+              DEADLINE=$(( $(date +%s) + 180 ))
+              START=$(date +%s)
+              while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+                kubectl -n "$NS" annotate "$KIND" "$NAME" --overwrite \
+                  reconcile.machinery.stuttgart-things.com/nudged-at=$(date +%s) >/dev/null
+                state=$(kubectl -n "$NS" get "$KIND" "$NAME" \
+                  -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}' 2>/dev/null || true)
+                if [ "$state" = "True" ]; then
+                  printf 'ResolvedRefs=True after %ss\n' "$(( $(date +%s) - START ))"
+                  exit 0
+                fi
+                printf 'ResolvedRefs=%s; retrying in 5s\n' "${state:-<unknown>}"
+                sleep 5
+              done
+              echo "Timed out after 180s waiting for ResolvedRefs=True" >&2
+              exit 1
           resources:
             requests:
               cpu: 10m

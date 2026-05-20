@@ -39,15 +39,33 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          # Poll-and-annotate retry loop (180s deadline, 5s interval).
+          # See stuttgart-things/argocd#164 and the matching loop in
+          # apps/machinery/httproute/templates/nudge-hook.yaml.
           command:
-            - kubectl
-            - -n
-            - {{ $.Values.namespace | quote }}
-            - annotate
-            - grpcroute
-            - {{ .name | quote }}
-            - --overwrite
-            - reconcile.machinery.stuttgart-things.com/nudged-at={{ now | unixEpoch }}
+            - /bin/sh
+            - -c
+            - |
+              set -u
+              NS={{ $.Values.namespace | quote }}
+              NAME={{ .name | quote }}
+              KIND=grpcroute
+              DEADLINE=$(( $(date +%s) + 180 ))
+              START=$(date +%s)
+              while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+                kubectl -n "$NS" annotate "$KIND" "$NAME" --overwrite \
+                  reconcile.machinery.stuttgart-things.com/nudged-at=$(date +%s) >/dev/null
+                state=$(kubectl -n "$NS" get "$KIND" "$NAME" \
+                  -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}' 2>/dev/null || true)
+                if [ "$state" = "True" ]; then
+                  printf 'ResolvedRefs=True after %ss\n' "$(( $(date +%s) - START ))"
+                  exit 0
+                fi
+                printf 'ResolvedRefs=%s; retrying in 5s\n' "${state:-<unknown>}"
+                sleep 5
+              done
+              echo "Timed out after 180s waiting for ResolvedRefs=True" >&2
+              exit 1
           resources:
             requests:
               cpu: 10m
