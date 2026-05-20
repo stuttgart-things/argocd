@@ -1,0 +1,19 @@
+---
+namespace: machinery
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: machinery
+    hostname: machinery-grpc.example.com
+    backend:
+      name: machinery
+      port: 50051
+
+# Post-sync hook that re-annotates each rendered GRPCRoute so Cilium's
+# gateway-controller re-reconciles against a warm Service cache. Mirrors
+# the HTTPRoute sub-chart's nudge hook — the same stale-`ResolvedRefs`
+# race observed on freshly-created HTTPRoutes hits GRPCRoutes too (same
+# controller, same informer-cache ordering). Default on for preview
+# envs; opt out on long-lived deployments.
+nudgeAfterSync: true

@@ -96,6 +96,30 @@
       "if": { "properties": { "enabled": { "const": true } } },
       "then": { "required": ["hostname", "gateway"] }
     },
+    "grpcRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "hostname": { "type": "string", "minLength": 1 },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name":      { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "namespace"]
+        },
+        "nudgeAfterSync": {
+          "type": "boolean",
+          "description": "Pass-through to the grpcroute sub-chart's PostSync nudge hook. Defaults to true. See values.yaml for the rationale."
+        }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": { "required": ["hostname", "gateway"] }
+    },
     "rbac": {
       "type": "object",
       "additionalProperties": false,

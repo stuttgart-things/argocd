@@ -83,6 +83,19 @@ httpRoute:
     namespace: default
   nudgeAfterSync: true
 
+# Gateway API GRPCRoute sub-Application (opt-in).
+# Sibling to httpRoute — same shape, but the rendered route points at
+# machinery's gRPC port (50051) so CLIs and other in-cluster services
+# can dial the ResourceService through the gateway. Disabled by
+# default; preview envs (machinery-pr-*) flip it on.
+grpcRoute:
+  enabled: false
+  hostname: machinery-grpc.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+  nudgeAfterSync: true
+
 # Sync policy applied to all rendered Applications.
 syncPolicy:
   automated:
