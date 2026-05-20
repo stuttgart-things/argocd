@@ -96,6 +96,29 @@ grpcRoute:
     namespace: default
   nudgeAfterSync: true
 
+# Optional gRPC bearer-token auth on the network side
+# (stuttgart-things/machinery#56). Opt-in; default off.
+#
+# When `enabled: true`, the chart folds these fields into the rendered
+# MACHINERY_CONFIG JSON as the `auth` block, so they survive the same
+# ConfigMap mount as the rest of the config (no separate Secret here;
+# token mounting via Secret is tracked in the follow-up KCL change).
+#
+# Token resolution at the machinery side: `token` (inline) → `tokenFile`
+# → `$tokenEnvVar` → `$MACHINERY_AUTH_TOKEN`. Set only the field you
+# actually want machinery to use. Inline `token` is the simplest path
+# for short-lived preview envs; production should use `tokenFile`
+# pointing at a Secret-mounted path (chart support to follow).
+#
+# In-process callers (HTMX frontend) bypass the interceptor by
+# construction; `/grpc.health.v1.Health/*` stays anonymous so probes
+# keep working.
+auth:
+  enabled: false
+  # token: ""        # inline; test/dev/preview only
+  # tokenFile: ""    # path to a Secret-mounted file
+  # tokenEnvVar: ""  # custom env var name; defaults to MACHINERY_AUTH_TOKEN
+
 # Sync policy applied to all rendered Applications.
 syncPolicy:
   automated:
