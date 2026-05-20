@@ -20,7 +20,7 @@
         "namespace": { "type": "string", "minLength": 1 }
       },
       "required": ["namespace"],
-      "oneOf": [
+      "anyOf": [
         { "required": ["server"] },
         { "required": ["name"] }
       ]
