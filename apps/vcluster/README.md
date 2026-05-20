@@ -66,6 +66,52 @@ The outer `destination.server` is the **management cluster** (where the rendered
 
 > **Why the finalizer?** When the consumer Application is reconciled by Flux (Kustomization in a cluster repo), deleting the file removes the Application CR directly — ArgoCD's `syncPolicy.automated.prune` never gets a chance to run, leaving the vcluster Helm release orphaned on the host. `resources-finalizer.argocd.argoproj.io` blocks CR deletion until ArgoCD has cascade-pruned its managed resources (the rendered inner Application, then the vcluster pods/PVCs/Service). The inner Application emitted by `install/templates/chart.yaml` carries the same finalizer, so the cascade reaches all the way to the upstream Helm release. Omit only if you never delete via Flux/`kubectl delete` and always use `argocd app delete` (which has its own cascade flag).
 
+## Local kubectl access
+
+`kubectl` against the vcluster from your shell. Use this for interactive dev work (writing Compositions, poking at CRDs, etc.) — for declaratively syncing apps into the vcluster, jump to the ArgoCD section below.
+
+### Option A — `vcluster connect` (recommended)
+
+The CLI handles port-forwarding and writes a ready-to-use kubeconfig:
+
+```bash
+export KUBECONFIG=<host-cluster-kubeconfig>
+vcluster connect vcluster-dev -n vcluster-dev \
+  --kube-config $HOME/.kube/vcluster-dev \
+  --kube-config-context-name vcluster-dev \
+  --background-proxy
+```
+
+`--background-proxy` keeps the port-forward running in a sidecar container (survives shell exit). Then:
+
+```bash
+export KUBECONFIG=$HOME/.kube/vcluster-dev
+kubectl get nodes
+kubectl api-resources --api-group=pkg.crossplane.io   # if you installed Crossplane
+```
+
+### Option B — host-cluster Secret + manual port-forward (no CLI)
+
+When the `vcluster` binary isn't available, extract the admin kubeconfig from the auto-created `vc-<vclusterName>` Secret and rewrite the server URL to `localhost`:
+
+```bash
+export KUBECONFIG=<host-cluster-kubeconfig>
+kubectl -n vcluster-dev get secret vc-vcluster-dev -o jsonpath='{.data.config}' | base64 -d \
+  | sed 's|server: https://[^[:space:]]*|server: https://127.0.0.1:8443|' \
+  > $HOME/.kube/vcluster-dev
+
+# in a separate terminal — keep this running for the duration of the session:
+kubectl -n vcluster-dev port-forward svc/vcluster-dev 8443:443
+```
+
+The vcluster apiserver cert is signed for the in-cluster shortname `vcluster-dev`, not `127.0.0.1`, so verification will fail unless you skip it:
+
+```bash
+KUBECONFIG=$HOME/.kube/vcluster-dev kubectl --insecure-skip-tls-verify get nodes
+```
+
+Option A sidesteps the TLS-skip entirely — prefer it for anything beyond a one-off probe.
+
 ## Registering the vcluster with ArgoCD
 
 Once the vcluster is `Healthy / Synced` in ArgoCD, register it as a destination cluster so ArgoCD can deploy *into* the vcluster. vcluster authenticates with mTLS (client cert + key), not a bearer token — the recipes below extract those three credential fields (CA, client cert, client key) from the kubeconfig vcluster emits.
