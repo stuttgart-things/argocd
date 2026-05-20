@@ -1,0 +1,99 @@
+{{- if .Values.nudgeAfterSync }}
+{{- range .Values.routes }}
+---
+# Mirror of the HTTPRoute nudge hook in apps/machinery/httproute. Cilium's
+# gateway-controller hits the same stale-`ResolvedRefs` race on freshly-
+# created GRPCRoutes (same controller, same informer-cache ordering) — a
+# PostSync re-annotate forces a re-reconcile against a warm Service cache.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-grpc-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: machinery-grpcroute-nudge
+        app.kubernetes.io/managed-by: argocd
+    spec:
+      serviceAccountName: {{ printf "%s-grpc-nudge" .name | quote }}
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nudge
+          image: cgr.dev/chainguard/kubectl:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          command:
+            - kubectl
+            - -n
+            - {{ $.Values.namespace | quote }}
+            - annotate
+            - grpcroute
+            - {{ .name | quote }}
+            - --overwrite
+            - reconcile.machinery.stuttgart-things.com/nudged-at={{ now | unixEpoch }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ printf "%s-grpc-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-grpc-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+rules:
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["grpcroutes"]
+    resourceNames: [{{ .name | quote }}]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-grpc-nudge" .name | quote }}
+  namespace: {{ $.Values.namespace | quote }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-grpc-nudge" .name | quote }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ printf "%s-grpc-nudge" .name | quote }}
+    namespace: {{ $.Values.namespace | quote }}
+{{- end }}
+{{- end }}

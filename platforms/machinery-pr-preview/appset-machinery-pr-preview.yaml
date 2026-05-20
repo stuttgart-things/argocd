@@ -127,7 +127,8 @@ spec:
                   "resources": {
                     "Certificate":    { "group": "cert-manager.io",            "version": "v1",       "resource": "certificates",    "connectionField": "status.notAfter",  "statusFields": ["status.renewalTime"], "infoFields": [{"label":"Issuer","path":"spec.issuerRef.name"},{"label":"CommonName","path":"spec.commonName"},{"label":"Expires","path":"status.notAfter"},{"label":"Renews","path":"status.renewalTime"}] },
                     "ExternalSecret": { "group": "external-secrets.io",        "version": "v1",       "resource": "externalsecrets", "connectionField": "status.refreshTime", "statusFields": ["status.syncedResourceVersion"], "infoFields": [{"label":"Store","path":"spec.secretStoreRef.name"},{"label":"Target","path":"spec.target.name"},{"label":"Refreshed","path":"status.refreshTime"}] },
-                    "HTTPRoute":      { "group": "gateway.networking.k8s.io",  "version": "v1",       "resource": "httproutes",      "connectionField": "spec.hostnames", "infoFields": [{"label":"Parent","path":"spec.parentRefs"}] }
+                    "HTTPRoute":      { "group": "gateway.networking.k8s.io",  "version": "v1",       "resource": "httproutes",      "connectionField": "spec.hostnames", "infoFields": [{"label":"Parent","path":"spec.parentRefs"}] },
+                    "GRPCRoute":      { "group": "gateway.networking.k8s.io",  "version": "v1",       "resource": "grpcroutes",      "connectionField": "spec.hostnames", "infoFields": [{"label":"Parent","path":"spec.parentRefs"}] }
                   }
                 }
 
@@ -142,11 +143,18 @@ spec:
                 - apiGroups: ["external-secrets.io"]
                   resources: ["externalsecrets"]
                 - apiGroups: ["gateway.networking.k8s.io"]
-                  resources: ["httproutes"]
+                  resources: ["httproutes", "grpcroutes"]
 
             httpRoute:
               enabled: true
               hostname: 'machinery-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+
+            grpcRoute:
+              enabled: true
+              hostname: 'machinery-pr-{{ .number }}-grpc.homerun2-dev.sthings-vsphere.labul.sva.de'
               gateway:
                 name: homerun2-dev-gateway
                 namespace: default
