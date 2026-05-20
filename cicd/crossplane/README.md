@@ -67,7 +67,7 @@ See `install/values.yaml` / `install/values.schema.json` for the full contract.
 | Key | Default | Purpose |
 |---|---|---|
 | `project` | `default` | ArgoCD AppProject for the rendered Application |
-| `destination.server` / `namespace` | `https://kubernetes.default.svc` / `crossplane-system` | Target workload cluster + namespace |
+| `destination.server` *or* `destination.name`, `destination.namespace` | `https://kubernetes.default.svc` / `crossplane-system` | Target workload cluster + namespace. Set exactly one of `server` (cluster API URL) or `name` (ArgoCD cluster-Secret `name`). Using `name` is convenient when registering vclusters by name |
 | `chartVersion` | `2.2.1` | Upstream crossplane chart version |
 | `args` | `[--debug, --enable-usages, --enable-operations]` | Crossplane runtime args. `--enable-operations` enables the alpha Operations / CronOperations / WatchOperations APIs |
 | `providerPackages` | `[]` | Provider xpkgs to install via the upstream chart. Empty by default — install providers through `providers/` instead so they version independently of core. Set non-empty here only for one-off setups |
