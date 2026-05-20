@@ -1,0 +1,9 @@
+{{- range .Values.configs }}
+---
+apiVersion: {{ .apiVersion }}
+kind: {{ .kind | default "ProviderConfig" }}
+metadata:
+  name: {{ .name | quote }}
+spec:
+  {{- toYaml .spec | nindent 2 }}
+{{- end }}

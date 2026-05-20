@@ -1,0 +1,31 @@
+---
+# Crossplane ProviderConfig resources to install.
+#
+# Each provider ships its own ProviderConfig CRD (the apiGroup is unique
+# per provider), so this chart can't usefully abstract them — it just emits
+# them opaquely from a values list. Schemas vary per provider; consult the
+# provider's docs for the spec shape.
+#
+# Each entry under `configs`:
+#   name:       ProviderConfig resource name (typically `default`)
+#   apiVersion: e.g. helm.crossplane.io/v1beta1
+#   kind:       optional, defaults to `ProviderConfig`
+#   spec:       the provider-specific spec body
+#
+# Defaults cover the baseline providers shipped by cicd/crossplane/providers
+# (helm + kubernetes), both targeting the cluster Crossplane runs in via
+# `InjectedIdentity` — zero secrets, works out of the box. For cloud-credentialed
+# providers (provider-aws-*, provider-azure-*, …) replace this list or append
+# entries with `spec.credentials.source: Secret` + your own secretRef. The
+# referenced Secret is the consumer's responsibility (ESO, SOPS, etc.).
+configs:
+  - name: default
+    apiVersion: helm.crossplane.io/v1beta1
+    spec:
+      credentials:
+        source: InjectedIdentity
+  - name: default
+    apiVersion: kubernetes.crossplane.io/v1alpha1
+    spec:
+      credentials:
+        source: InjectedIdentity

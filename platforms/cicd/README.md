@@ -18,6 +18,7 @@ Catalog entries rendered:
 | `argo-rollouts-cicd` | `cicd/argo-rollouts/install`   | `argo-rollouts`    | Progressive-delivery controller |
 | `crossplane-cicd`    | `cicd/crossplane/install`      | `crossplane-system`| Crossplane core (chart `2.2.1`, args include `--enable-operations` for the alpha Operations / CronOperations / WatchOperations APIs). Providers installed via `crossplane-providers-cicd`; functions/configurations are separate charts under `cicd/crossplane/` — opt in per cluster via follow-up Applications |
 | `crossplane-providers-cicd` | `cicd/crossplane/providers` | `crossplane-system`| Crossplane Providers (defaults: provider-helm, provider-kubernetes, provider-opentofu). Shares the `cicd-platform/crossplane` opt-out key with `crossplane-cicd` |
+| `crossplane-provider-configs-cicd` | `cicd/crossplane/provider-configs` | `crossplane-system`| Crossplane ProviderConfigs (defaults: helm + kubernetes pointed at the local cluster via `InjectedIdentity`). Shares the `cicd-platform/crossplane` opt-out key with `crossplane-cicd` |
 | `kargo-cicd`         | `cicd/kargo/install`           | `kargo`            | Kargo control-plane. `api.host` is derived from the cluster's `clusterbook.stuttgart-things.com/fqdn` annotation (→ `kargo.<fqdn>`) so install + HTTPRoute + cert + cookie-Host check line up |
 | `kargo-httproute-cicd` | `cicd/kargo/httproute`       | `kargo`            | Gateway API `HTTPRoute` exposing the kargo API. **Additionally gated on** `clusterbook.stuttgart-things.com/allocation-ip` being present — only clusterbook-registered clusters have the `<cluster>-gateway` Gateway and `<cluster>-gateway-tls` wildcard cert this route consumes. Non-clusterbook clusters in the cicd platform get kargo installed but no HTTPRoute (bring your own Gateway) |
 | `tekton-cicd`        | `cicd/tekton/operator`         | `tekton-operator`  | Tekton operator (control plane for the rest) |
@@ -94,7 +95,7 @@ Default behaviour: labelling a cluster with `cicd-platform: "true"` enrols it in
 | `cicd-platform/dapr: "false"`                  | Skip `dapr-cicd`          |
 | `cicd-platform/kro: "false"`                   | Skip `kro-cicd`           |
 | `cicd-platform/argo-rollouts: "false"`         | Skip `argo-rollouts-cicd` |
-| `cicd-platform/crossplane: "false"`            | Skip `crossplane-cicd` **and** `crossplane-providers-cicd` (shared key) |
+| `cicd-platform/crossplane: "false"`            | Skip `crossplane-cicd`, `crossplane-providers-cicd` **and** `crossplane-provider-configs-cicd` (shared key) |
 | `cicd-platform/kargo: "false"`                 | Skip `kargo-cicd` **and** `kargo-httproute-cicd` (shared key) |
 | `cicd-platform/tekton: "false"`                | Skip `tekton-cicd`, `tekton-config-cicd` **and** `tekton-dashboard-httproute-cicd` (shared key) |
 

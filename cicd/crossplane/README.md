@@ -1,15 +1,16 @@
 # cicd/crossplane
 
-Catalog entries for [Crossplane](https://crossplane.io/) plus the stuttgart-things opinionated stack of composition Functions, Providers, and Configurations. Four independently deployable pieces — consumers create one ArgoCD `Application` per piece they need, each pointing at a Helm chart in this directory.
+Catalog entries for [Crossplane](https://crossplane.io/) plus the stuttgart-things opinionated stack of composition Functions, Providers, ProviderConfigs, and Configurations. Five independently deployable pieces — consumers create one ArgoCD `Application` per piece they need, each pointing at a Helm chart in this directory.
 
 ## Layout
 
 ```
 cicd/crossplane/
-├── install/      app-of-apps — renders Application "crossplane" (sync-wave -10)
-├── providers/    plain Helm chart — renders Crossplane Provider resources
-├── functions/    plain Helm chart — renders Crossplane Function resources
-├── configs/      plain Helm chart — renders Crossplane Configuration resources
+├── install/           app-of-apps — renders Application "crossplane" (sync-wave -10)
+├── providers/         plain Helm chart — renders Crossplane Provider resources
+├── provider-configs/  plain Helm chart — renders Crossplane ProviderConfig resources
+├── functions/         plain Helm chart — renders Crossplane Function resources
+├── configs/           plain Helm chart — renders Crossplane Configuration resources
 └── README.md
 ```
 
@@ -19,10 +20,11 @@ Matrix of typical consumer shapes:
 |---|---|
 | Crossplane only | `install` |
 | Crossplane + Providers | `install`, `providers` |
-| Crossplane + Providers + Functions | `install`, `providers`, `functions` |
-| Crossplane + Providers + Functions + stuttgart-things Configurations | `install`, `providers`, `functions`, `configs` |
+| Crossplane + Providers + ProviderConfigs | `install`, `providers`, `provider-configs` |
+| Crossplane + Providers + ProviderConfigs + Functions | `install`, `providers`, `provider-configs`, `functions` |
+| Crossplane + Providers + ProviderConfigs + Functions + stuttgart-things Configurations | `install`, `providers`, `provider-configs`, `functions`, `configs` |
 
-`install/` is app-of-apps (wraps the upstream Helm chart). `providers/`, `functions/` and `configs/` are plain Helm charts — the consumer-owned `Application` IS the outer wrapper; there's no upstream Helm chart to re-wrap.
+`install/` is app-of-apps (wraps the upstream Helm chart). `providers/`, `provider-configs/`, `functions/` and `configs/` are plain Helm charts — the consumer-owned `Application` IS the outer wrapper; there's no upstream Helm chart to re-wrap.
 
 ## install/
 
@@ -135,7 +137,81 @@ helm:
 
 Each entry in `services` becomes a `provider-aws-<service>` Provider CR pinned to `awsFamily.version`. Disabled by default. Combine freely with the flat `providers` list — `providers: []` + `awsFamily.enabled: true` is a valid AWS-only set.
 
-`ProviderConfig` resources and provider credentials Secrets live with the consumer, not in this chart — they're per-cluster, often per-environment, and typically SOPS-encrypted.
+`ProviderConfig` resources live in the sibling [`provider-configs/`](#provider-configs) chart. Credentials Secrets stay with the consumer (per-cluster, per-environment, typically SOPS-encrypted or sourced from ESO).
+
+## provider-configs/
+
+Plain Helm chart rendering `ProviderConfig` resources for any installed Provider. Every Crossplane provider ships its own `ProviderConfig` CRD with its own apiGroup (`helm.crossplane.io/v1beta1`, `kubernetes.crossplane.io/v1alpha1`, `aws.upbound.io/v1beta1`, …), so this chart doesn't try to abstract them — it emits them opaquely from a values list.
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crossplane-provider-configs
+  namespace: argocd
+spec:
+  project: my-cluster
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: cicd/crossplane/provider-configs
+    # Optional — the chart ships ProviderConfigs for provider-helm and
+    # provider-kubernetes targeting the local cluster via InjectedIdentity
+    # (zero secrets, works out of the box). Override `configs` to taste.
+  destination:
+    server: https://<cluster-api>:6443
+    namespace: crossplane-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [ServerSideApply=true]
+```
+
+### provider-configs defaults
+
+| Name | apiVersion | Credentials |
+|---|---|---|
+| `default` | `helm.crossplane.io/v1beta1` | `InjectedIdentity` (local cluster, the SA crossplane runs as) |
+| `default` | `kubernetes.crossplane.io/v1alpha1` | `InjectedIdentity` (local cluster) |
+
+`InjectedIdentity` works when the Provider has cluster-admin-ish permissions on the cluster it runs in — sufficient for in-cluster dev work. For external targets or cloud APIs, override the list:
+
+```yaml
+helm:
+  values: |
+    configs:
+      # Keep the local-helm default
+      - name: default
+        apiVersion: helm.crossplane.io/v1beta1
+        spec:
+          credentials:
+            source: InjectedIdentity
+
+      # Add a kubernetes ProviderConfig pointing at a remote cluster.
+      # The secret `provider-kubernetes-target-kubeconfig` (created out-of-band
+      # by ESO, SOPS, or whatever flow you use) must exist in crossplane-system.
+      - name: target-cluster
+        apiVersion: kubernetes.crossplane.io/v1alpha1
+        spec:
+          credentials:
+            source: Secret
+            secretRef:
+              namespace: crossplane-system
+              name: provider-kubernetes-target-kubeconfig
+              key: kubeconfig
+
+      # AWS family — one ProviderConfig referenced by every provider-aws-*
+      - name: default
+        apiVersion: aws.upbound.io/v1beta1
+        spec:
+          credentials:
+            source: Secret
+            secretRef:
+              namespace: crossplane-system
+              name: aws-credentials
+              key: creds
+```
+
+The chart doesn't manage credentials Secrets — those are per-cluster, per-environment, often secret-store-backed. Land them in `crossplane-system` via External Secrets Operator, SOPS, sealed-secrets, or whichever mechanism your cluster repo already uses; reference them by `secretRef` here.
 
 ## functions/
 
@@ -273,7 +349,7 @@ spec:
         syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-Repeat the pattern for `providers/`, `functions/` and `configs/` — their consumer Application targets the workload cluster directly (no inner app-of-apps wrapping), so `destination.server` is `{{server}}` rather than `https://kubernetes.default.svc`.
+Repeat the pattern for `providers/`, `provider-configs/`, `functions/` and `configs/` — their consumer Application targets the workload cluster directly (no inner app-of-apps wrapping), so `destination.server` is `{{server}}` rather than `https://kubernetes.default.svc`.
 
 ## Related
 
