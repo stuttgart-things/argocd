@@ -22,6 +22,10 @@
             "type": "string",
             "minLength": 1
           },
+          "namespace": {
+            "type": "string",
+            "minLength": 1
+          },
           "apiVersion": {
             "type": "string",
             "minLength": 1

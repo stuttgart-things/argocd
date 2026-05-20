@@ -1,5 +1,5 @@
 ---
-# Crossplane ProviderConfig resources to install.
+# Crossplane ProviderConfig / ClusterProviderConfig resources to install.
 #
 # Each provider ships its own ProviderConfig CRD (the apiGroup is unique
 # per provider), so this chart can't usefully abstract them — it just emits
@@ -7,25 +7,58 @@
 # provider's docs for the spec shape.
 #
 # Each entry under `configs`:
-#   name:       ProviderConfig resource name (typically `default`)
-#   apiVersion: e.g. helm.crossplane.io/v1beta1
-#   kind:       optional, defaults to `ProviderConfig`
+#   name:       resource name (typically `in-cluster` — matches the
+#               `providerConfigRef: in-cluster` convention used in the
+#               stuttgart-things Compositions)
+#   namespace:  optional. Only honored for namespaced kinds; ignored for
+#               cluster-scoped kinds like `ClusterProviderConfig`.
+#   apiVersion: e.g. kubernetes.m.crossplane.io/v1alpha1
+#   kind:       optional, defaults to `ProviderConfig`. Use
+#               `ClusterProviderConfig` for the v2 namespaced API surface
+#               (`*.m.crossplane.io`) — that's what the namespaced
+#               `Object` (kubernetes.m.crossplane.io/v1alpha1) references.
 #   spec:       the provider-specific spec body
 #
 # Defaults cover the baseline providers shipped by cicd/crossplane/providers
 # (helm + kubernetes), both targeting the cluster Crossplane runs in via
-# `InjectedIdentity` — zero secrets, works out of the box. For cloud-credentialed
-# providers (provider-aws-*, provider-azure-*, …) replace this list or append
-# entries with `spec.credentials.source: Secret` + your own secretRef. The
+# `InjectedIdentity` — zero secrets, works out of the box. Only the v2
+# namespaced (m.*) ClusterProviderConfig kinds are emitted: the v1
+# non-namespaced ProviderConfigs are consumed only by the cluster-scoped
+# Object (kubernetes.crossplane.io/v1alpha2), which the v2 namespaced XR
+# default can't compose. For cloud-credentialed providers
+# (provider-aws-*, provider-azure-*, …) replace this list or append entries
+# with `spec.credentials.source: Secret` + your own secretRef. The
 # referenced Secret is the consumer's responsibility (ESO, SOPS, etc.).
 configs:
-  - name: default
-    apiVersion: helm.crossplane.io/v1beta1
+  - name: in-cluster
+    apiVersion: helm.m.crossplane.io/v1beta1
+    kind: ClusterProviderConfig
     spec:
       credentials:
         source: InjectedIdentity
-  - name: default
-    apiVersion: kubernetes.crossplane.io/v1alpha1
+  - name: in-cluster
+    apiVersion: kubernetes.m.crossplane.io/v1alpha1
+    kind: ClusterProviderConfig
     spec:
       credentials:
         source: InjectedIdentity
+  # provider-opentofu has no `InjectedIdentity` mode — every entry needs a
+  # `configuration` (the terraform/tofu HCL the provider runs). The default
+  # below ships an empty `credentials` list + a kubernetes backend that
+  # stores state in-cluster (no cloud creds wired up). It's a valid skeleton
+  # but does nothing useful until the consumer adds a provider block + creds.
+  # See https://github.com/upbound/provider-opentofu/blob/main/examples/namespaced/clusterproviderconfig.yaml
+  # for the GCP-credentialed shape.
+  - name: in-cluster
+    apiVersion: opentofu.m.upbound.io/v1beta1
+    kind: ClusterProviderConfig
+    spec:
+      credentials: []
+      configuration: |
+        terraform {
+          backend "kubernetes" {
+            secret_suffix     = "clusterproviderconfig-in-cluster"
+            namespace         = "crossplane-system"
+            in_cluster_config = true
+          }
+        }
