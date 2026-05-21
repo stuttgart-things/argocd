@@ -123,9 +123,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":   { "type": "boolean" },
-        "version":   { "type": "string", "minLength": 1 },
-        "namespace": { "type": "string", "minLength": 1 }
+        "enabled":       { "type": "boolean" },
+        "version":       { "type": "string", "minLength": 1 },
+        "namespace":     { "type": "string", "minLength": 1 },
+        "inlineProfile": { "type": "boolean" }
       },
       "required": ["enabled"]
     },

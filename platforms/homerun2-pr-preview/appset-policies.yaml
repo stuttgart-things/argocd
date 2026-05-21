@@ -473,6 +473,64 @@ spec:
                   helmValues: |
                     name: homerun2-light-catcher-preview-sweep
                     namespacePrefix: "homerun2-light-catcher-pr-*"
+
+                # ----- k8s-pitcher -----
+                # No seed-data row: k8s-pitcher watches its own PR namespace,
+                # so the co-tenants (omni-pitcher / core-catcher / redis-stack)
+                # spinning up are themselves the events — the dashboard gets
+                # populated without a separate seed Job. (Decision:
+                # stuttgart-things/homerun2-k8s-pitcher#46.)
+                - releaseName: homerun2-k8s-pitcher-preview-quota
+                  component: k8s-pitcher
+                  policy: quota
+                  chartPath: apps/homerun2/preview-quota
+                  helmValues: |
+                    name: homerun2-k8s-pitcher-preview-quota
+                    namespacePrefix: "homerun2-k8s-pitcher-pr-*"
+
+                - releaseName: homerun2-k8s-pitcher-preview-secrets
+                  component: k8s-pitcher
+                  policy: secrets
+                  chartPath: apps/homerun2/preview-secrets
+                  helmValues: |
+                    name: homerun2-k8s-pitcher-preview-secrets
+                    namespacePrefix: "homerun2-k8s-pitcher-pr-*"
+                    clusterSecretStoreName: vault-homerun2-pr
+                    refreshInterval: 1m
+                    vaultSecretName: preview-env
+                    components:
+                      - name: omni-pitcher-token
+                        secretName: homerun2-omni-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+                      - name: omni-pitcher-redis
+                        secretName: homerun2-omni-pitcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      - name: redis-stack-auth
+                        secretName: redis-stack-auth
+                        dataKey: redis-password
+                        vaultProperty: redisPassword
+                      - name: core-catcher-redis
+                        secretName: homerun2-core-catcher-redis
+                        dataKey: password
+                        vaultProperty: redisPassword
+                      # k8s-pitcher's profile resolves auth.tokenFrom from this
+                      # Secret to authenticate against omni-pitcher's /pitch
+                      # endpoint. Same vault property as omni-pitcher-token so
+                      # both sides share the token.
+                      - name: k8s-pitcher-token
+                        secretName: homerun2-k8s-pitcher-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
+
+                - releaseName: homerun2-k8s-pitcher-preview-sweep
+                  component: k8s-pitcher
+                  policy: sweep
+                  chartPath: apps/homerun2/preview-sweep
+                  helmValues: |
+                    name: homerun2-k8s-pitcher-preview-sweep
+                    namespacePrefix: "homerun2-k8s-pitcher-pr-*"
   template:
     metadata:
       # No `-{{ .name }}` cluster suffix because today only `homerun2-dev`
