@@ -2,15 +2,20 @@
 {{- $appName := include "homerun2.appName" . }}
 {{- $name := "homerun2-k8s-pitcher" }}
 {{- $ns := .Values.k8sPitcher.namespace }}
+{{- /* The trust-bundle volume is always remounted. The `profile` volume is
+       only remounted from the out-of-band ConfigMap when inlineProfile is
+       false; when true, the kustomize OCI's own profile ConfigMap + volume
+       are kept (the delete patch below is also skipped). */ -}}
+{{- $volumes := list (dict "name" "trust-bundle" "configMap" (dict "name" .Values.trustBundleConfigMap "optional" true)) }}
+{{- if not .Values.k8sPitcher.inlineProfile }}
+{{- $volumes = append $volumes (dict "name" "profile" "configMap" (dict "name" .Values.k8sPitcherProfileConfigMap)) }}
+{{- end }}
 {{- $trustPatch := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"
       "metadata" (dict "name" $name)
       "spec" (dict "template" (dict "spec" (dict
-        "volumes" (list
-          (dict "name" "trust-bundle" "configMap" (dict "name" .Values.trustBundleConfigMap "optional" true))
-          (dict "name" "profile"      "configMap" (dict "name" .Values.k8sPitcherProfileConfigMap))
-        )
+        "volumes" $volumes
         "containers" (list (dict
           "name" $name
           "env"  (list (dict "name" "SSL_CERT_DIR" "value" "/etc/ssl/custom"))
@@ -66,11 +71,13 @@ spec:
             name: {{ $name }}
           patch: |
 {{ toYaml $trustPatch | indent 12 }}
+{{- if not .Values.k8sPitcher.inlineProfile }}
         - target:
             kind: ConfigMap
             name: {{ printf "%s-profile" $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "ConfigMap" "name" (printf "%s-profile" $name)) | indent 12 }}
+{{- end }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}

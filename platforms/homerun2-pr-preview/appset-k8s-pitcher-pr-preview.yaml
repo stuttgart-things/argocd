@@ -1,0 +1,141 @@
+---
+# Per-PR preview environments for stuttgart-things/homerun2-k8s-pitcher.
+#
+# Fans out across (clusters labelled homerun2-pr-preview: "true") ×
+# (open PRs on homerun2-k8s-pitcher carrying the `preview` label).
+# k8s-pitcher watches a Kubernetes namespace via informers/collectors and
+# pitches the activity it sees to omni-pitcher's /pitch endpoint.
+#
+# k8s-pitcher has no UI of its own, so its preview ships with omni-pitcher +
+# redis-stack + core-catcher (web mode) co-tenanted. The reviewer opens
+# core-catcher's dashboard at cc-k8s-pr-<num>.… and sees the pod / event /
+# deployment activity k8s-pitcher pitched as the co-tenants boot.
+#
+# Decisions from stuttgart-things/homerun2-k8s-pitcher#46:
+#   - namespace: `homerun2-k8s-pitcher-pr-<num>` (image-name-mirrored);
+#     k8s-pitcher co-locates here with the co-tenants
+#   - hostnames:
+#     * `cc-k8s-pr-<num>`   — core-catcher dashboard (the review surface)
+#     * `omni-k8s-pr-<num>` — co-tenanted omni-pitcher (debug convenience)
+#   - k8s-pitcher runs NAMESPACE-SCOPED in the preview (namespaced Role,
+#     watches only its own namespace) — a cluster-scoped ClusterRole would
+#     collide across concurrent previews. The preview kustomize OCI is built
+#     from tests/kcl-deploy-profile-preview.yaml; inlineProfile keeps that
+#     OCI's profile ConfigMap (no out-of-band ConfigMap in a PR namespace).
+#   - omni-pitcher / core-catcher pinned to latest released
+#   - no seed-data Job — k8s-pitcher's own watch of the co-tenants spinning
+#     up populates the dashboard (same reasoning as git-pitcher)
+#   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
+#     stuttgart-things repo
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-k8s-pitcher-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  homerun2-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: homerun2-k8s-pitcher
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'homerun2-k8s-pitcher-pr-{{ .number }}'
+      labels:
+        homerun2.stuttgart-things.com/pr: '{{ .number }}'
+        homerun2.stuttgart-things.com/component: k8s-pitcher
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/homerun2/install
+        helm:
+          releaseName: 'homerun2-k8s-pitcher-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'homerun2-k8s-pitcher-pr-{{ .number }}'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'homerun2-k8s-pitcher-pr-{{ .number }}'
+
+            # SUT: k8s-pitcher at the PR's commit. Same kustomize-OCI tag for
+            # both image and manifests. namespace pins it into the shared PR
+            # namespace alongside the co-tenants; inlineProfile keeps the
+            # namespace-scoped profile shipped in the preview kustomize OCI.
+            k8sPitcher:
+              enabled: true
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              namespace: 'homerun2-k8s-pitcher-pr-{{ .number }}'
+              inlineProfile: true
+
+            # Co-tenanted: omni-pitcher pinned to latest released — receives
+            # k8s-pitcher's pitches and writes them to redis-stack.
+            omniPitcher:
+              enabled: true
+              version: v1.11.1
+              hostname: 'omni-k8s-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+
+            # Co-tenanted: core-catcher in web mode at latest released —
+            # consumes the redis stream and renders the dashboard, which is
+            # the review surface for this preview.
+            coreCatcher:
+              enabled: true
+              version: v0.13.0
+              kustomizeVersion: v0.13.0
+              hostname: 'cc-k8s-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
+
+            redisStack:
+              enabled: true
+              persistence:
+                enabled: false
+              auth:
+                existingSecret: redis-stack-auth
+
+            # Everything else off.
+            scout:        { enabled: false }
+            lightCatcher: { enabled: false }
+            wledMock:     { enabled: false }
+            demoPitcher:  { enabled: false }
+            ledCatcher:   { enabled: false }
+            gitPitcher:   { enabled: false }
+
+            httpRoute:
+              enabled: true
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

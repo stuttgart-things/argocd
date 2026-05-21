@@ -135,6 +135,13 @@ k8sPitcher:
   enabled: false
   version: v0.4.0
   namespace: homerun2
+  # When true, keep the K8sPitcherProfile ConfigMap shipped inside the
+  # k8s-pitcher kustomize OCI instead of deleting it and remounting an
+  # out-of-band one. Set this on PR-preview consumers, whose ephemeral
+  # namespaces have no out-of-band profile ConfigMap — the preview kustomize
+  # OCI carries a namespace-scoped profile (built from
+  # tests/kcl-deploy-profile-preview.yaml in the SUT repo).
+  inlineProfile: false
 
 # light-catcher (Redis Streams consumer → WLED HTTP).
 lightCatcher:
