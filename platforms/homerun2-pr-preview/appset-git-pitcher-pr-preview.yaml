@@ -91,19 +91,16 @@ spec:
             # build (v0.13.0). Consumes the redis stream + renders the
             # dashboard so reviewers can see what git-pitcher produced.
             #
-            # redisStream pinned to `homerun` because git-pitcher's
-            # feat/14 (stuttgart-things/homerun2-git-pitcher#16) made
-            # `homerun` git-pitcher's default stream — core-catcher's
-            # kustomize base still defaults to `messages`, so without
-            # this override the dashboard reads from an empty stream
-            # while git-pitcher writes to a different one.
+            # No redisStream override: git-pitcher now defaults to the
+            # project-wide `messages` stream (homerun2-git-pitcher#32),
+            # which is also core-catcher's kustomize-base default — both
+            # sides align without a pin.
             coreCatcher:
               enabled: true
               version: v0.13.0
               kustomizeVersion: v0.13.0
               hostname: 'cc-git-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
               inlineHttpRoute: true
-              redisStream: homerun
 
             redisStack:
               enabled: true

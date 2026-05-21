@@ -95,6 +95,7 @@ spec:
               enabled: true
               version: v1.11.1
               hostname: 'omni-k8s-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
 
             # Co-tenanted: core-catcher in web mode at latest released —
             # consumes the redis stream and renders the dashboard, which is
