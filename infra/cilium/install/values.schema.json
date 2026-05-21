@@ -35,8 +35,11 @@
     "gatewayAPI": {
       "type": "object",
       "additionalProperties": false,
-      "properties": { "enabled": { "type": "boolean" } },
-      "required": ["enabled"]
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "enableAlpn": { "type": "boolean" }
+      },
+      "required": ["enabled", "enableAlpn"]
     },
     "l2announcements": {
       "type": "object",

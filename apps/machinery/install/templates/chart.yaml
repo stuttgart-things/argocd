@@ -89,7 +89,7 @@ default mount path. */}}
       "kind" "Service"
       "metadata" (dict "name" "machinery")
       "spec" (dict "ports" (list
-        (dict "name" "grpc" "port" 50051 "targetPort" "grpc" "protocol" "TCP")
+        (dict "name" "grpc" "port" 50051 "targetPort" "grpc" "protocol" "TCP" "appProtocol" "kubernetes.io/h2c")
         (dict "name" "http" "port" 8080  "targetPort" "http" "protocol" "TCP")
       ))
 }}

@@ -24,8 +24,16 @@ operatorReplicas: 1
 
 # Enables the `cilium` GatewayClass. Required by the gateway catalog entry
 # and by any consumer wanting HTTPRoutes through Cilium.
+#
+# enableAlpn advertises h2,http/1.1 in the ALPN of every Gateway API HTTPS
+# listener. gRPC mandates HTTP/2 and cannot fall back to HTTP/1.1, so without
+# this any GRPCRoute on an HTTPS listener is unreachable off-cluster — the TLS
+# handshake fails before gRPC frames are exchanged. Enabling it also turns on
+# appProtocol support: gRPC backend Services must set
+# `appProtocol: kubernetes.io/h2c` for Cilium to speak h2c upstream.
 gatewayAPI:
   enabled: true
+  enableAlpn: true
 
 # L2 announcements + externalIPs — required by the lb catalog entry for
 # LoadBalancer service IPs to be reachable on bare-metal / non-cloud clusters.
