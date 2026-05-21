@@ -77,10 +77,13 @@ spec:
               inlineHttpRoute: true
 
             # Co-tenanted: omni-pitcher pinned to latest released.
+            # inlineHttpRoute requires v1.11.0+ (Option B landed in
+            # stuttgart-things/homerun2-omni-pitcher#125).
             omniPitcher:
               enabled: true
-              version: v1.8.1
+              version: v1.11.1
               hostname: 'omni-cc-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              inlineHttpRoute: true
 
             redisStack:
               enabled: true

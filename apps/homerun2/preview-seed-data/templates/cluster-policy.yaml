@@ -62,7 +62,11 @@ spec:
                           sleep "$HEALTH_INTERVAL"
                         done
                         echo "posting fixture..."
-                        echo "$EVENTS_JSON" | tr -d '\n' | sed 's/},{/}\n{/g' | tr -d '[]' | while read -r evt; do
+                        # `|| [ -n "$evt" ]` processes the final object too:
+                        # the sed split leaves no trailing newline after the
+                        # last `}`, so a plain `while read` exits before
+                        # handling it and only 4 of 5 events get posted.
+                        echo "$EVENTS_JSON" | tr -d '\n' | sed 's/},{/}\n{/g' | tr -d '[]' | while read -r evt || [ -n "$evt" ]; do
                           [ -z "$evt" ] && continue
                           code=$(curl -s -o /dev/null -w '%{http_code}' \
                             -X POST "$PITCHER_URL/pitch" \
