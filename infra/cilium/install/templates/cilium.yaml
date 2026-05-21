@@ -3,7 +3,7 @@
 {{- $_ := set $computed "k8sServiceHost" .Values.k8s.serviceHost }}
 {{- $_ := set $computed "k8sServicePort" (int .Values.k8s.servicePort) }}
 {{- $_ := set $computed "operator"        (dict "replicas" (int .Values.operatorReplicas)) }}
-{{- $_ := set $computed "gatewayAPI"      (dict "enabled" .Values.gatewayAPI.enabled) }}
+{{- $_ := set $computed "gatewayAPI"      (dict "enabled" .Values.gatewayAPI.enabled "enableAlpn" .Values.gatewayAPI.enableAlpn) }}
 {{- $_ := set $computed "l2announcements" (dict "enabled" .Values.l2announcements.enabled) }}
 {{- $_ := set $computed "externalIPs"     (dict "enabled" .Values.externalIPs.enabled) }}
 

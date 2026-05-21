@@ -30,7 +30,7 @@ Argo CD Kustomize source against `oci://ghcr.io/stuttgart-things/machinery-kusto
 - **Deployment image override** — `ghcr.io/stuttgart-things/machinery:<tag>` from `.Values.image`
 - **Deployment env + volumes** — `MACHINERY_CONFIG=/etc/machinery/config.json` + `machinery-config-file` ConfigMap mounted at `/etc/machinery` (optional; distinct from the env-vars `machinery-config` ConfigMap shipped by the KCL base)
 - **Deployment ports** — `grpc:50051` + `http:8080`
-- **Service ports** — `grpc:50051` + `http:8080`
+- **Service ports** — `grpc:50051` (`appProtocol: kubernetes.io/h2c`, so Cilium speaks h2c to the gRPC backend) + `http:8080`
 - **HTTPRoute delete** — when `httpRoute.enabled: true`, the KCL-generated HTTPRoute in the base is pruned (we ship our own via the sub-Application below)
 
 ### `machinery-httproute` Application (opt-in, `httpRoute.enabled: true`)

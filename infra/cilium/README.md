@@ -71,6 +71,7 @@ See `install/values.yaml` / `install/values.schema.json` for the full contract.
 | `kubeProxyReplacement` | `true` | Cilium replaces kube-proxy |
 | `operatorReplicas` | `1` | `cilium-operator` replicas |
 | `gatewayAPI.enabled` | `true` | Enables the `cilium` GatewayClass (required by `gateway/`) |
+| `gatewayAPI.enableAlpn` | `true` | Advertise `h2,http/1.1` ALPN on every Gateway API HTTPS listener — required for `GRPCRoute` over TLS (gRPC needs HTTP/2; it can't fall back to HTTP/1.1). Also enables `appProtocol` support |
 | `l2announcements.enabled` | `true` | L2 announcements (required by `lb/`) |
 | `externalIPs.enabled` | `true` | Allow externalIPs on Services (required by `lb/`) |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
@@ -156,6 +157,8 @@ spec:
 ```
 
 Prerequisite: the `cilium` GatewayClass must exist (`gatewayAPI.enabled: true` in `install/`, or the equivalent on your out-of-band Cilium install).
+
+The HTTPS listener terminates TLS and serves both `HTTPRoute` and `GRPCRoute`. For gRPC to be reachable off-cluster the listener must advertise `h2` in its ALPN — that comes from `gatewayAPI.enableAlpn: true` on the Cilium **install** (default in `install/`), not from anything on this `Gateway` resource; ALPN is not a Gateway API listener field. A gRPC backend Service must also set `appProtocol: kubernetes.io/h2c` on its port so Cilium speaks h2c upstream.
 
 ### gateway values reference
 
