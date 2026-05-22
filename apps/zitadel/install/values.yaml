@@ -1,0 +1,107 @@
+---
+# Reference back to this catalog repo — used by the secrets / httpRoute
+# Applications to load apps/zitadel/{secrets,httproute} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: zitadel
+
+# Upstream ZITADEL chart (https://charts.zitadel.com).
+chartVersion: 10.0.1
+
+# ZITADEL server.
+replicas: 1
+image:
+  repository: ghcr.io/zitadel/zitadel
+  tag: v4.14.0
+  pullPolicy: IfNotPresent
+
+# ZITADEL runtime configuration.
+#   externalDomain      — MUST match httpRoute.hostname (the FQDN users reach
+#                         ZITADEL on); baked into issued tokens.
+#   externalSecure      — true: ZITADEL knows it is served over HTTPS. TLS
+#                         terminates at the Gateway; ZITADEL itself serves
+#                         cleartext h2c.
+#   masterkeySecretName — Secret holding the 32-byte masterkey under key
+#                         `masterkey`. Provisioned by the secrets sub-App when
+#                         secretsApp.enabled: true, else provide it out-of-band.
+zitadel:
+  externalDomain: zitadel.example.com
+  externalPort: 443
+  externalSecure: true
+  masterkeySecretName: zitadel-masterkey
+
+# Bundled PostgreSQL (Bitnami sub-chart of the upstream ZITADEL chart). For
+# production, point ZITADEL at managed PostgreSQL via extraValues and set
+# postgresql.enabled: false.
+postgresql:
+  enabled: true
+  storageClass: nfs4-csi
+  storageSize: 8Gi
+  auth:
+    database: zitadel
+    username: zitadel
+    # Passwords: inline only for dev — override via ArgoCD Vault Plugin / SOPS,
+    # never commit a literal here.
+    password: ""
+    postgresPassword: ""
+
+# externalSecrets sub-Application (opt-in, sync-wave -10) — the PRODUCTION
+# secrets path. Provisions the Secret named zitadel.masterkeySecretName via the
+# External Secrets Operator, pulling `masterkey`, `db-password`, and
+# `db-admin-password` from the referenced store. When enabled, ZITADEL and the
+# bundled PostgreSQL are wired to read DB credentials from that Secret, so no
+# password is rendered into the chart values or git.
+# Enable EITHER externalSecrets OR secretsApp, not both.
+externalSecrets:
+  enabled: false
+  store:
+    name: vault-backend
+    kind: ClusterSecretStore
+  secretPath: zitadel
+  refreshInterval: 1h
+
+# secrets sub-Application (opt-in, sync-wave -10). Inlines the masterkey Secret
+# in git — DEV ONLY, and does not cover the PostgreSQL credentials. Prefer
+# externalSecrets above. Production: leave both disabled and provision the
+# Secret named zitadel.masterkeySecretName out-of-band.
+secretsApp:
+  enabled: false
+  # ZITADEL masterkey — must be exactly 32 characters.
+  masterkey: ""
+
+# Gateway API HTTPRoute sub-Application (opt-in). ZITADEL speaks HTTP/2
+# cleartext (h2c); the upstream chart sets appProtocol: kubernetes.io/h2c on
+# the Service so the Gateway proxies gRPC/Connect traffic correctly.
+httpRoute:
+  enabled: true
+  hostname: zitadel.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

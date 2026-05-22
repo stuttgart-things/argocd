@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: zitadel-external-secrets
+description: ExternalSecret pulling the ZITADEL masterkey + PostgreSQL credentials from Vault — loaded as a sub-Application by apps/zitadel/install.
+type: application
+version: 0.1.0

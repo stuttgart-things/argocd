@@ -1,0 +1,93 @@
+{{- $defaultName := printf "zitadel-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $configmapConfig := dict
+      "ExternalDomain" .Values.zitadel.externalDomain
+      "ExternalPort"   (.Values.zitadel.externalPort | int)
+      "ExternalSecure" .Values.zitadel.externalSecure
+      "TLS"            (dict "Enabled" false)
+}}
+{{- $zitadel := dict
+      "configmapConfig"     $configmapConfig
+      "masterkeySecretName" .Values.zitadel.masterkeySecretName
+}}
+{{- $postgresql := dict "enabled" .Values.postgresql.enabled }}
+{{- if .Values.postgresql.enabled }}
+  {{- $auth := dict
+        "database"         .Values.postgresql.auth.database
+        "username"         .Values.postgresql.auth.username
+        "password"         .Values.postgresql.auth.password
+        "postgresPassword" .Values.postgresql.auth.postgresPassword
+  }}
+  {{- $_ := set $postgresql "auth" $auth }}
+  {{- $_ := set $postgresql "primary" (dict
+        "persistence" (dict
+          "enabled"      true
+          "storageClass" .Values.postgresql.storageClass
+          "size"         .Values.postgresql.storageSize
+        )
+  ) }}
+  {{- if .Values.externalSecrets.enabled }}
+    {{- /* ESO mode: the bundled PostgreSQL and ZITADEL both read DB
+           credentials from the ESO-managed Secret — no password rendered
+           into the chart values or git. */}}
+    {{- $secretName := .Values.zitadel.masterkeySecretName }}
+    {{- $_ := set $auth "existingSecret" $secretName }}
+    {{- $_ := set $auth "secretKeys" (dict
+          "userPasswordKey"  "db-password"
+          "adminPasswordKey" "db-admin-password"
+    ) }}
+    {{- /* Setting Database.Postgres.Host suppresses the chart's auto-DSN
+           helper (which would otherwise inline the password as plaintext). */}}
+    {{- $_ := set $configmapConfig "Database" (dict
+          "Postgres" (dict
+            "Host"     "zitadel-postgresql"
+            "Port"     5432
+            "Database" .Values.postgresql.auth.database
+            "User"  (dict "Username" .Values.postgresql.auth.username "SSL" (dict "Mode" "disable"))
+            "Admin" (dict "Username" "postgres" "SSL" (dict "Mode" "disable"))
+          )
+    ) }}
+    {{- $_ := set $zitadel "env" (list
+          (dict "name" "ZITADEL_DATABASE_POSTGRES_USER_PASSWORD"
+                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "db-password")))
+          (dict "name" "ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD"
+                "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "db-admin-password")))
+    ) }}
+  {{- end }}
+{{- end }}
+{{- $computed := dict
+      "replicaCount" .Values.replicas
+      "image" (dict
+        "repository" .Values.image.repository
+        "tag"        .Values.image.tag
+        "pullPolicy" (.Values.image.pullPolicy | default "IfNotPresent")
+      )
+      "zitadel"    $zitadel
+      "postgresql" $postgresql
+      "ingress"    (dict "enabled" false)
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://charts.zitadel.com
+    chart: zitadel
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: zitadel
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

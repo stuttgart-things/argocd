@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "zitadel app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion", "image", "zitadel"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": { "type": "string", "format": "uri" },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repoURL", "targetRevision"]
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "replicas": { "type": "integer", "minimum": 1 },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag":        { "type": "string", "minLength": 1 },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository", "tag"]
+    },
+    "zitadel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "externalDomain":      { "type": "string", "minLength": 1 },
+        "externalPort":        { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "externalSecure":      { "type": "boolean" },
+        "masterkeySecretName": { "type": "string", "minLength": 1 }
+      },
+      "required": ["externalDomain", "masterkeySecretName"]
+    },
+    "postgresql": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "storageClass": { "type": "string", "minLength": 1 },
+        "storageSize":  { "type": "string", "minLength": 1 },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "database":         { "type": "string", "minLength": 1 },
+            "username":         { "type": "string", "minLength": 1 },
+            "password":         { "type": "string" },
+            "postgresPassword": { "type": "string" }
+          }
+        }
+      },
+      "required": ["enabled"]
+    },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "store": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] }
+          },
+          "required": ["name", "kind"]
+        },
+        "secretPath":      { "type": "string", "minLength": 1 },
+        "refreshInterval": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": { "required": ["store", "secretPath"] }
+    },
+    "secretsApp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":   { "type": "boolean" },
+        "masterkey": { "type": "string" }
+      },
+      "required": ["enabled"]
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "hostname": { "type": "string", "minLength": 1 },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name":      { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "namespace"]
+        }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": { "required": ["hostname", "gateway"] }
+    },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed valuesObject passed to the upstream ZITADEL chart.",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
