@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: zitadel-httproute
+description: Gateway API HTTPRoute for ZITADEL — loaded as a sub-Application by apps/zitadel/install.
+type: application
+version: 0.1.0

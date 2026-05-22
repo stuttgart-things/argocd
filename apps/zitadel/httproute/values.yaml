@@ -1,0 +1,11 @@
+---
+namespace: zitadel
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: zitadel
+    hostname: zitadel.example.com
+    backend:
+      name: zitadel
+      port: 8080

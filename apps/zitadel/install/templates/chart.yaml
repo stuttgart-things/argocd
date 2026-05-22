@@ -1,0 +1,63 @@
+{{- $defaultName := printf "zitadel-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $zitadel := dict
+      "configmapConfig" (dict
+        "ExternalDomain" .Values.zitadel.externalDomain
+        "ExternalPort"   (.Values.zitadel.externalPort | int)
+        "ExternalSecure" .Values.zitadel.externalSecure
+        "TLS"            (dict "Enabled" false)
+      )
+      "masterkeySecretName" .Values.zitadel.masterkeySecretName
+}}
+{{- $postgresql := dict "enabled" .Values.postgresql.enabled }}
+{{- if .Values.postgresql.enabled }}
+  {{- $_ := set $postgresql "auth" (dict
+        "database"         .Values.postgresql.auth.database
+        "username"         .Values.postgresql.auth.username
+        "password"         .Values.postgresql.auth.password
+        "postgresPassword" .Values.postgresql.auth.postgresPassword
+  ) }}
+  {{- $_ := set $postgresql "primary" (dict
+        "persistence" (dict
+          "enabled"      true
+          "storageClass" .Values.postgresql.storageClass
+          "size"         .Values.postgresql.storageSize
+        )
+  ) }}
+{{- end }}
+{{- $computed := dict
+      "replicaCount" .Values.replicas
+      "image" (dict
+        "repository" .Values.image.repository
+        "tag"        .Values.image.tag
+        "pullPolicy" (.Values.image.pullPolicy | default "IfNotPresent")
+      )
+      "zitadel"    $zitadel
+      "postgresql" $postgresql
+      "ingress"    (dict "enabled" false)
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://charts.zitadel.com
+    chart: zitadel
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: zitadel
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

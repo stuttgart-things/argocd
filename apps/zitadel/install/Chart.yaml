@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: zitadel-install
+description: App-of-apps chart packaging ZITADEL (upstream Helm chart) with bundled PostgreSQL, an optional dev-only masterkey Secret, and a Gateway API HTTPRoute sub-Application.
+type: application
+version: 0.1.0
+appVersion: "v4.14.0"
