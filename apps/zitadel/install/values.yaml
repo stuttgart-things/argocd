@@ -53,9 +53,25 @@ postgresql:
     password: ""
     postgresPassword: ""
 
+# externalSecrets sub-Application (opt-in, sync-wave -10) — the PRODUCTION
+# secrets path. Provisions the Secret named zitadel.masterkeySecretName via the
+# External Secrets Operator, pulling `masterkey`, `db-password`, and
+# `db-admin-password` from the referenced store. When enabled, ZITADEL and the
+# bundled PostgreSQL are wired to read DB credentials from that Secret, so no
+# password is rendered into the chart values or git.
+# Enable EITHER externalSecrets OR secretsApp, not both.
+externalSecrets:
+  enabled: false
+  store:
+    name: vault-backend
+    kind: ClusterSecretStore
+  secretPath: zitadel
+  refreshInterval: 1h
+
 # secrets sub-Application (opt-in, sync-wave -10). Inlines the masterkey Secret
-# in git — DEV ONLY. Production: leave disabled and provision the Secret named
-# zitadel.masterkeySecretName via ExternalSecrets / SOPS / Vault.
+# in git — DEV ONLY, and does not cover the PostgreSQL credentials. Prefer
+# externalSecrets above. Production: leave both disabled and provision the
+# Secret named zitadel.masterkeySecretName out-of-band.
 secretsApp:
   enabled: false
   # ZITADEL masterkey — must be exactly 32 characters.

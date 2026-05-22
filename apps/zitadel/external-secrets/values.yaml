@@ -1,0 +1,24 @@
+---
+namespace: zitadel
+
+# Secret materialized by the External Secrets Operator. ZITADEL reads the
+# masterkey from it (key `masterkey`); the bundled PostgreSQL reads the DB
+# credentials from it (keys `db-password`, `db-admin-password`).
+secretName: zitadel-secrets         # pragma: allowlist secret
+
+# SecretStore / ClusterSecretStore the ESO ExternalSecret reads from.
+store:
+  name: vault-backend
+  kind: ClusterSecretStore
+
+# Path of the entry under the store's KV mount (e.g. Vault `kv/<secretPath>`).
+secretPath: zitadel
+
+refreshInterval: 1h
+
+# Keys copied from the Vault entry into the Secret. Each list item is used as
+# both the Secret key and the Vault property name.
+keys:
+  - masterkey
+  - db-password
+  - db-admin-password

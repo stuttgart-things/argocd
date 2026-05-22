@@ -5,8 +5,8 @@ access platform (OIDC / OAuth2 provider). Packaged as an **app-of-apps Helm
 chart** over the upstream `https://charts.zitadel.com` chart: consumers create
 one ArgoCD `Application` pointing at `apps/zitadel/install`, pass overrides via
 `helm.values`, and the chart renders child `Application`s for ZITADEL itself
-(plus its bundled PostgreSQL), an opt-in dev-only masterkey Secret, and a
-Gateway API HTTPRoute.
+(plus its bundled PostgreSQL), opt-in secret provisioning (ExternalSecrets, or
+a dev-only inline Secret), and a Gateway API HTTPRoute.
 
 Mirrors the structure of [`apps/vault`](../vault/) and [`apps/backstage`](../backstage/).
 
@@ -26,10 +26,12 @@ apps/zitadel/
 │   ├── values.yaml
 │   ├── values.schema.json
 │   └── templates/
-│       ├── chart.yaml            renders Application "zitadel"           (sync-wave 0)
-│       ├── secrets.yaml          renders Application "zitadel-secrets"   (sync-wave -10, gated by secretsApp.enabled — DEV ONLY)
-│       └── httproute.yaml        renders Application "zitadel-httproute" (sync-wave 10, gated by httpRoute.enabled)
-├── secrets/                      ZITADEL masterkey Secret (dev-only path; production: ExternalSecrets)
+│       ├── chart.yaml            renders Application "zitadel"                  (sync-wave 0)
+│       ├── external-secrets.yaml renders Application "zitadel-external-secrets" (sync-wave -10, gated by externalSecrets.enabled)
+│       ├── secrets.yaml          renders Application "zitadel-secrets"          (sync-wave -10, gated by secretsApp.enabled — DEV ONLY)
+│       └── httproute.yaml        renders Application "zitadel-httproute"        (sync-wave 10, gated by httpRoute.enabled)
+├── external-secrets/             ESO ExternalSecret — masterkey + DB credentials from Vault (production path)
+├── secrets/                      ZITADEL masterkey Secret (dev-only path)
 └── httproute/                    Gateway API HTTPRoute
 ```
 
@@ -52,13 +54,28 @@ ArgoCD source on `https://charts.zitadel.com` at `chart: zitadel`,
 - `ingress.enabled: false` — Gateway API HTTPRoute is the ingress path here
 - `.Values.extraValues` — deep-merged on top as an escape hatch
 
+### `zitadel-external-secrets` Application (opt-in, `externalSecrets.enabled: true`, sync-wave -10)
+The **production secrets path**. Renders an `ExternalSecret` (External Secrets
+Operator) that materialises the Secret named by `zitadel.masterkeySecretName`,
+pulling three keys from the referenced store:
+
+- `masterkey` — the 32-char ZITADEL masterkey
+- `db-password` — password for the PostgreSQL `zitadel` user
+- `db-admin-password` — password for the PostgreSQL `postgres` superuser
+
+When enabled, the `zitadel` Application is also wired so ZITADEL and the bundled
+PostgreSQL read those DB credentials from the Secret (via `existingSecret` and
+`ZITADEL_DATABASE_POSTGRES_*` env vars) — no password is rendered into the chart
+values or git. The store must already exist on the target cluster (e.g. a
+`ClusterSecretStore` provisioned by `infra/external-secrets/`).
+
 ### `zitadel-secrets` Application (opt-in, `secretsApp.enabled: true`, sync-wave -10)
-Provisions the Secret named by `zitadel.masterkeySecretName` with the masterkey
-under key `masterkey`. **Inlining a literal masterkey in git is dev-only.** For
-real deployments leave `secretsApp.enabled: false` and provision the Secret
-out-of-band via ArgoCD Vault Plugin / ExternalSecrets Operator / SOPS. The
-masterkey **must be exactly 32 characters** and must not change after the first
-deploy (it encrypts data at rest).
+Dev-only alternative to `externalSecrets`. Provisions the Secret named by
+`zitadel.masterkeySecretName` with just the masterkey under key `masterkey`.
+**Inlining a literal masterkey in git is dev-only**, and this path does *not*
+cover the PostgreSQL credentials. Enable **either** `externalSecrets` **or**
+`secretsApp`, not both. The masterkey **must be exactly 32 characters** and must
+not change after the first deploy (it encrypts data at rest).
 
 ### `zitadel-httproute` Application (opt-in, `httpRoute.enabled: true`, sync-wave 10)
 Renders an `HTTPRoute` to the `zitadel` Service on port 8080. ZITADEL serves
@@ -116,14 +133,16 @@ spec:
         chartVersion: 10.0.1
         zitadel:
           externalDomain: zitadel.my-cluster.example.com
-          masterkeySecretName: zitadel-masterkey
+          masterkeySecretName: zitadel-secrets
         postgresql:
           enabled: true
           storageClass: nfs4-csi
-          auth:
-            # Provide via ArgoCD Vault Plugin / SOPS — never inline a literal
-            password: <path:vault/data/zitadel#pg-password>
-            postgresPassword: <path:vault/data/zitadel#pg-admin-password>
+        externalSecrets:
+          enabled: true
+          store:
+            name: vault-backend
+            kind: ClusterSecretStore
+          secretPath: zitadel
         httpRoute:
           enabled: true
           hostname: zitadel.my-cluster.example.com
@@ -138,9 +157,10 @@ spec:
     syncOptions: [CreateNamespace=true, ServerSideApply=true]
 ```
 
-The masterkey Secret (`zitadel-masterkey`) must exist before the `zitadel`
-Application syncs — either provision it out-of-band, or set
-`secretsApp.enabled: true` (dev only) so the sub-App creates it at sync-wave -10.
+With `externalSecrets.enabled: true`, write the three keys to the store first
+(e.g. `vault kv put <mount>/zitadel masterkey=… db-password=… db-admin-password=…`)
+— ESO materialises the Secret at sync-wave -10, before the `zitadel` chart and
+its init job run.
 
 ## Values reference
 
@@ -162,7 +182,11 @@ full JSON Schema.
 | `postgresql.enabled` | `true` | Deploy the bundled Bitnami PostgreSQL |
 | `postgresql.storageClass` | `nfs4-csi` | StorageClass for the PostgreSQL PVC |
 | `postgresql.storageSize` | `8Gi` | PostgreSQL PVC size |
-| `postgresql.auth.{database,username,password,postgresPassword}` | `zitadel` / `zitadel` / `""` / `""` | Bundled PostgreSQL credentials (set passwords via secret overlay) |
+| `postgresql.auth.{database,username,password,postgresPassword}` | `zitadel` / `zitadel` / `""` / `""` | Bundled PostgreSQL credentials (ignored when `externalSecrets.enabled`) |
+| `externalSecrets.enabled` | `false` | Render the `zitadel-external-secrets` sub-App (production path) |
+| `externalSecrets.store.{name,kind}` | `vault-backend` / `ClusterSecretStore` | ESO store the `ExternalSecret` reads from |
+| `externalSecrets.secretPath` | `zitadel` | Entry path under the store's KV mount |
+| `externalSecrets.refreshInterval` | `1h` | ESO refresh interval |
 | `secretsApp.enabled` | `false` | Render the `zitadel-secrets` sub-App (DEV ONLY) |
 | `secretsApp.masterkey` | `""` | 32-char masterkey, inlined when `secretsApp.enabled: true` |
 | `httpRoute.enabled` | `true` | Render the HTTPRoute sub-App |

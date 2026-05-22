@@ -72,6 +72,27 @@
       },
       "required": ["enabled"]
     },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "store": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] }
+          },
+          "required": ["name", "kind"]
+        },
+        "secretPath":      { "type": "string", "minLength": 1 },
+        "refreshInterval": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } } },
+      "then": { "required": ["store", "secretPath"] }
+    },
     "secretsApp": {
       "type": "object",
       "additionalProperties": false,
