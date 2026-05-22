@@ -24,7 +24,7 @@ kustomize:
 # Machinery container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/machinery
-  tag: 1.12.0
+  tag: 1.13.0
 
 # Optional MACHINERY_CONFIG. Two opt-in paths:
 #
