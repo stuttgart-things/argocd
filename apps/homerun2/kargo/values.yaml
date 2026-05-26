@@ -45,7 +45,7 @@ credentials:
     externalSecret:
       enabled: true
       refreshInterval: 1h
-      secretStoreName: vault-backend
+      secretStoreName: vault-homerun2-cd
       secretStoreKind: ClusterSecretStore
       vaultPath: homerun2-cd/data/kargo
       vaultKeyUsername: gitUsername
@@ -57,7 +57,7 @@ credentials:
     externalSecret:
       enabled: true
       refreshInterval: 1h
-      secretStoreName: vault-backend
+      secretStoreName: vault-homerun2-cd
       secretStoreKind: ClusterSecretStore
       vaultPath: homerun2-cd/data/kargo
       vaultKeyUsername: ghcrUsername
