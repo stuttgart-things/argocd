@@ -70,6 +70,10 @@ credentials:
 # component joins the pipeline.
 warehouse:
   name: homerun2
+  # Poll cadence for the Warehouse's subscriptions. Matches the live Kargo
+  # CRD default (5m0s) — lower it during smoke-testing if you need faster
+  # tag-pickup feedback.
+  interval: 5m0s
   subscriptions:
     omniPitcher:
       enabled: true

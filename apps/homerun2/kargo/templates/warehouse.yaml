@@ -8,6 +8,11 @@ metadata:
   name: {{ .Values.warehouse.name | quote }}
   namespace: {{ .Values.project | quote }}
 spec:
+  # How often the Warehouse polls each subscription for new artifacts.
+  # The Kargo CRD defaults this to 5m0s if omitted, but the
+  # datreeio/CRDs-catalog schema (used by CI Helm-verify) lists it as
+  # required, so the chart always emits it explicitly.
+  interval: {{ .Values.warehouse.interval | quote }}
   subscriptions:
   {{- with .Values.warehouse.subscriptions.omniPitcher }}
   {{- if .enabled }}
