@@ -64,8 +64,11 @@ spec:
         - uses: git-commit
           config:
             path: ./repo
-            messageFromSteps:
-              - yaml-update
+            # Kargo's git-commit step in 1.9.x requires a literal `message`;
+            # the older `messageFromSteps` field has been removed. Reference
+            # the Freight via the expression context so each commit names
+            # what got promoted.
+            message: "chore({{ $stageName }}): promote freight ${{ "{{" }} ctx.promotion {{ "}}" }}"
         - uses: git-push
           config:
             path: ./repo
