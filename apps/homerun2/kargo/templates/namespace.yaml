@@ -1,0 +1,12 @@
+---
+# Project namespace. Kargo refuses to create a Project whose namespace doesn't
+# exist; the chart provisions it explicitly (rather than relying on
+# `CreateNamespace=true` on the Application sync option, which races with the
+# Project CR.). The kargo.akuity.io/project label tells the Kargo controller
+# that the namespace belongs to a Project.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.project | quote }}
+  labels:
+    kargo.akuity.io/project: "true"

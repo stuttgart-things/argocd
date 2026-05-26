@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: homerun2-kargo
+description: Kargo promotion pipeline for the homerun2 stack. Renders the Project + kargo-homerun2 namespace + ExternalSecrets for Git/GHCR credentials + Warehouse (omni-pitcher freight to start) + three Stages (dev auto-promote → staging gated on dev Healthy → prod manual gate). Promotion templates `yaml-update` the env-values file in stuttgart-things/stuttgart-things, push, then `argocd-update` waits on the per-env homerun2 Application.
+type: application
+version: 0.1.0
+appVersion: "v1.9.6"
