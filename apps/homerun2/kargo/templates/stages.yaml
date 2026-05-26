@@ -61,7 +61,8 @@ spec:
                 value: ${{ "{{" }} imageFrom({{ .repoURL | quote }}).Tag {{ "}}" }}
             {{- end }}
             {{- end }}
-        - uses: git-commit
+        - as: commit
+          uses: git-commit
           config:
             path: ./repo
             # Kargo's git-commit step in 1.9.x requires a literal `message`;
@@ -75,9 +76,13 @@ spec:
         - uses: argocd-update
           config:
             apps:
-              # Argo CD project the per-env Application belongs to.
               - name: {{ $appName | quote }}
                 sources:
                   - repoURL: {{ $values.envValuesRepo.url | quote }}
-                    desiredCommitFromStep: git-clone
+                    # Kargo 1.9.x replaced `desiredCommitFromStep: <step>` with
+                    # `desiredRevision: <expression>`. We point at the commit
+                    # produced by the `commit` step (git-commit, aliased above)
+                    # so Argo CD waits for ITS Application to converge on the
+                    # exact SHA Kargo just pushed.
+                    desiredRevision: ${{ "{{" }} outputs.commit.commit {{ "}}" }}
 {{- end }}
