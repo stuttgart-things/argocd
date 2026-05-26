@@ -1,0 +1,25 @@
+---
+# Kargo Project — owns all Stages + the Warehouse in this chart. In current
+# Kargo (1.x) the Project CR carries no spec; configuration lives in the
+# adjacent ProjectConfig.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Project
+metadata:
+  name: {{ .Values.project | quote }}
+---
+# ProjectConfig — promotion policies and (later) webhook receivers /
+# additional config for the Project. Stages NOT listed here require a
+# manual promotion (via UI / `kargo promote`).
+apiVersion: kargo.akuity.io/v1alpha1
+kind: ProjectConfig
+metadata:
+  name: {{ .Values.project | quote }}
+  namespace: {{ .Values.project | quote }}
+spec:
+  promotionPolicies:
+    {{- range .Values.stages }}
+    {{- if .autoPromote }}
+    - stage: {{ .name | quote }}
+      autoPromotionEnabled: true
+    {{- end }}
+    {{- end }}

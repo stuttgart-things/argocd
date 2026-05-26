@@ -1,0 +1,80 @@
+{{- $values := .Values -}}
+{{- $project := .Values.project -}}
+{{- range .Values.stages }}
+{{- $stageName := .name -}}
+{{- $appName := include "homerun2-kargo.applicationName" (dict "Values" $values "env" $stageName) -}}
+{{- $valuesPath := include "homerun2-kargo.envValuesPath" (dict "Values" $values "env" $stageName) }}
+---
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Stage
+metadata:
+  name: {{ $stageName | quote }}
+  namespace: {{ $project | quote }}
+spec:
+  requestedFreight:
+    - origin:
+        kind: Warehouse
+        name: {{ $values.warehouse.name | quote }}
+      sources:
+        {{- if .direct }}
+        # Pulls newest discovered freight directly from the Warehouse.
+        direct: true
+        {{- else }}
+        # Promotes only freight already validated as Healthy on upstream Stage(s).
+        stages:
+        {{- range .sourceStages }}
+          - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+  promotionTemplate:
+    spec:
+      steps:
+        - uses: git-clone
+          config:
+            repoURL: {{ $values.envValuesRepo.url | quote }}
+            checkout:
+              - branch: {{ $values.envValuesRepo.branch | quote }}
+                path: ./repo
+        - uses: yaml-update
+          config:
+            path: ./repo/{{ $valuesPath }}
+            updates:
+            {{- with $values.warehouse.subscriptions.omniPitcher }}
+            {{- if .enabled }}
+              - key: omniPitcher.version
+                value: ${{ "{{" }} imageFrom({{ .repoURL | quote }}).Tag {{ "}}" }}
+            {{- end }}
+            {{- end }}
+            {{- with $values.warehouse.subscriptions.coreCatcher }}
+            {{- if .enabled }}
+              - key: coreCatcher.version
+                value: ${{ "{{" }} imageFrom({{ .repoURL | quote }}).Tag {{ "}}" }}
+              # core-catcher's image tag and kustomize OCI tag bump together —
+              # both keys must update in the same yaml-update step.
+              - key: coreCatcher.kustomizeVersion
+                value: ${{ "{{" }} imageFrom({{ .repoURL | quote }}).Tag {{ "}}" }}
+            {{- end }}
+            {{- end }}
+            {{- with $values.warehouse.subscriptions.scout }}
+            {{- if .enabled }}
+              - key: scout.version
+                value: ${{ "{{" }} imageFrom({{ .repoURL | quote }}).Tag {{ "}}" }}
+            {{- end }}
+            {{- end }}
+        - uses: git-commit
+          config:
+            path: ./repo
+            messageFromSteps:
+              - yaml-update
+        - uses: git-push
+          config:
+            path: ./repo
+        - uses: argocd-update
+          config:
+            apps:
+              # Argo CD project the per-env Application belongs to.
+              - name: {{ $appName | quote }}
+                sources:
+                  - repoURL: {{ $values.envValuesRepo.url | quote }}
+                    desiredCommitFromStep: git-clone
+{{- end }}

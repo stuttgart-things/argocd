@@ -1,0 +1,35 @@
+---
+# Single Warehouse aggregating every freight stream that contributes to
+# homerun2. Only enabled subscriptions render — start with omni-pitcher,
+# extend per Step 4e of stuttgart-things/homerun2-omni-pitcher#116.
+apiVersion: kargo.akuity.io/v1alpha1
+kind: Warehouse
+metadata:
+  name: {{ .Values.warehouse.name | quote }}
+  namespace: {{ .Values.project | quote }}
+spec:
+  subscriptions:
+  {{- with .Values.warehouse.subscriptions.omniPitcher }}
+  {{- if .enabled }}
+    - image:
+        repoURL: {{ .repoURL | quote }}
+        semverConstraint: {{ .semverConstraint | quote }}
+        discoveryLimit: {{ .discoveryLimit | default 5 }}
+  {{- end }}
+  {{- end }}
+  {{- with .Values.warehouse.subscriptions.coreCatcher }}
+  {{- if .enabled }}
+    - image:
+        repoURL: {{ .repoURL | quote }}
+        semverConstraint: {{ .semverConstraint | quote }}
+        discoveryLimit: {{ .discoveryLimit | default 5 }}
+  {{- end }}
+  {{- end }}
+  {{- with .Values.warehouse.subscriptions.scout }}
+  {{- if .enabled }}
+    - image:
+        repoURL: {{ .repoURL | quote }}
+        semverConstraint: {{ .semverConstraint | quote }}
+        discoveryLimit: {{ .discoveryLimit | default 5 }}
+  {{- end }}
+  {{- end }}

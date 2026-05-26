@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "homerun2-kargo chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "argocdProject",
+    "envValuesRepo",
+    "applicationNameTemplate",
+    "credentials",
+    "warehouse",
+    "stages"
+  ],
+  "properties": {
+    "project": { "type": "string", "minLength": 1 },
+    "argocdProject": { "type": "string", "minLength": 1 },
+    "envValuesRepo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "branch", "pathTemplate"],
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "branch": { "type": "string", "minLength": 1 },
+        "pathTemplate": {
+          "type": "string",
+          "description": "Path template; must contain literal {env} which Kargo substitutes per Stage.",
+          "pattern": "\\{env\\}"
+        }
+      }
+    },
+    "applicationNameTemplate": {
+      "type": "string",
+      "description": "Per-env Argo CD Application name. Must contain literal {env}.",
+      "pattern": "\\{env\\}"
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["git", "ghcr"],
+      "properties": {
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["externalSecret"],
+          "properties": {
+            "externalSecret": { "$ref": "#/definitions/externalSecret" }
+          }
+        },
+        "ghcr": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["externalSecret"],
+          "properties": {
+            "externalSecret": { "$ref": "#/definitions/externalSecret" }
+          }
+        }
+      }
+    },
+    "warehouse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "subscriptions"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "subscriptions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "omniPitcher": { "$ref": "#/definitions/imageSubscription" },
+            "coreCatcher": { "$ref": "#/definitions/imageSubscription" },
+            "scout": { "$ref": "#/definitions/imageSubscription" }
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "autoPromote"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "autoPromote": { "type": "boolean" },
+          "direct": { "type": "boolean" },
+          "sourceStages": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "oneOf": [
+          { "required": ["direct"], "properties": { "direct": { "const": true } } },
+          { "required": ["sourceStages"] }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "externalSecret": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "refreshInterval",
+        "secretStoreName",
+        "secretStoreKind",
+        "vaultPath",
+        "vaultKeyUsername",
+        "vaultKeyPassword",
+        "repoURL"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "refreshInterval": { "type": "string", "minLength": 1 },
+        "secretStoreName": { "type": "string", "minLength": 1 },
+        "secretStoreKind": {
+          "type": "string",
+          "enum": ["SecretStore", "ClusterSecretStore"]
+        },
+        "vaultPath": { "type": "string", "minLength": 1 },
+        "vaultKeyUsername": { "type": "string", "minLength": 1 },
+        "vaultKeyPassword": { "type": "string", "minLength": 1 },
+        "repoURL": { "type": "string", "minLength": 1 }
+      }
+    },
+    "imageSubscription": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "repoURL", "semverConstraint"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "repoURL": { "type": "string", "minLength": 1 },
+        "semverConstraint": { "type": "string", "minLength": 1 },
+        "discoveryLimit": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    }
+  }
+}

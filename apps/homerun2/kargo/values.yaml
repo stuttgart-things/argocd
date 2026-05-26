@@ -1,0 +1,109 @@
+---
+# Kargo Project name. Doubles as the namespace name (project namespace is
+# always `<project>` per Kargo convention) — i.e. project=homerun2 lands in
+# namespace `homerun2`. The plan calls the namespace `kargo-homerun2`; if
+# that naming is preferred, set `project: kargo-homerun2` here.
+project: kargo-homerun2
+
+# ArgoCD project that the per-env Applications belong to. The Kargo
+# controller's RBAC must be allowed to patch Applications in this project.
+argocdProject: default
+
+# Where Kargo's `yaml-update` step patches version pins. This is the
+# env-values path locked in stuttgart-things/homerun2-omni-pitcher#116:
+# values files live in the cluster-config repo, separate from the chart
+# they parameterise.
+envValuesRepo:
+  url: https://github.com/stuttgart-things/stuttgart-things.git
+  branch: main
+  # Promotion writes `<envValuesRepo.pathTemplate>` with `{env}` substituted
+  # per-stage. Each file is consumed as the second source of the per-env
+  # multi-source Application (source 1 = apps/homerun2/install chart,
+  # source 2 = this values file via `helm.valueFiles: $values/...`).
+  pathTemplate: argocd/homerun2/values-{env}.yaml
+
+# Per-env Application names that `argocd-update` waits on. `{env}` is
+# substituted with the Stage's name (dev/staging/prod).
+applicationNameTemplate: homerun2-{env}
+
+# Credentials. Both Secrets are Project-scoped (live in the project's
+# namespace) and carry the `kargo.akuity.io/cred-type` label so the Kargo
+# controller picks them up. ExternalSecret materialises them from Vault
+# (matches the homerun2 preview-secrets pattern).
+#
+# Prerequisite: External Secrets Operator must be installed on the cluster
+# where this chart syncs (the central Kargo cluster). The `platform-sthings`
+# cluster does NOT currently carry the `security-platform/external-secrets`
+# clusterbook flag — flip it (or install ESO out-of-band) before turning
+# these on. Set `externalSecret.enabled: false` to suppress rendering and
+# provide creds via another path (manual Secret, sealed-secrets, etc.).
+credentials:
+  git:
+    # ExternalSecret reads the git PAT used by `git-push` from Vault. PAT
+    # must have `contents: write` on stuttgart-things/stuttgart-things so
+    # Kargo can commit the values-file bump.
+    externalSecret:
+      enabled: true
+      refreshInterval: 1h
+      secretStoreName: vault-backend
+      secretStoreKind: ClusterSecretStore
+      vaultPath: homerun2-cd/data/kargo
+      vaultKeyUsername: gitUsername
+      vaultKeyPassword: gitToken
+      # Matches the URL Kargo compares against subscription / git-clone steps.
+      repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+  ghcr:
+    # ExternalSecret reads the GHCR read PAT used by Warehouse tag scans.
+    externalSecret:
+      enabled: true
+      refreshInterval: 1h
+      secretStoreName: vault-backend
+      secretStoreKind: ClusterSecretStore
+      vaultPath: homerun2-cd/data/kargo
+      vaultKeyUsername: ghcrUsername
+      vaultKeyPassword: ghcrToken
+      # Matches every ghcr.io/stuttgart-things/* repo Kargo scans.
+      repoURL: ghcr.io/stuttgart-things
+
+# Single Warehouse subscribing to every artifact stream that should
+# contribute freight. Start with omni-pitcher only; extend when the next
+# component joins the pipeline.
+warehouse:
+  name: homerun2
+  subscriptions:
+    omniPitcher:
+      enabled: true
+      repoURL: ghcr.io/stuttgart-things/homerun2-omni-pitcher
+      semverConstraint: ">=1.0.0"
+      discoveryLimit: 5
+    # Placeholder subscriptions disabled until each component is ready
+    # to be promoted (Step 4e of stuttgart-things/homerun2-omni-pitcher#116).
+    coreCatcher:
+      enabled: false
+      repoURL: ghcr.io/stuttgart-things/homerun2-core-catcher
+      semverConstraint: ">=0.5.0"
+      discoveryLimit: 5
+    scout:
+      enabled: false
+      repoURL: ghcr.io/stuttgart-things/homerun2-scout
+      semverConstraint: ">=0.5.0"
+      discoveryLimit: 5
+
+# Stages chained dev → staging → prod. Order in this list determines the
+# promotion chain: each Stage requests freight from the previous one
+# (except `dev`, which pulls directly from the Warehouse).
+stages:
+  - name: dev
+    autoPromote: true
+    # `direct: true` means dev pulls newest discovered freight straight
+    # from the Warehouse, bypassing any upstream Stage gate.
+    direct: true
+  - name: staging
+    autoPromote: true
+    # Promotes only freight already validated as Healthy on `dev`.
+    sourceStages:
+      - dev
+  - name: prod
+    autoPromote: false
+    sourceStages:
+      - staging
