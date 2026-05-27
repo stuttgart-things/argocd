@@ -9,6 +9,8 @@ resources:
   - appset-crossplane.yaml
   - appset-crossplane-providers.yaml
   - appset-crossplane-provider-configs.yaml
+  - appset-crossplane-functions.yaml
+  - appset-crossplane-configs.yaml
   - appset-kargo.yaml
   - appset-kargo-httproute.yaml
   - appset-tekton.yaml
