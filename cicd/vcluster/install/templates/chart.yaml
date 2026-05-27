@@ -9,6 +9,11 @@
         "accessModes"     (list "ReadWriteOnce")
       )
 }}
+{{- $statefulSet := dict
+      "persistence"      $persistence
+      "resources"        .Values.resources
+      "highAvailability" (dict "replicas" .Values.replicas)
+}}
 {{- $controlPlane := dict
       "distro" (dict
         "k8s" (dict
@@ -18,10 +23,8 @@
       )
       "backingStore" (dict
         "etcd" (dict "embedded" (dict "enabled" true))
-        "resources"        .Values.resources
-        "highAvailability" (dict "replicas" .Values.replicas)
       )
-      "persistence" $persistence
+      "statefulSet" $statefulSet
 }}
 {{- $sync := dict
       "toHost" (dict

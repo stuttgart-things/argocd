@@ -3,5 +3,5 @@ apiVersion: v2
 name: vcluster-install
 description: App-of-apps chart packaging loft-sh/vcluster (k8s distro on embedded etcd, host-side service/endpoint/PVC sync, host-side storage/ingress class import).
 type: application
-version: 0.1.0
-appVersion: "0.29.1"
+version: 0.2.0
+appVersion: "0.34.0"

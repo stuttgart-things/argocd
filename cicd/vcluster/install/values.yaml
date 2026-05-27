@@ -8,12 +8,12 @@ destination:
   namespace: vcluster
 
 # Upstream loft-sh/vcluster Helm chart version.
-chartVersion: 0.29.1
+chartVersion: 0.34.0
 
 # Kubernetes version inside the virtual cluster (controlPlane.distro.k8s.image.tag).
 k8sVersion: v1.33.4
 
-# controlPlane resources (passed through to backingStore.etcd.resources).
+# controlPlane resources (passed through to controlPlane.statefulSet.resources).
 resources:
   requests:
     cpu: 200m
