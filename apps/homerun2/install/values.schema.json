@@ -201,6 +201,18 @@
         }
       },
       "required": ["enabled"]
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional sub-Application that materialises the Secrets the workloads consume (omni-pitcher auth-token + redis password, redis-stack auth) from a ClusterSecretStore + Vault path. When `enabled: false` (default), nothing is rendered — the cluster relies on inline `redisPassword`/`authToken` literals or out-of-band-managed Secrets.",
+      "properties": {
+        "enabled":                { "type": "boolean" },
+        "clusterSecretStoreName": { "type": "string", "minLength": 1 },
+        "vaultSecretName":        { "type": "string", "minLength": 1 },
+        "refreshInterval":        { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
+      },
+      "required": ["enabled"]
     }
   }
 }
