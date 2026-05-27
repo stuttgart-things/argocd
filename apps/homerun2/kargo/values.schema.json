@@ -13,6 +13,11 @@
     "stages"
   ],
   "properties": {
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
     "project": { "type": "string", "minLength": 1 },
     "argocdProject": { "type": "string", "minLength": 1 },
     "envValuesRepo": {
