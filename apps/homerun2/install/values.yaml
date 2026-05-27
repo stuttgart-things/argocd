@@ -224,3 +224,22 @@ httpRoute:
   gateway:
     name: cilium-gateway
     namespace: default
+
+# Optional ExternalSecrets sub-Application (apps/homerun2/secrets in this
+# catalog). Off by default — when enabled, renders one ExternalSecret per
+# Secret-needed-by-the-stack (omni-pitcher auth-token + redis password,
+# redis-stack auth) against the named ClusterSecretStore and Vault KV
+# secret. Useful for steady-state envs where the chart's `authToken` /
+# `redisPassword` literals are left empty (the chart deletes the kustomize-
+# shipped Secrets in that case, expecting an ESO-managed Secret to take
+# their place).
+#
+# The named ClusterSecretStore must already exist on the workload cluster.
+# For homerun2-dev, `vault-homerun2-pr` (shared with the PR-preview path)
+# is the pragmatic choice; staging + prod should point at dedicated Vault
+# paths when those are provisioned.
+secrets:
+  enabled: false
+  clusterSecretStoreName: vault-homerun2-pr
+  vaultSecretName: preview-env
+  refreshInterval: 1h
