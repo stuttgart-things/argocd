@@ -267,11 +267,11 @@ spec:
 
 | Function | apiVersion | Package |
 |---|---|---|
-| `function-auto-ready` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-auto-ready:v0.6.4` |
-| `function-go-templating` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-go-templating:v0.12.0` |
+| `function-auto-ready` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-auto-ready:v0.6.5` |
+| `function-go-templating` | `pkg.crossplane.io/v1beta1` | `xpkg.crossplane.io/crossplane-contrib/function-go-templating:v0.12.1` |
 | `function-kcl` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/function-kcl:v0.12.1` |
-| `function-patch-and-transform` | `pkg.crossplane.io/v1beta1` | `xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.10.5` |
-| `function-environment-configs` | `pkg.crossplane.io/v1` | `xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.0` |
+| `function-patch-and-transform` | `pkg.crossplane.io/v1beta1` | `xpkg.upbound.io/crossplane-contrib/function-patch-and-transform:v0.10.6` |
+| `function-environment-configs` | `pkg.crossplane.io/v1` | `xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.1` |
 
 Override the whole list via `helm.values`:
 
