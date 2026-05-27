@@ -22,9 +22,9 @@ A single Argo CD `Application` pointing at the loft.sh `vcluster` chart. Compute
 
 - `controlPlane.distro.k8s.enabled: true` + `image.tag: .Values.k8sVersion` (default `v1.33.4`)
 - `controlPlane.backingStore.etcd.embedded.enabled: true` — embedded etcd, no external store
-- `controlPlane.backingStore.resources` — from `.Values.resources` (default 200m/512Mi/1Gi → 4Gi/8Gi)
-- `controlPlane.backingStore.highAvailability.replicas: .Values.replicas` (set to 3 for true HA)
-- `controlPlane.persistence.volumeClaim` — `enabled` + `size` + `storageClass`, `retentionPolicy: Retain`, `ReadWriteOnce`
+- `controlPlane.statefulSet.resources` — from `.Values.resources` (default 200m/512Mi/1Gi → 4Gi/8Gi)
+- `controlPlane.statefulSet.highAvailability.replicas: .Values.replicas` (set to 3 for true HA)
+- `controlPlane.statefulSet.persistence.volumeClaim` — `enabled` + `size` + `storageClass`, `retentionPolicy: Retain`, `ReadWriteOnce`
 - `sync.toHost` — services, endpoints, PVCs synced from vcluster down to the host
 - `sync.fromHost` — events + StorageClasses + IngressClasses imported from the host (nodes off by default)
 - `.Values.extraValues` — deep-merged on top as an escape hatch
@@ -49,7 +49,7 @@ spec:
         destination:
           server: https://<cluster-api>:6443
           namespace: vcluster
-        chartVersion: 0.29.1
+        chartVersion: 0.34.0
         k8sVersion: v1.33.4
         persistence:
           enabled: true
@@ -70,11 +70,11 @@ spec:
 | `project` | `default` | AppProject for the rendered Application |
 | `destination.server` | `https://kubernetes.default.svc` | Target cluster API |
 | `destination.namespace` | `vcluster` | Namespace for the vcluster controlPlane |
-| `chartVersion` | `0.29.1` | Upstream `vcluster` chart version |
+| `chartVersion` | `0.34.0` | Upstream `vcluster` chart version |
 | `k8sVersion` | `v1.33.4` | Kubernetes version inside the virtual cluster |
-| `resources.{requests,limits}` | 200m/512Mi/1Gi → 4Gi/8Gi | controlPlane etcd resources |
+| `resources.{requests,limits}` | 200m/512Mi/1Gi → 4Gi/8Gi | controlPlane statefulSet resources |
 | `replicas` | `1` | controlPlane HA replicas (use 3 for production) |
-| `persistence.{enabled,storageClass,size}` | `true` / `""` / `10Gi` | controlPlane PVC config (empty `storageClass` lets the cluster default apply) |
+| `persistence.{enabled,storageClass,size}` | `true` / `""` / `10Gi` | controlPlane statefulSet PVC config (empty `storageClass` lets the cluster default apply) |
 | `sync.toHost.{services,endpoints,persistentVolumeClaims}` | all `true` | Push these resource types out to the host namespace |
 | `sync.fromHost.{events,storageClasses,nodes,ingressClasses}` | `true,true,false,true` | Pull these in from the host |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
