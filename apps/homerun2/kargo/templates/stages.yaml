@@ -85,4 +85,13 @@ spec:
                     # so Argo CD waits for ITS Application to converge on the
                     # exact SHA Kargo just pushed.
                     desiredRevision: ${{ "{{" }} outputs.commit.commit {{ "}}" }}
+  {{- if .verify }}
+  # Verification — see templates/analysistemplate.yaml for why this is
+  # wired even though the AnalysisTemplate is a no-op. Without it, Kargo
+  # 1.9.6's Stage controller doesn't mark freight verifiedIn[<stage>],
+  # which blocks dev→staging→prod freight propagation.
+  verification:
+    analysisTemplates:
+      - name: noop-pass
+  {{- end }}
 {{- end }}
