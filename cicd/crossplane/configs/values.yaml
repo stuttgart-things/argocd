@@ -5,9 +5,15 @@
 #   name:    Configuration resource name
 #   package: full xpkg reference including tag
 #
-# The default list is intentionally empty while the Configurations are
-# migrated from the old ghcr.io/stuttgart-things/crossplane/... packages
-# to ghcr.io/stuttgart-things/crossplane-configurations/... — entries
-# will be re-added one at a time as their replacements are pushed and
-# verified.
-configurations: []
+# Migrated from ghcr.io/stuttgart-things/crossplane/... (old repo, decommissioned)
+# to ghcr.io/stuttgart-things/crossplane-configurations/... (Crossplane v2,
+# namespaced XRs, dagger-verified). Entries are re-added one at a time as their
+# replacements are pushed.
+#
+# Profile structure (one chart, one entry list) is deliberately flat for now —
+# when there's a real second profile (e.g. CI/CD-only Configurations vs.
+# generic k8s primitives), split into cicd/crossplane/profiles/<name>/ with
+# one chart + one ApplicationSet per profile.
+configurations:
+  - name: namespace
+    package: ghcr.io/stuttgart-things/crossplane-configurations/namespace:v0.1.1
