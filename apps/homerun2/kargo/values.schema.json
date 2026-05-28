@@ -97,6 +97,10 @@
           "sourceStages": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
+          },
+          "verify": {
+            "type": "boolean",
+            "description": "Attach the chart's no-op AnalysisTemplate as the Stage's verification step. Required for freight to be marked verifiedIn[stage] in Kargo 1.9.x; can be dropped if a later release auto-verifies on Healthy without it."
           }
         },
         "oneOf": [

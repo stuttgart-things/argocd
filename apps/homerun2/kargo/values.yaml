@@ -102,12 +102,21 @@ stages:
     # `direct: true` means dev pulls newest discovered freight straight
     # from the Warehouse, bypassing any upstream Stage gate.
     direct: true
+    # Run a no-op AnalysisTemplate after each promotion so freight gets
+    # marked verifiedIn[dev]. Working around a Kargo 1.9.6 behavior where
+    # the Stage controller didn't auto-absorb succeeded Promotions into
+    # Stage.status; with a verification step, the controller takes the
+    # AnalysisRun-driven path and writes freight verification correctly.
+    verify: true
   - name: staging
     autoPromote: true
     # Promotes only freight already validated as Healthy on `dev`.
     sourceStages:
       - dev
+    verify: true
   - name: prod
     autoPromote: false
     sourceStages:
       - staging
+    # No verify on prod yet — prod promotion is manual; gate-keeping is
+    # the operator, not an AnalysisRun.

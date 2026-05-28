@@ -1,0 +1,51 @@
+{{- /*
+No-op AnalysisTemplate referenced by Stages that opt in via `verify: true`.
+
+Argo Rollouts AnalysisRuns are the only way (in Kargo 1.9.x) to drive a
+Stage's `spec.verification`, which in turn is what we need to make the
+Stage controller absorb a succeeded Promotion's freight into
+`Stage.status.freightHistory[0]` and ultimately mark
+`Freight.status.verifiedIn[<stage>]`. Without that, downstream Stages
+(staging/prod) never receive freight from `sourceStages`.
+
+The AnalysisRun executes a single Job whose pod exits 0 — no real
+health probe, just a verification of "Argo CD made the change Healthy".
+The Argo CD Application health check happens *inside* the chart's
+argocd-update step (already gating the Promotion), so a separate
+non-trivial probe here would be redundant.
+
+If you later move to a Kargo release that auto-verifies on Healthy
+without an AnalysisRun, flip `verify: false` on every Stage and this
+template stops rendering.
+*/}}
+{{- $needVerify := false -}}
+{{- range .Values.stages }}{{- if .verify }}{{- $needVerify = true }}{{- end }}{{- end }}
+{{- if $needVerify }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: noop-pass
+  namespace: {{ .Values.project | quote }}
+spec:
+  metrics:
+    - name: noop
+      provider:
+        job:
+          spec:
+            backoffLimit: 0
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: noop
+                    image: alpine:3.20
+                    command: ["sh", "-c", "exit 0"]
+                    resources:
+                      requests:
+                        cpu: 10m
+                        memory: 16Mi
+                      limits:
+                        cpu: 100m
+                        memory: 64Mi
+{{- end }}
