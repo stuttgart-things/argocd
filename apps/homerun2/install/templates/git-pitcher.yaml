@@ -21,11 +21,6 @@ spec:
     kustomize:
       namespace: {{ $ns | quote }}
       patches:
-        - target:
-            kind: Namespace
-            name: homerun2
-          patch: |
-{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Namespace" "name" "homerun2") | indent 12 }}
 {{- if .Values.gitPitcher.inlineHttpRoute }}
         # Option B from stuttgart-things/argocd#116 — kustomize OCI ships the
         # HTTPRoute alongside Service so they land atomically. Patch parentRef
