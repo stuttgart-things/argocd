@@ -1,4 +1,9 @@
-{{- if and .Values.config .Values.config.content }}
+{{/* Resolve the effective config JSON from either `config.content` (raw)
+or `config.watch` (assembled from the .Values.kinds catalog). Empty
+string => nothing to materialize here (machinery's defaultConfig, or an
+external `config.fromConfigMap`). */}}
+{{- $cfgJSON := include "machinery.configContent" . }}
+{{- if $cfgJSON }}
 {{- $defaultName := printf "machinery-%s" (sha1sum .Values.destination.server | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
 {{- $cmName := default "machinery-config-file" .Values.config.name }}
@@ -8,9 +13,8 @@ free-form catch-all; consumers can still inline auth there if they
 prefer. The auth block only carries fields that are actually set, so
 machinery's resolution order (token → tokenFile → tokenEnvVar →
 $MACHINERY_AUTH_TOKEN) sees exactly what the caller chose. */}}
-{{- $cfgJSON := .Values.config.content }}
 {{- if and .Values.auth .Values.auth.enabled }}
-{{-   $parsed := fromJson .Values.config.content }}
+{{-   $parsed := fromJson $cfgJSON }}
 {{-   $auth := dict "enabled" true }}
 {{/* When tokenSecretRef is set, the chart auto-derives tokenFile from
 tokenMountPath — the user shouldn't have to keep them in sync. Inline

@@ -1,4 +1,13 @@
-{{- if and .Values.rbac .Values.rbac.rules }}
+{{/* Effective rules = explicit `rbac.rules` UNION the rules derived from
+`config.watch` (one per apiGroup, see _helpers.tpl). Deriving from the
+same catalog the watch config is built from keeps RBAC and the watch set
+from ever drifting — add a kind to `watch` and its list/watch permission
+comes along automatically. */}}
+{{- $explicitRules := list }}
+{{- if and .Values.rbac .Values.rbac.rules }}{{- $explicitRules = .Values.rbac.rules }}{{- end }}
+{{- $watchRules := include "machinery.watchRbacRules" . | fromJsonArray }}
+{{- $allRules := concat $explicitRules $watchRules }}
+{{- if $allRules }}
 {{- $defaultName := printf "machinery-%s" (sha1sum .Values.destination.server | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
 {{- $roleName := default (printf "%s-reader" $appName) .Values.rbac.name }}
@@ -8,7 +17,8 @@
 # Application, machinery's list/watch calls for anything outside the
 # `view` aggregation come back forbidden, and the dashboard just
 # error-loops. Cluster-scoped so a single binding covers whichever
-# kinds `rbac.rules` enumerates.
+# kinds `config.watch` selects (rules derived from the catalog) plus any
+# extra `rbac.rules`.
 #
 # Sync-wave 0: same as the kustomize Application so the binding lands
 # in the same pass that creates the SA.
@@ -37,7 +47,7 @@ spec:
           name: machinery
           namespace: {{ .Values.destination.namespace | quote }}
         rules:
-          {{- toYaml .Values.rbac.rules | nindent 10 }}
+          {{- toYaml $allRules | nindent 10 }}
   destination:
     # ClusterRole + ClusterRoleBinding are cluster-scoped; namespace is
     # ignored by the API server but Argo wants something here.

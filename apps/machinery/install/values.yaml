@@ -17,22 +17,34 @@ destination:
 # The chart prepends `oci://` automatically if missing — Argo CD 2.13+ needs
 # the prefix to treat the repoURL as a kustomize OCI source rather than git
 # (without it Argo reports "failed to list refs: repository not found").
+# NOTE: both the kustomize base and the image are tagged v-prefixed (vX.Y.Z)
+# in ghcr — a bare `1.13.2` is a 404. Keep kustomize and image on the SAME
+# release; the base's KCL schema and the binary move together.
 kustomize:
   repoURL: ghcr.io/stuttgart-things/machinery-kustomize
-  targetRevision: 1.3.0
+  targetRevision: v1.13.2
 
 # Machinery container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/machinery
-  tag: 1.13.2
+  tag: v1.13.2
 
-# Optional MACHINERY_CONFIG. Two opt-in paths:
+# Optional MACHINERY_CONFIG. Three opt-in paths:
+#
+#   config.watch          The "smart" path. A flat list of kind names from
+#                         the `kinds:` catalog below — e.g. [AnsibleRun].
+#                         The chart assembles BOTH the MACHINERY_CONFIG JSON
+#                         and the matching ClusterRole rules (rbac) from the
+#                         one catalog entry, so the two can never drift. Add
+#                         a kind to the list and its list/watch permission
+#                         comes along automatically. Prefer this.
 #
 #   config.content        Inline JSON. The chart materializes a ConfigMap
 #                         (via the apps/machinery/configmap sub-Application)
 #                         in the destination namespace, then patches the
-#                         Deployment to mount it. Use this when you want
-#                         the config to ship alongside the Application.
+#                         Deployment to mount it. Escape hatch for kinds not
+#                         in the catalog; you must supply matching rbac.rules
+#                         yourself. Takes precedence over `watch`.
 #
 #   config.fromConfigMap  Name of a ConfigMap with a `config.json` key,
 #                         materialized out-of-band (Kyverno generate,
@@ -43,20 +55,24 @@ image:
 # `examples/configs/`. Leave the block empty (the default) to run with
 # machinery's built-in defaultConfig().
 config: {}
+  # watch:                         # preferred: list kind names from the `kinds:` catalog below
+  #   - AnsibleRun
+  #   - HarvesterVM
   # name: machinery-config-file    # name of the materialized ConfigMap (defaults to machinery-config-file; must NOT collide with the env-vars ConfigMap `machinery-config` the KCL base ships)
-  # content: |                     # inline JSON; chart auto-creates the ConfigMap
+  # content: |                     # escape hatch: inline JSON; chart auto-creates the ConfigMap (you own the matching rbac.rules)
   #   {"port":50051,"resources":{...}}
   # fromConfigMap: my-overrides    # alternative: reference an externally-managed ConfigMap
 
 # Optional cluster-scoped RBAC for the machinery ServiceAccount. The KCL
 # base in machinery-kustomize ships only the SA, so machinery has no read
 # access to most resources by default and the dashboard error-loops on
-# any configured kind. List the (group, resource) pairs that match the
-# kinds in `config` so machinery can list/watch them.
+# any configured kind.
 #
-# Leave `rules` empty (the default) to skip the rbac sub-Application
-# entirely — appropriate when something else (Kyverno generate, manual
-# kubectl apply, the base bumped to ship its own RBAC) already covers it.
+# When you use `config.watch`, the chart already derives the matching
+# (apiGroups, resources) rules from the catalog — you do NOT list them
+# here. Use `rbac.rules` only to ADD permissions on top (e.g. for a kind
+# pulled in via `config.content`, or an extra resource). The two sets are
+# unioned. Leave `rules` empty to add nothing.
 rbac:
   rules: []
   # rules:
@@ -144,3 +160,115 @@ syncPolicy:
       duration: 10s
       factor: 2
       maxDuration: 3m
+
+# ---------------------------------------------------------------------------
+# Kind catalog — the single source of truth for `config.watch`.
+#
+# Each entry is one watchable kind, keyed by the display name machinery
+# shows in the dashboard. The value is machinery's per-kind resource block
+# verbatim (group/version/resource + optional connectionField/statusFields/
+# infoFields — see stuttgart-things/machinery's examples/configs/README.md).
+#
+# A consumer references entries by name via `config.watch`. From that one
+# list the chart derives BOTH:
+#   * the MACHINERY_CONFIG `resources` map (config.yaml), and
+#   * the ClusterRole rules — apiGroups: [<group>], resources: [<resource>]
+#     (rbac.yaml).
+# So config and RBAC are guaranteed to stay in lockstep.
+#
+# Field-path note: dot-paths must match the LIVE object. The fields below
+# were taken from the actual CRDs/XRDs, not aspirational schemas.
+kinds:
+  # stuttgart-things Crossplane v2 XRs (resources.stuttgart-things.com)
+  AnsibleRun:
+    group: resources.stuttgart-things.com
+    version: v1alpha1
+    resource: ansibleruns
+    connectionField: status.pipelineRunName
+    statusFields:
+      - status.succeeded
+      - status.installed
+      - status.reason
+    infoFields:
+      - { label: Playbooks,  path: spec.ansiblePlaybooks }
+      - { label: Target,     path: spec.ansibleTargetHost }
+      - { label: Namespace,  path: spec.namespace }
+      - { label: GitRepo,    path: spec.gitRepoUrl }
+      - { label: Message,    path: status.message }
+      - { label: Started,    path: status.startTime }
+      - { label: Completed,  path: status.completionTime }
+  HarvesterVM:
+    group: resources.stuttgart-things.com
+    version: v1alpha1
+    resource: harvestervms
+    connectionField: status.vm.name
+    statusFields:
+      - status.volume.ready
+      - status.cloudInit.ready
+      - status.vm.ready
+  VsphereVM:
+    group: resources.stuttgart-things.com
+    version: v1alpha1
+    resource: vspherevms
+    connectionField: status.share.ip
+    statusFields:
+      - status.share.ip
+  StoragePlatform:
+    group: resources.stuttgart-things.com
+    version: v1alpha1
+    resource: storageplatforms
+    statusFields:
+      - status.installed
+      - status.observedVersion
+  NetworkIntegration:
+    group: resources.stuttgart-things.com
+    version: v1alpha1
+    resource: networkintegrations
+    statusFields:
+      - status.installed
+      - status.observedVersion
+  SecurityPlatform:
+    group: resources.stuttgart-things.com
+    version: v1alpha1
+    resource: securityplatforms
+    statusFields:
+      - status.installed
+      - status.observedVersion
+  # Platform-services kinds (present on most clusters)
+  Certificate:
+    group: cert-manager.io
+    version: v1
+    resource: certificates
+    connectionField: status.notAfter
+    statusFields:
+      - status.renewalTime
+    infoFields:
+      - { label: Issuer,     path: spec.issuerRef.name }
+      - { label: CommonName, path: spec.commonName }
+      - { label: Expires,    path: status.notAfter }
+      - { label: Renews,     path: status.renewalTime }
+  ExternalSecret:
+    group: external-secrets.io
+    version: v1
+    resource: externalsecrets
+    connectionField: status.refreshTime
+    statusFields:
+      - status.syncedResourceVersion
+    infoFields:
+      - { label: Store,     path: spec.secretStoreRef.name }
+      - { label: Target,    path: spec.target.name }
+      - { label: Refreshed, path: status.refreshTime }
+  HTTPRoute:
+    group: gateway.networking.k8s.io
+    version: v1
+    resource: httproutes
+    connectionField: spec.hostnames
+    infoFields:
+      - { label: Parent, path: spec.parentRefs }
+  GRPCRoute:
+    group: gateway.networking.k8s.io
+    version: v1
+    resource: grpcroutes
+    connectionField: spec.hostnames
+    infoFields:
+      - { label: Parent, path: spec.parentRefs }
