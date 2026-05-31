@@ -50,26 +50,62 @@
     "config": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional MACHINERY_CONFIG injection. Set `content` for inline JSON, or `fromConfigMap` to reference one materialized out-of-band. Both unset = machinery uses its built-in defaultConfig().",
+      "description": "Optional MACHINERY_CONFIG injection. Set `watch` (preferred) to a list of kind names from the top-level `kinds` catalog, `content` for inline JSON, or `fromConfigMap` to reference one materialized out-of-band. All unset = machinery uses its built-in defaultConfig().",
       "properties": {
+        "watch": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "List of kind display-names defined in the top-level `kinds` catalog. The chart assembles both the MACHINERY_CONFIG resources map and the matching ClusterRole rules from each entry, so config and RBAC stay in lockstep. Mutually exclusive with `content`/`fromConfigMap`."
+        },
         "name": {
           "type": "string",
           "minLength": 1,
-          "description": "Name of the materialized ConfigMap. Defaults to `machinery-config-file` (distinct from the env-vars `machinery-config` that the KCL base ships). Only meaningful with `content`."
+          "description": "Name of the materialized ConfigMap. Defaults to `machinery-config-file` (distinct from the env-vars `machinery-config` that the KCL base ships). Meaningful with `watch` or `content`."
         },
         "content": {
           "type": "string",
           "minLength": 1,
-          "description": "Inline JSON config (machinery's config.json schema). The chart auto-creates a ConfigMap via the apps/machinery/configmap sub-Application."
+          "description": "Inline JSON config (machinery's config.json schema). Escape hatch for kinds not in the catalog — you supply matching rbac.rules yourself. The chart auto-creates a ConfigMap via the apps/machinery/configmap sub-Application. Takes precedence over `watch`."
         },
         "fromConfigMap": {
           "type": "string",
           "minLength": 1,
-          "description": "Name of a ConfigMap pre-existing in the destination namespace carrying a `config.json` key. Use instead of `content` when something else (ESO / Kyverno / manual) populates the ConfigMap."
+          "description": "Name of a ConfigMap pre-existing in the destination namespace carrying a `config.json` key. Use instead of `content`/`watch` when something else (ESO / Kyverno / manual) populates the ConfigMap."
         }
       },
-      "not": {
-        "required": ["content", "fromConfigMap"]
+      "allOf": [
+        { "not": { "required": ["content", "fromConfigMap"] } },
+        { "not": { "required": ["watch", "content"] } },
+        { "not": { "required": ["watch", "fromConfigMap"] } }
+      ]
+    },
+    "kinds": {
+      "type": "object",
+      "description": "Catalog of watchable kinds, keyed by the display name machinery shows. Each value is machinery's per-kind resource block. Referenced by name from `config.watch`; the chart derives the watch config and the RBAC rules from the same entry.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["group", "version", "resource"],
+        "properties": {
+          "group":    { "type": "string" },
+          "version":  { "type": "string", "minLength": 1 },
+          "resource": { "type": "string", "minLength": 1 },
+          "connectionField": { "type": "string", "minLength": 1 },
+          "statusFields": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "infoFields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["label", "path"],
+              "properties": {
+                "label": { "type": "string", "minLength": 1 },
+                "path":  { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
       }
     },
     "httpRoute": {

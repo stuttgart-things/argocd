@@ -58,10 +58,10 @@ spec:
           namespace: machinery
         kustomize:
           repoURL: ghcr.io/stuttgart-things/machinery-kustomize
-          targetRevision: 1.3.0
+          targetRevision: v1.13.2   # v-prefixed; keep in lockstep with image.tag
         image:
           repository: ghcr.io/stuttgart-things/machinery
-          tag: 1.3.0
+          tag: v1.13.2
         httpRoute:
           enabled: true
           hostname: machinery.my-cluster.example.com
@@ -84,13 +84,51 @@ spec:
 | `destination.server` | `https://kubernetes.default.svc` | Target cluster API |
 | `destination.namespace` | `machinery` | Namespace for Machinery |
 | `kustomize.repoURL` | `ghcr.io/stuttgart-things/machinery-kustomize` | OCI kustomize base |
-| `kustomize.targetRevision` | `1.3.0` | Kustomize base tag (flux `MACHINERY_VERSION`) |
-| `image.repository` / `tag` | `ghcr.io/stuttgart-things/machinery` / `1.3.0` | Container image override |
+| `kustomize.targetRevision` | `v1.13.2` | Kustomize base tag (flux `MACHINERY_VERSION`); v-prefixed, lockstep with image.tag |
+| `image.repository` / `tag` | `ghcr.io/stuttgart-things/machinery` / `v1.13.2` | Container image override (v-prefixed) |
 | `httpRoute.enabled` | `true` | Render the HTTPRoute sub-Application + delete the base's KCL HTTPRoute |
 | `httpRoute.hostname` | `machinery.example.com` | FQDN on the HTTPRoute |
 | `httpRoute.gateway.name` / `namespace` | `cilium-gateway` / `default` | Gateway reference |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the httpRoute Application fetches manifests from |
+| `config.watch` | _(unset)_ | List of kind names from the `kinds` catalog to watch — see below |
+| `config.content` | _(unset)_ | Escape-hatch inline JSON config (you own the matching `rbac.rules`) |
+| `config.fromConfigMap` | _(unset)_ | Name of an externally-materialized config ConfigMap |
+| `kinds` | _(catalog)_ | Library of watchable kinds; `config.watch` selects from it |
+| `rbac.rules` | `[]` | Extra ClusterRole rules, unioned with those derived from `config.watch` |
 | `syncPolicy` | automated + retry | Applied to all rendered Applications |
+
+## Watch config (the smart path)
+
+Machinery needs two things to surface a kind: a **watch entry** in its
+`MACHINERY_CONFIG` JSON, and **list/watch RBAC** for the
+ServiceAccount. Historically those were two hand-edited blocks
+(`config.content` + `rbac.rules`) that had to be kept in sync — drift
+meant either an empty dashboard filter or an error-loop.
+
+`config.watch` collapses them into one list. Each name is looked up in
+the `kinds` catalog (`values.yaml`), and the chart derives **both** the
+config JSON and the matching ClusterRole rules from that single entry:
+
+```yaml
+helm:
+  valuesObject:
+    config:
+      watch:
+        - AnsibleRun        # → resources map entry + RBAC for ansibleruns
+        - HarvesterVM
+    # no rbac.rules needed — apiGroups/resources come from the catalog
+```
+
+Rules for kinds sharing an apiGroup are collapsed into one ClusterRole
+rule. `rbac.rules` still exists for *extra* permissions (e.g. a kind you
+pulled in via `config.content`) and is unioned with the derived set.
+
+To watch a kind not yet in the catalog, add it to `kinds` in
+`values.yaml` (one PR, reusable everywhere) — or fall back to
+`config.content` + a matching `rbac.rules` for a one-off. Catalog
+field-paths are taken from the live CRDs/XRDs; dot-paths must match the
+real object (array indexing like `spec.parentRefs[0]` is not supported —
+point at the parent and let machinery flatten it).
 
 ## Endpoints
 

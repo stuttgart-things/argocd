@@ -26,7 +26,9 @@ Two opt-in paths:
 */}}
 {{- $cmName := "" }}
 {{- if .Values.config }}
-{{-   if .Values.config.content }}
+{{-   if or .Values.config.content .Values.config.watch }}
+{{/* Both `content` (raw JSON) and `watch` (catalog-assembled, see
+_helpers.tpl) are materialized into a ConfigMap by config.yaml. */}}
 {{-     $cmName = default "machinery-config-file" .Values.config.name }}
 {{-   else if .Values.config.fromConfigMap }}
 {{-     $cmName = .Values.config.fromConfigMap }}
