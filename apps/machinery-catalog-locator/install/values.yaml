@@ -54,6 +54,24 @@ github:
     name: ""
     key: token
 
+# externalSecrets sub-Application (opt-in, sync-wave -10). Provisions the
+# Secret named github.privateKeySecret.name via the External Secrets Operator,
+# pulling the PEM (`private-key.pem`) from the referenced store — so the GitHub
+# App key never lands in git. Mirrors apps/zitadel/install. When enabled, set
+# github.privateKeySecret.name to the same value as secretName below.
+externalSecrets:
+  enabled: false
+  secretName: machinery-catalog-locator-github-app   # pragma: allowlist secret
+  store:
+    name: vault-backend
+    kind: ClusterSecretStore
+  secretPath: machinery-catalog-locator-github-app
+  refreshInterval: 1h
+  # Keys copied from the Vault entry. Default: just the PEM (App IDs are
+  # non-secret and inlined via the `github` block above).
+  keys:
+    - private-key.pem
+
 # Gateway API HTTPRoute sub-Application (opt-in). When enabled, the base's
 # KCL-generated HTTPRoute is pruned via $patch: delete and replaced with one
 # pointing at the per-deployment hostname. Reuses apps/machinery/httproute.

@@ -108,18 +108,33 @@ spec:
               tag: 'pr-{{ .number }}-{{ .head_sha }}'
 
             # GitHub App credentials for the catalog-locator workload. The App
-            # IDs are not secret and are inlined; the PEM is mounted from a
-            # Secret that must exist in the per-PR namespace (see prereqs).
+            # IDs are not secret and are inlined; the PEM is provisioned into
+            # the per-PR namespace by the externalSecrets sub-App below (ESO
+            # pulls it from Vault), then mounted via privateKeySecret.
             #
             # TODO(maintainer): set the real GitHub App ID + installation ID
-            # for the App that has read access to the target catalog repo
-            # (and the Secret name if it differs from the default below).
+            # for the App that has read access to the target catalog repo.
             github:
               appID: "000000"
               installationID: "00000000"
               privateKeySecret:
                 name: machinery-catalog-locator-github-app
                 key: private-key.pem
+
+            # ESO provisions the PEM Secret (above) per preview namespace,
+            # pulling `private-key.pem` from Vault via the dedicated
+            # `vault-machinery-catalog-locator` ClusterSecretStore (deployed
+            # per cluster from stuttgart-things/stuttgart-things). Runs at
+            # sync-wave -10 so the Secret exists before the Pod boots.
+            externalSecrets:
+              enabled: true
+              secretName: machinery-catalog-locator-github-app
+              store:
+                name: vault-machinery-catalog-locator
+                kind: ClusterSecretStore
+              secretPath: machinery-catalog-locator-github-app
+              keys:
+                - private-key.pem
 
             httpRoute:
               enabled: true

@@ -46,20 +46,33 @@ Each per-PR install:
 ## GitHub credentials (the catalog-locator-specific bit)
 
 catalog-locator's `config.Load` refuses to start without GitHub credentials.
-The AppSet wires the **GitHub App** path by default: it inlines the (non-secret)
-App ID + installation ID and mounts a PEM from a Secret named
-`machinery-catalog-locator-github-app` that must exist in each per-PR
-namespace on the target cluster (materialized out-of-band — ESO / Kyverno
-generate / pre-applied).
+The AppSet wires the **GitHub App** path: it inlines the (non-secret) App ID +
+installation ID, and the PEM is provisioned into each per-PR namespace by
+**Vault + the External Secrets Operator** — no key material in git.
 
-> **TODO before first use:** set the real `github.appID` / `github.installationID`
-> in `appset-machinery-catalog-locator-pr-preview.yaml` (placeholders today),
-> and provision the PEM Secret.
+The flow per preview namespace (all rendered by the install chart):
 
-To use a **PAT** instead (simpler — one env var, no file mount), drop the App
-fields and set `github.tokenSecret.name` to a Secret carrying `GITHUB_TOKEN`.
-See `apps/machinery-catalog-locator/install/values.yaml` for the full `github`
-block.
+1. `externalSecrets.enabled: true` renders an `ExternalSecret` (sync-wave −10)
+   that pulls `private-key.pem` from Vault via the dedicated
+   `vault-machinery-catalog-locator` `ClusterSecretStore`.
+2. ESO materializes the Secret `machinery-catalog-locator-github-app` in the
+   namespace.
+3. The Deployment patch mounts that PEM and points `GITHUB_PRIVATE_KEY_PATH`
+   at it.
+
+> **TODO before first use:**
+> - Set the real `github.appID` / `github.installationID` in the AppSet
+>   (placeholders `000000`/`00000000` today).
+> - Provision the dedicated `ClusterSecretStore` per cluster
+>   (`external-secrets-cluster-store-machinery-catalog-locator.yaml` in
+>   `stuttgart-things/stuttgart-things`, Vault KV mount
+>   `machinery-catalog-locator`).
+> - Store the PEM in Vault at `machinery-catalog-locator/machinery-catalog-locator-github-app`,
+>   property `private-key.pem`.
+
+To use a **PAT** instead (simpler — one env var, no file mount), set
+`externalSecrets.keys: [token]` and `github.tokenSecret.name` to the synced
+Secret. See `apps/machinery-catalog-locator/install/values.yaml`.
 
 ## Opt-in label
 
