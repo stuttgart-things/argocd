@@ -60,15 +60,17 @@ The flow per preview namespace (all rendered by the install chart):
 3. The Deployment patch mounts that PEM and points `GITHUB_PRIVATE_KEY_PATH`
    at it.
 
-> **TODO before first use:**
-> - Set the real `github.appID` / `github.installationID` in the AppSet
->   (placeholders `000000`/`00000000` today).
-> - Provision the dedicated `ClusterSecretStore` per cluster
->   (`external-secrets-cluster-store-machinery-catalog-locator.yaml` in
->   `stuttgart-things/stuttgart-things`, Vault KV mount
->   `machinery-catalog-locator`).
-> - Store the PEM in Vault at `machinery-catalog-locator/machinery-catalog-locator-github-app`,
->   property `private-key.pem`.
+> **Provisioning status** (stuttgart-things org, homerun2-dev):
+> - GitHub App created + installed; `github.appID: "3928844"`,
+>   `github.installationID: "137151756"` set in the AppSet. ✅
+> - Dedicated `vault-machinery-catalog-locator` `ClusterSecretStore` +
+>   `machinery-catalog-locator` KV mount provisioned (see
+>   `stuttgart-things/stuttgart-things`), and `read-machinery-catalog-locator`
+>   bound to the homerun2-dev `eso` role. ✅
+> - PEM stored at `machinery-catalog-locator/machinery-catalog-locator-github-app`,
+>   property `private-key.pem`. ✅
+>
+> To onboard another cluster, repeat the store + role-binding + label steps there.
 
 To use a **PAT** instead (simpler — one env var, no file mount), set
 `externalSecrets.keys: [token]` and `github.tokenSecret.name` to the synced

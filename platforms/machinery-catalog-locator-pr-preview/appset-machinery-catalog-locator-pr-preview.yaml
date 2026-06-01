@@ -115,8 +115,8 @@ spec:
             # TODO(maintainer): set the real GitHub App ID + installation ID
             # for the App that has read access to the target catalog repo.
             github:
-              appID: "000000"
-              installationID: "00000000"
+              appID: "3928844"
+              installationID: "137151756"
               privateKeySecret:
                 name: machinery-catalog-locator-github-app
                 key: private-key.pem
