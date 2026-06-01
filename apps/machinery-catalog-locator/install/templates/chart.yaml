@@ -1,0 +1,141 @@
+{{- $defaultName := printf "machinery-catalog-locator-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+Argo CD 2.13+ treats an `oci://`-prefixed repoURL as a kustomize OCI source
+and any other prefix as git. Without the prefix Argo falls back to go-git and
+reports "failed to list refs: repository not found", even for public ghcr
+packages. Tolerate both forms so the user can't silently mis-configure it.
+*/}}
+{{- $kustomizeRepo := .Values.kustomize.repoURL -}}
+{{- if not (hasPrefix "oci://" $kustomizeRepo) -}}
+{{- $kustomizeRepo = printf "oci://%s" $kustomizeRepo -}}
+{{- end }}
+{{/*
+Build the Deployment container patch. catalog-locator reads Git, so the only
+thing that MUST be injected is GitHub credentials (config.Load refuses to start
+without either App creds or a PAT). The KCL base already wires GRPC_PORT/
+HTTP_PORT/GIT_AUTHOR_* via envFrom its ConfigMap; here we add the GitHub env +
+secret material on top.
+*/}}
+{{- $g := .Values.github | default dict }}
+{{- $envVars := list }}
+{{- $volumes := list }}
+{{- $volumeMounts := list }}
+{{- if $g.appID }}
+{{-   $envVars = append $envVars (dict "name" "GITHUB_APP_ID" "value" (toString $g.appID)) }}
+{{- end }}
+{{- if $g.installationID }}
+{{-   $envVars = append $envVars (dict "name" "GITHUB_INSTALLATION_ID" "value" (toString $g.installationID)) }}
+{{- end }}
+{{- if and $g.privateKeySecret $g.privateKeySecret.name }}
+{{-   $mountPath := default "/var/run/github-app/private-key.pem" $g.privateKeyMountPath }}
+{{-   $secretKey := default "private-key.pem" $g.privateKeySecret.key }}
+{{-   $envVars = append $envVars (dict "name" "GITHUB_PRIVATE_KEY_PATH" "value" $mountPath) }}
+{{-   $volumes = append $volumes (dict
+        "name" "github-app-key"
+        "secret" (dict
+          "secretName" $g.privateKeySecret.name
+          "items" (list (dict "key" $secretKey "path" "private-key.pem"))
+        )
+) }}
+{{-   $volumeMounts = append $volumeMounts (dict
+        "name"      "github-app-key"
+        "mountPath" $mountPath
+        "subPath"   "private-key.pem"
+        "readOnly"  true
+) }}
+{{- end }}
+{{- if and $g.tokenSecret $g.tokenSecret.name }}
+{{-   $secretKey := default "token" $g.tokenSecret.key }}
+{{-   $envVars = append $envVars (dict
+        "name" "GITHUB_TOKEN"
+        "valueFrom" (dict "secretKeyRef" (dict "name" $g.tokenSecret.name "key" $secretKey))
+) }}
+{{- end }}
+{{- $container := dict "name" "machinery-catalog-locator" "image" (printf "%s:%s" .Values.image.repository .Values.image.tag) }}
+{{- if $envVars }}{{- $_ := set $container "env" $envVars }}{{- end }}
+{{- if $volumeMounts }}{{- $_ := set $container "volumeMounts" $volumeMounts }}{{- end }}
+{{- $podSpec := dict "containers" (list $container) }}
+{{- if $volumes }}{{- $_ := set $podSpec "volumes" $volumes }}{{- end }}
+{{- $deployPatch := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" "machinery-catalog-locator")
+      "spec" (dict "template" (dict "spec" $podSpec))
+}}
+{{- $svcPatch := dict
+      "apiVersion" "v1"
+      "kind" "Service"
+      "metadata" (dict "name" "machinery-catalog-locator")
+      "spec" (dict "ports" (list
+        (dict "name" "grpc" "port" 50051 "targetPort" "grpc" "protocol" "TCP" "appProtocol" "kubernetes.io/h2c")
+        (dict "name" "http" "port" 8080  "targetPort" "http" "protocol" "TCP")
+      ))
+}}
+{{- $hrDelete := dict
+      "apiVersion" "gateway.networking.k8s.io/v1"
+      "kind" "HTTPRoute"
+      "metadata" (dict "name" "machinery-catalog-locator")
+      "$patch" "delete"
+}}
+{{- $grDelete := dict
+      "apiVersion" "gateway.networking.k8s.io/v1"
+      "kind" "GRPCRoute"
+      "metadata" (dict "name" "machinery-catalog-locator")
+      "$patch" "delete"
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  # Finalizer so deleting the parent App prunes the kustomize-rendered
+  # Deployment/Service/etc. on the destination cluster before this App is
+  # removed — otherwise they're orphaned. See apps/machinery/install.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ $kustomizeRepo | quote }}
+    targetRevision: {{ .Values.kustomize.targetRevision | quote }}
+    path: .
+    kustomize:
+      # The catalog-locator-kustomize OCI base bakes
+      # `namespace: machinery-catalog-locator` into every resource (the KCL
+      # schema default). Rewrite it to the consumer's namespace so per-PR
+      # previews land in their own namespace instead of colliding.
+      namespace: {{ .Values.destination.namespace | quote }}
+      patches:
+        - target:
+            kind: Deployment
+            name: machinery-catalog-locator
+          patch: |
+{{ toYaml $deployPatch | indent 12 }}
+        - target:
+            kind: Service
+            name: machinery-catalog-locator
+          patch: |
+{{ toYaml $svcPatch | indent 12 }}
+        {{- if .Values.httpRoute.enabled }}
+        - target:
+            kind: HTTPRoute
+            name: machinery-catalog-locator
+          patch: |
+{{ toYaml $hrDelete | indent 12 }}
+        {{- end }}
+        {{- if .Values.grpcRoute.enabled }}
+        - target:
+            kind: GRPCRoute
+            name: machinery-catalog-locator
+          patch: |
+{{ toYaml $grDelete | indent 12 }}
+        {{- end }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

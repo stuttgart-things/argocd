@@ -1,0 +1,43 @@
+{{- if .Values.grpcRoute.enabled }}
+{{- $defaultName := printf "machinery-catalog-locator-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/* Reuse the generic apps/machinery/grpcroute sub-chart — points at the
+catalog-locator Service on the gRPC port (50051). */}}
+{{- $nudge := true }}
+{{- if hasKey .Values.grpcRoute "nudgeAfterSync" }}
+{{-   $nudge = .Values.grpcRoute.nudgeAfterSync }}
+{{- end }}
+{{- $routesValues := dict
+      "namespace" .Values.destination.namespace
+      "gateway" .Values.grpcRoute.gateway
+      "nudgeAfterSync" $nudge
+      "routes" (list
+        (dict "name" "machinery-catalog-locator" "hostname" .Values.grpcRoute.hostname "backend" (dict "name" "machinery-catalog-locator" "port" 50051))
+      )
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-grpcroute" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/machinery/grpcroute
+    helm:
+      releaseName: machinery-catalog-locator-grpcroute
+      valuesObject:
+        {{- toYaml $routesValues | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

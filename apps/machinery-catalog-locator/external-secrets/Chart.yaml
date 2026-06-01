@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: machinery-catalog-locator-external-secrets
+description: ExternalSecret pulling the catalog-locator GitHub App PEM from Vault — loaded as a sub-Application by apps/machinery-catalog-locator/install.
+type: application
+version: 0.1.0

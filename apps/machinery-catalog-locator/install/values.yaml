@@ -1,0 +1,114 @@
+---
+# Reference back to this catalog repo — used by the route sub-Applications
+# to load apps/machinery/{httproute,grpcroute} from git (reused as-is; those
+# sub-charts are generic — backend name/port are parameterized).
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: machinery-catalog-locator
+
+# catalog-locator OCI kustomize base (ghcr.io/stuttgart-things/machinery-catalog-locator-kustomize).
+# The chart prepends `oci://` automatically if missing — Argo CD 2.13+ needs
+# the prefix to treat the repoURL as a kustomize OCI source rather than git.
+# Keep kustomize and image on the SAME tag; the base's KCL schema and the
+# binary move together.
+kustomize:
+  repoURL: ghcr.io/stuttgart-things/machinery-catalog-locator-kustomize
+  targetRevision: latest
+
+# catalog-locator container image — patched into the Deployment rendered by the base.
+image:
+  repository: ghcr.io/stuttgart-things/machinery-catalog-locator
+  tag: latest
+
+# GitHub access for the catalog-locator workload. catalog-locator reads Git
+# (resolves the catalog, opens PRs to remove resources), so unlike machinery
+# it needs no cluster-watch config or RBAC — it needs GitHub credentials.
+# See machinery-catalog-locator/internal/config/config.go: it requires EITHER
+# GitHub App creds (GITHUB_APP_ID + GITHUB_INSTALLATION_ID + a PEM at
+# GITHUB_PRIVATE_KEY_PATH) OR a PAT (GITHUB_TOKEN), else it refuses to start.
+#
+# Secret material (the PEM / the PAT) is materialized out-of-band in
+# destination.namespace (ESO / Kyverno / pre-applied) — this chart only wires
+# it into the Pod via a Deployment patch. The non-secret App IDs are inlined.
+github:
+  # GitHub App (preferred). Set appID + installationID and reference a Secret
+  # carrying the PEM; the chart mounts it read-only and points
+  # GITHUB_PRIVATE_KEY_PATH at the mount.
+  appID: ""
+  installationID: ""
+  privateKeySecret:
+    name: ""
+    key: private-key.pem
+  privateKeyMountPath: /var/run/github-app/private-key.pem
+  # PAT fallback (dev/preview). Reference a Secret carrying the token; the
+  # chart surfaces it as GITHUB_TOKEN via secretKeyRef. Used when no App is set.
+  tokenSecret:
+    name: ""
+    key: token
+
+# externalSecrets sub-Application (opt-in, sync-wave -10). Provisions the
+# Secret named github.privateKeySecret.name via the External Secrets Operator,
+# pulling the PEM (`private-key.pem`) from the referenced store — so the GitHub
+# App key never lands in git. Mirrors apps/zitadel/install. When enabled, set
+# github.privateKeySecret.name to the same value as secretName below.
+externalSecrets:
+  enabled: false
+  secretName: machinery-catalog-locator-github-app   # pragma: allowlist secret
+  store:
+    name: vault-backend
+    kind: ClusterSecretStore
+  secretPath: machinery-catalog-locator-github-app
+  refreshInterval: 1h
+  # Keys copied from the Vault entry. Default: just the PEM (App IDs are
+  # non-secret and inlined via the `github` block above).
+  keys:
+    - private-key.pem
+
+# Gateway API HTTPRoute sub-Application (opt-in). When enabled, the base's
+# KCL-generated HTTPRoute is pruned via $patch: delete and replaced with one
+# pointing at the per-deployment hostname. Reuses apps/machinery/httproute.
+#
+# nudgeAfterSync: PostSync Job that re-annotates the route after each sync —
+# works around Cilium gateway-controller latching onto a stale
+# BackendNotFound. Default on; surfaced on every fresh preview spin-up.
+httpRoute:
+  enabled: true
+  hostname: machinery-catalog-locator.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+  nudgeAfterSync: true
+
+# Gateway API GRPCRoute sub-Application (opt-in). Sibling to httpRoute, but
+# the rendered route points at the gRPC port (50051). Reuses
+# apps/machinery/grpcroute.
+grpcRoute:
+  enabled: false
+  hostname: machinery-catalog-locator-grpc.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+  nudgeAfterSync: true
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

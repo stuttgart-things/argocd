@@ -1,0 +1,21 @@
+---
+namespace: machinery-catalog-locator
+
+# Secret materialized by the External Secrets Operator. catalog-locator mounts
+# the PEM from it (key `private-key.pem`) and reads it via GITHUB_PRIVATE_KEY_PATH.
+secretName: machinery-catalog-locator-github-app   # pragma: allowlist secret
+
+# SecretStore / ClusterSecretStore the ESO ExternalSecret reads from.
+store:
+  name: vault-backend
+  kind: ClusterSecretStore
+
+# Path of the entry under the store's KV mount (e.g. Vault `<mount>/<secretPath>`).
+secretPath: machinery-catalog-locator-github-app
+
+refreshInterval: 1h
+
+# Keys copied from the Vault entry into the Secret. Each list item is used as
+# both the Secret key and the Vault property name. Default: just the PEM.
+keys:
+  - private-key.pem
