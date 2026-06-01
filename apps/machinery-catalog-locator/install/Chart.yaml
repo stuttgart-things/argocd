@@ -1,0 +1,11 @@
+---
+apiVersion: v2
+name: machinery-catalog-locator-install
+description: >-
+  App-of-apps chart packaging machinery-catalog-locator (OCI kustomize base +
+  optional HTTPRoute/GRPCRoute). Mirrors apps/machinery/install, minus the
+  cluster-watch config and RBAC — catalog-locator reads Git, not the cluster
+  API, so it injects GitHub credentials instead.
+type: application
+version: 0.1.0
+appVersion: "latest"
