@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "rancher-certs sub-chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "namespace",
+    "hostname",
+    "secretName",
+    "issuer"
+  ],
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hostname": {
+      "type": "string",
+      "minLength": 1
+    },
+    "secretName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Issuer",
+            "ClusterIssuer"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "kind"
+      ]
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}

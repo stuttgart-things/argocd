@@ -1,0 +1,79 @@
+---
+# Reference back to this catalog repo — used by the certs / httpRoute Applications
+# to load apps/rancher/{certs,httproute} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: cattle-system
+
+# Upstream Rancher chart version (rancher-stable Helm repo).
+chartVersion: 2.14.2
+
+# Public hostname Rancher is exposed on (single label + apex domain).
+# The chart's `hostname` is set to "<hostname>.<domain>".
+hostname: rancher
+domain: example.com
+
+# Rancher replica count.
+replicas: 3
+
+# Initial admin bootstrap password. Inline only for dev — prefer an ArgoCD Vault
+# Plugin / SOPS overlay so the literal never lands in git. Leave empty to omit and
+# manage out-of-band.
+bootstrapPassword: ""               # pragma: allowlist secret
+
+# TLS source. With the httpRoute sub-App the Gateway terminates TLS, so Rancher
+# serves plain HTTP — keep this `external`. ("ingress" / "external" / "secret").
+tls: external
+
+# Trust a private/internal CA. When true, the chart expects a `tls-ca` secret
+# (cacerts.pem) in the namespace — typically distributed by trust-manager
+# (see infra/trust-manager with secretTargets.enabled and a Bundle). Leave false
+# unless that machinery is in place.
+privateCA: false
+
+# Rancher built-in ingress (disabled — prefer the httpRoute sub-App for Gateway API).
+ingress:
+  enabled: false
+
+# cert-manager Certificate sub-Application (opt-in, sync-wave -10). Provisions the
+# TLS Secret consumed by the Gateway listener / built-in ingress.
+certs:
+  enabled: false
+  issuer:
+    name: cluster-ca
+    kind: ClusterIssuer
+
+# Gateway API HTTPRoute sub-Application (opt-in, sync-wave 10). Renders a
+# ReferenceGrant (cross-namespace Gateway -> Service) plus the Rancher HTTPRoute.
+httpRoute:
+  enabled: true
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

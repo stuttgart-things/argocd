@@ -1,0 +1,7 @@
+---
+namespace: cattle-system
+hostname: rancher.example.com
+secretName: rancher.example.com-tls
+issuer:
+  name: cluster-ca
+  kind: ClusterIssuer

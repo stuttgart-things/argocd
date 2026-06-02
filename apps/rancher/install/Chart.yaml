@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: rancher-install
+description: App-of-apps chart packaging Rancher (rancher-stable Helm chart) with optional cert-manager Certificate and Gateway API HTTPRoute sub-Applications. TLS is terminated at the Gateway; Rancher runs with ingress.enabled false and tls external.
+type: application
+version: 0.1.0
+appVersion: "2.14.2"

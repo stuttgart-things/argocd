@@ -1,0 +1,14 @@
+---
+namespace: cattle-system
+gateway:
+  name: cilium-gateway
+  namespace: default
+fqdn: rancher.example.com
+backend:
+  name: rancher
+  port: 80
+# Render a ReferenceGrant allowing the Gateway (in gateway.namespace) to route to
+# the Rancher Service in this namespace. Needed whenever the Gateway lives in a
+# different namespace than Rancher.
+referenceGrant:
+  enabled: true
