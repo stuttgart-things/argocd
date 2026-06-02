@@ -1,0 +1,43 @@
+{{- if .Values.referenceGrant.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: rancher-gateway-access
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app.kubernetes.io/name: rancher
+    app.kubernetes.io/instance: rancher
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      namespace: {{ .Values.gateway.namespace | quote }}
+  to:
+    - group: ""
+      kind: Service
+{{- end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: rancher
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app.kubernetes.io/name: rancher
+    app.kubernetes.io/instance: rancher
+spec:
+  hostnames:
+    - {{ .Values.fqdn | quote }}
+  parentRefs:
+    - name: {{ .Values.gateway.name | quote }}
+      namespace: {{ .Values.gateway.namespace | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ .Values.backend.name | quote }}
+          namespace: {{ .Values.namespace | quote }}
+          port: {{ .Values.backend.port }}

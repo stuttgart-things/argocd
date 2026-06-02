@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: rancher-httproute
+description: Gateway API HTTPRoute (plus cross-namespace ReferenceGrant) for Rancher — loaded as a sub-Application by apps/rancher/install.
+type: application
+version: 0.1.0
