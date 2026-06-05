@@ -49,7 +49,12 @@ spec:
             # Override the chart's default child-Application name (sha8 of
             # destination.server) so the inner Application also carries the
             # `-storage` suffix and never collides with the cicd-platform one.
-            applicationName: openebs-storage-{{ .name }}
+            # Must stay DISTINCT from this parent's metadata.name
+            # (openebs-storage-{{ .name }}); reusing the parent name makes the
+            # parent manage an Application of its own name+namespace — a
+            # self-collision that leaves it perpetually OutOfSync and never
+            # installs OpenEBS. Hence the `-install` suffix.
+            applicationName: openebs-storage-{{ .name }}-install
             destination:
               server: '{{ .server }}'
               namespace: openebs
