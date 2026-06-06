@@ -49,7 +49,9 @@ needed — but the store and the Vault KV path must exist on the target cluster.
 
 - Secret `homerun2-omni-pitcher-pat` in the `argocd` namespace (reused PAT).
 - Target cluster registered as an Argo cluster labelled
-  `machinery-catalog-publisher-pr-preview: "true"`, with a matching AppProject.
+  `machinery-catalog-publisher-pr-preview: "true"`. (The AppProject is bundled —
+  `appproject.yaml`, a dedicated namespace-scoped project — so it is NOT a
+  manual prereq, unlike the per-cluster-project convention.)
 - `vault-homerun2-pr` ClusterSecretStore present on the target cluster, and the
   MinIO root creds in Vault at the KV path referenced by
   `connectionSecretExternal.vault` (`minio` → `root-user` / `root-password` —

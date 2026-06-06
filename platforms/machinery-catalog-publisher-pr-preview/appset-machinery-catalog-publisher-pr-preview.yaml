@@ -21,15 +21,18 @@
 # Per-PR isolation: each preview writes to its OWN S3 key prefix
 # (status/pr-<n>/), so previews never clobber each other or the prod prefix.
 #
+# The AppProject (appproject.yaml) is bundled alongside this AppSet, so it is
+# not a prereq.
+#
 # Prereqs not declared here:
 #   - Secret `homerun2-omni-pitcher-pat` in argocd ns (reused PAT — covers any
 #     public stuttgart-things repo).
 #   - Target cluster registered as an Argo cluster with label
-#     machinery-catalog-publisher-pr-preview: "true" (+ matching AppProject).
-#   - The S3/MinIO connection Secret `minio-homerun` materialized in each
-#     machinery-catalog-publisher-pr-<n> namespace (ESO/Kyverno). The publisher
-#     can't authenticate to S3 without it. CreateNamespace=true makes the ns;
-#     the Secret must be projected into it out-of-band.
+#     machinery-catalog-publisher-pr-preview: "true".
+#   - The `vault-homerun2-pr` ClusterSecretStore + the MinIO creds in Vault on
+#     the target cluster. The `minio-homerun` connection Secret itself is
+#     self-provisioned per env (connectionSecretExternal → ESO sub-App), so it
+#     does NOT need projecting in out-of-band.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -67,7 +70,9 @@ spec:
       finalizers:
         - resources-finalizer.argocd.argoproj.io
     spec:
-      project: '{{ .name }}'
+      # Dedicated, namespace-scoped preview project (see appproject.yaml),
+      # rather than the per-cluster project machinery-pr-preview reuses.
+      project: machinery-catalog-publisher-pr-preview
       # Parent App = the rendered install chart; its output is more Argo
       # Application CRDs, which land in argocd ns on the management cluster.
       destination:
@@ -81,7 +86,7 @@ spec:
           releaseName: 'machinery-catalog-publisher-pr-{{ .number }}'
           valuesObject:
             applicationName: 'machinery-catalog-publisher-pr-{{ .number }}'
-            project: '{{ .name }}'
+            project: machinery-catalog-publisher-pr-preview
             # Deploy to the labelled remote cluster, not the management one.
             destination:
               server: '{{ .server }}'
