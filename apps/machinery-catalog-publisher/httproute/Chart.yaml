@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: machinery-catalog-publisher-httproute
+description: Gateway API HTTPRoute exposing the publisher's metrics/health port.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,17 @@
+---
+# Namespace the HTTPRoute + backend Service live in (set by the install chart).
+namespace: machinery-catalog-publisher
+
+# Public hostname routed to the publisher's metrics/health endpoint.
+hostname: machinery-catalog-publisher.example.com
+
+# Parent Gateway (Gateway API). Cross-namespace parentRef — the gateway's
+# listener must allow routes from this namespace.
+gateway:
+  name: cilium-gateway
+  namespace: default
+
+# Backend metrics Service (rendered by the publisher's KCL base).
+service:
+  name: machinery-catalog-publisher
+  port: 8080

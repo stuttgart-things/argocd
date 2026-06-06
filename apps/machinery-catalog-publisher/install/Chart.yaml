@@ -1,0 +1,10 @@
+---
+apiVersion: v2
+name: machinery-catalog-publisher-install
+description: >-
+  App-of-apps chart packaging machinery-catalog-publisher — the OCI kustomize
+  base (workload + per-PR config) plus an optional metrics/health HTTPRoute so
+  headless preview envs still have a browsable URL.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
