@@ -12,10 +12,14 @@ Backstage `Resource` entities to S3/MinIO.
   (`ghcr.io/stuttgart-things/machinery-catalog-publisher-kustomize`), patches in
   the image, rewrites the namespace, patches the per-deploy `config.yaml` into
   the base ConfigMap, and wires the S3 connection Secret via `envFrom`. When
-  `httpRoute.enabled`, it also renders the `httproute/` sub-Application so the
-  headless service gets a browsable URL (→ `/healthz`, `/metrics`).
+  `httpRoute.enabled`, it also renders the `httproute/` sub-Application; when
+  `connectionSecretExternal.enabled`, the `externalsecret/` sub-Application.
 - **`httproute/`** — Gateway API `HTTPRoute` to the publisher's metrics Service
   (port 8080).
+- **`externalsecret/`** — ESO `ExternalSecret` that materializes the
+  `minio-homerun` connection Secret (`S3_*` keys) from Vault via a
+  ClusterSecretStore. MinIO creds come from Vault; endpoint/region/insecure are
+  written as literals through the target template.
 
 ## Config
 

@@ -95,8 +95,24 @@ spec:
               repository: ghcr.io/stuttgart-things/machinery-catalog-publisher
               tag: 'pr-{{ .number }}-{{ .head_sha }}'
 
-            # S3 connection Secret expected in the PR namespace (see prereqs).
+            # S3 connection Secret. Self-provisioned from Vault per preview env
+            # (ESO sub-App), so no out-of-band projection into the PR namespace
+            # is needed — only the vault-homerun2-pr ClusterSecretStore + the
+            # MinIO creds in Vault must exist on the target cluster.
             connectionSecret: minio-homerun
+            connectionSecretExternal:
+              enabled: true
+              refreshInterval: 1m
+              secretStoreRef:
+                kind: ClusterSecretStore
+                name: vault-homerun2-pr
+              endpoint: https://artifacts.homerun2-dev.sthings-vsphere.labul.sva.de
+              region: us-east-1
+              insecureSkipVerify: "false"
+              vault:
+                secret: minio
+                accessKeyProperty: root-user
+                secretKeyProperty: root-password
 
             # Publisher config. keyPrefix is per-PR so the preview's objects
             # are isolated in the bucket.

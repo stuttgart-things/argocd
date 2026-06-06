@@ -36,12 +36,22 @@ Apply once on the management cluster:
 kubectl apply -f platforms/machinery-catalog-publisher-pr-preview/application.yaml
 ```
 
+## S3 connection Secret
+
+The `minio-homerun` Secret is **self-provisioned per preview env** by the
+install chart's `connectionSecretExternal` (an ESO `ExternalSecret` sub-App,
+sync-wave `-1`, see `apps/machinery-catalog-publisher/externalsecret`). It pulls
+the MinIO root creds from Vault via the `vault-homerun2-pr` ClusterSecretStore
+and writes the `S3_*` keys the publisher reads. No out-of-band projection
+needed — but the store and the Vault KV path must exist on the target cluster.
+
 ## Prerequisites (not declared here)
 
 - Secret `homerun2-omni-pitcher-pat` in the `argocd` namespace (reused PAT).
 - Target cluster registered as an Argo cluster labelled
   `machinery-catalog-publisher-pr-preview: "true"`, with a matching AppProject.
-- **The S3/MinIO connection Secret `minio-homerun` must be materialized in each
-  `machinery-catalog-publisher-pr-<n>` namespace** (ESO / Kyverno). The
-  publisher can't authenticate to S3 without it. `CreateNamespace=true` makes
-  the namespace; projecting the Secret into it is out-of-band.
+- `vault-homerun2-pr` ClusterSecretStore present on the target cluster, and the
+  MinIO root creds in Vault at the KV path referenced by
+  `connectionSecretExternal.vault` (`minio` → `root-user` / `root-password` —
+  **confirm against your Vault layout**).
+- `connectionSecretExternal.endpoint` set to the real MinIO S3 API.
