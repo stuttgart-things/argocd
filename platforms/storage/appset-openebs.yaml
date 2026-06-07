@@ -46,13 +46,24 @@ spec:
         helm:
           valuesObject:
             project: '{{ .name }}'
-            # Override the chart's default child-Application name (sha8 of
-            # destination.server) so the inner Application also carries the
-            # `-storage` suffix and never collides with the cicd-platform one.
-            applicationName: openebs-storage-{{ .name }}
+            # Child (inner) Application name. MUST differ from this AppSet's own
+            # parent Application name (openebs-storage-<cluster>): if they are
+            # equal, the parent renders an Application of its own name — a
+            # self-collision that leaves the parent perpetually OutOfSync and
+            # OpenEBS never actually deployed. Kept distinct from the
+            # cicd-platform child too (openebs-<sha8> / openebs-<cluster>) so
+            # dual-platform clusters don't clash.
+            applicationName: openebs-storage-install-{{ .name }}
             destination:
               server: '{{ .server }}'
               namespace: openebs
+            # openebs-crds is the single cluster-wide owner of the VolumeSnapshot
+            # CRDs; the nfs-csi snapshot-controller (csi-driver-nfs) deliberately
+            # ships with its own CRD install OFF and defers to openebs-crds.
+            # Enable here so storage-platform clusters running both get the CRDs
+            # and the snapshot-controller stops crash-looping on the missing API.
+            volumeSnapshots:
+              enabled: true
             # storage platform expects openebs-hostpath to be the cluster's
             # default StorageClass. Without this, PVCs created on the target
             # cluster without an explicit storageClassName would stay Pending
