@@ -1,0 +1,151 @@
+# =============================================================================
+# ClusterbookCluster — REFERENCE TEMPLATE (documentation only)
+# =============================================================================
+# This file documents every spec field, profile label, and annotation a
+# ClusterbookCluster understands. It is NOT applied by ArgoCD: nothing syncs
+# platforms/ at its root (the platform apps are scoped to platforms/<name>/,
+# non-recursive). Copy the bits you need into a real cluster.yaml under
+# clusters/.../argocd/<cluster>/cluster.yaml.
+#
+# How it works: the ClusterbookCluster controller reserves an IP/DNS record and
+# renders an ArgoCD *cluster Secret*, copying spec.labels onto the Secret's
+# labels and spec.annotations onto its annotations. Platform ApplicationSets in
+# this repo (platforms/<profile>/appset-*.yaml) select clusters by those labels
+# and read config from those annotations — so a label flips a component on, and
+# its annotations supply that component's parameters.
+#
+# Legend:
+#   [req]    required
+#   [user]   you set this value
+#   [auto]   stamped by the clusterbook controller — do NOT set by hand
+#   → appset-x  the ApplicationSet a label switches on
+# =============================================================================
+---
+apiVersion: clusterbook.stuttgart-things.com/v1alpha1
+kind: ClusterbookCluster
+metadata:
+  name: REPLACE-ME                      # = the cluster name; matches spec.clusterName
+spec:
+  # ---- core / reservation ---------------------------------------------------
+  clusterName: REPLACE-ME               # [req] identifier registered in clusterbook
+  clusterType: default                  # free-form discriminator: "default" (vSphere RKE2)
+                                        #   or "kind". Drives which *-platform labels apply.
+  networkKey: '10.31.103'               # clusterbook network pool the IP is reserved from
+  providerConfigRef:
+    name: default                       # ClusterbookProviderConfig (clusterbook endpoint/creds)
+  argocdNamespace: argocd               # namespace the rendered cluster Secret is written to
+  createDNS: true                       # ask clusterbook to create the wildcard DNS record
+  releaseOnDelete: true                 # release the reserved IP when this CR is deleted
+
+  # kubeconfig source for the target cluster (one of the two):
+  kubeconfigSecretRef:
+    name: REPLACE-ME                    # Secret holding the target cluster kubeconfig
+    namespace: argocd
+    key: kubeconfig                     # (optional) data key; some clusters use "value"
+  # existingSecretRef:                  # ...or point at an already-managed ArgoCD cluster Secret
+  #   name: REPLACE-ME
+  #   namespace: argocd
+
+  # ---- optional reservation / server-URL tuning -----------------------------
+  preserveKubeconfigServer: true        # keep data.server from the kubeconfig (don't rewrite to FQDN)
+  # useFQDNAsServer: false              # build the ArgoCD server URL from the FQDN instead of the IP
+  # serverSubdomain: ''                 # substituted for the wildcard "*" label in the server URL
+  # serverPort: 6443                    # port appended to the ArgoCD server URL (default 6443)
+  # skipReservation: false             # skip the clusterbook IP reservation entirely (BYO IP)
+  # lbRange:                            # reserve a contiguous LB IP range (kind/metallb-style)
+  #   start: '172.18.255.200'
+  #   stop: '172.18.255.250'
+
+  # ===========================================================================
+  # LABELS → copied to the cluster Secret; platform AppSets select on them.
+  # Convention: "<profile>: 'true'" is the umbrella switch; "<profile>/<x>"
+  # toggles one component. A sub-toggle only fires if its umbrella is also true.
+  # Every toggle is an explicit 'true'/'false' string (AppSets match on "false").
+  # ===========================================================================
+  labels:
+    # ---- core / project ----
+    env: LabUL                          # free-form; informational
+    role: dev                           # free-form; informational
+    auto-project: 'true'                # create a per-cluster ArgoCD AppProject (proj-<cluster>)
+    allow-all: 'false'                  # widen the AppProject to allow-all sources/dests
+
+    # ---- profile: cicd-platform (vSphere CI/CD stack) ----
+    cicd-platform: 'true'               # umbrella
+    cicd-platform/crossplane: 'true'    # → appset-crossplane (+ -configs/-functions/-provider-configs/-providers)
+    cicd-platform/kro: 'true'           # → appset-kro
+    cicd-platform/tekton: 'true'        # → appset-tekton (+ -config, -dashboard-httproute)
+    cicd-platform/dapr: 'false'         # → appset-dapr
+    cicd-platform/kargo: 'false'        # → appset-kargo (+ -httproute)
+    cicd-platform/argo-rollouts: 'false'# → appset-argo-rollouts
+    cicd-platform/openebs: 'false'      # → appset-openebs (cicd). Prefer storage-platform/openebs;
+                                        #   keep these two mutually exclusive (single OpenEBS install).
+
+    # ---- profile: network-platform (Cilium + cert-manager + trust) ----
+    network-platform: 'true'            # umbrella
+    network-platform/cilium-lb: 'true'  # → appset-cilium-lb            [ann: ip]
+    network-platform/cilium-gateway: 'true'           # → appset-cilium-gateway          [ann: fqdn]
+    network-platform/cilium-gateway-secondary: 'false'# → appset-cilium-gateway-secondary [ann: fqdn-secondary]
+    network-platform/cert-manager-install: 'true'     # → appset-cert-manager-install
+    network-platform/cert-manager-selfsigned: 'true'  # → appset-cert-manager-selfsigned
+    network-platform/cert-manager-cluster-ca: 'true'  # → appset-cert-manager-cluster-ca  [ann: fqdn, wildcard-issuer-name]
+    network-platform/cert-manager-vault-pki: 'true'   # → appset-cert-manager-vault-pki   [ann: vault-server, vault-pki-path, vault-token-secret]
+    network-platform/trust-manager-install: 'true'    # → appset-trust-manager-install
+    network-platform/trust-manager-bundle: 'true'     # → appset-trust-manager-bundle
+
+    # ---- profile: storage-platform ----
+    storage-platform: 'true'            # umbrella
+    storage-platform/openebs: 'true'    # → appset-openebs (storage): openebs-hostpath = DEFAULT SC
+                                        #   + openebs-crds owns the VolumeSnapshot CRDs
+    storage-platform/longhorn: 'false'  # → appset-longhorn
+    storage-platform/nfs-csi-install: 'true'        # → appset-nfs-csi-install (driver + snapshot-controller)
+    storage-platform/nfs-csi-storageclasses: 'true' # → appset-nfs-csi-storageclasses (the SC).
+                                        #   ALSO REQUIRES the gate label below + nfs-* annotations.
+    # gate (operator: Exists) — present this label only when you supply nfs-server/nfs-share:
+    storage-platform.stuttgart-things.com/nfs-config: 'true'
+
+    # ---- profile: security-platform ----
+    security-platform: 'true'           # umbrella
+    security-platform/external-secrets: 'true'  # → appset-external-secrets-install
+    security-platform/kyverno: 'true'           # → appset-kyverno-install
+
+    # ---- profile: kind-platform (only when clusterType: kind) ----
+    # kind-platform: 'true'
+    # kind-platform/cilium-install: 'true'        # → appset-cilium-install-kind
+    # kind-platform/cilium-lb: 'true'             # → appset-cilium-lb-kind
+    # kind-platform/cert-manager-install: 'true'  # → appset-cert-manager-install-kind
+    # kind-platform/cert-manager-selfsigned: 'true' # → appset-cert-manager-selfsigned-kind
+
+    # ---- opt-in app/preview platforms (single-label, no umbrella) ----
+    # homerun2-pr-preview: 'true'                  # → platforms/homerun2-pr-preview/*
+    # machinery-pr-preview: 'true'                 # → platforms/machinery-pr-preview/*
+    # machinery-catalog-publisher-pr-preview: 'true' # → platforms/machinery-catalog-publisher-pr-preview/*
+
+  # ===========================================================================
+  # ANNOTATIONS → copied to the cluster Secret; AppSets read config from them.
+  # [auto] ones are stamped by the controller from reservation/spec — do NOT
+  # set them by hand. [user] ones you must provide for the matching component.
+  # ===========================================================================
+  annotations:
+    # ---- [auto] stamped by the clusterbook controller (shown for reference) ----
+    # clusterbook.stuttgart-things.com/cluster-name: <cluster>
+    # clusterbook.stuttgart-things.com/ip: <reserved-ip>            (cilium-lb)
+    # clusterbook.stuttgart-things.com/fqdn: '*.<cluster>.<zone>'   (cilium-gateway, cert-manager-cluster-ca)
+    # clusterbook.stuttgart-things.com/fqdn-secondary: ...          (cilium-gateway-secondary)
+    # clusterbook.stuttgart-things.com/lb-range-start / lb-range-stop: ...  (kind gateway/lb)
+
+    # ---- [user] network: cert-manager Vault-PKI ClusterIssuer ----
+    clusterbook.stuttgart-things.com/vault-server: https://vault.infra.sthings-vsphere.labul.sva.de
+    clusterbook.stuttgart-things.com/vault-pki-path: pki/sign/sthings-vsphere
+    clusterbook.stuttgart-things.com/vault-token-secret: cert-manager-vault-token
+    # ---- [user] network: gateway TLS wildcard issuer (cert-manager-cluster-ca) ----
+    # clusterbook.stuttgart-things.com/wildcard-issuer-name: vault-pki
+    # ---- [user] kind: expose gateway/cluster-ca externally ----
+    # clusterbook.stuttgart-things.com/expose-external: 'true'
+
+    # ---- [user] storage: NFS StorageClass (needs the nfs-config gate label above) ----
+    # storage-platform.stuttgart-things.com/nfs-server: '10.31.101.26'   # [req]
+    # storage-platform.stuttgart-things.com/nfs-share: /data/col1/sthings # [req]
+    # storage-platform.stuttgart-things.com/nfs-version: '3'             # default 4.1 (labul server is v3-only)
+    # storage-platform.stuttgart-things.com/nfs-name: nfs-csi            # default nfs-csi (the SC name)
+    # storage-platform.stuttgart-things.com/nfs-subdir: <cluster>        # default = cluster name
+    # storage-platform.stuttgart-things.com/nfs-mount-permissions: '0'   # default 0
