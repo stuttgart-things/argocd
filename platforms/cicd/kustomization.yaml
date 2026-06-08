@@ -16,3 +16,4 @@ resources:
   - appset-tekton.yaml
   - appset-tekton-config.yaml
   - appset-tekton-dashboard-httproute.yaml
+  - appset-machinery.yaml

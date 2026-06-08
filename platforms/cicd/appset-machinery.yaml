@@ -1,0 +1,122 @@
+---
+# Machinery (resource dashboard + gRPC ResourceService) for the cicd platform.
+#
+# Fans out across clusters labelled `cicd-platform: "true"` that are also
+# clusterbook-registered (they carry the `<cluster>-gateway` Gateway and
+# `<cluster>-gateway-tls` wildcard cert the HTTP/gRPC routes below depend on).
+# One parent app-of-apps per cluster, rendering apps/machinery/install, which
+# in turn renders the machinery workload + config + RBAC + HTTPRoute + GRPCRoute
+# child Applications.
+#
+# Opt a cluster out with label `cicd-platform/machinery: "false"`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: machinery-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            # Per-cluster opt-out, mirroring the other cicd appsets.
+            - key: cicd-platform/machinery
+              operator: NotIn
+              values: ["false"]
+            # The HTTP/gRPC routes need the clusterbook `<cluster>-gateway`
+            # Gateway and `<cluster>-gateway-tls` wildcard cert. The operator
+            # stamps allocation-ip="" on registration-only kind clusters, so
+            # Exists alone over-matches — NotIn [""] excludes those.
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
+  template:
+    metadata:
+      # `-platform` suffix on the parent so it does not collide with the
+      # chart-rendered child Application (`applicationName: machinery-<cluster>`).
+      # apps/machinery/install uses applicationName as-is (no per-component
+      # suffix), so without this the parent's git source would overwrite the
+      # child's kustomize-OCI source and machinery would never deploy.
+      name: 'machinery-{{ .name }}-platform'
+      annotations:
+        # Informational — top-level Applications don't order across appsets;
+        # retry handles the race if the crossplane XR CRDs aren't present yet.
+        argocd.argoproj.io/sync-wave: "3"
+    spec:
+      project: '{{ .name }}'
+      # Parent app-of-apps renders Application CRDs, which must land in the
+      # argocd ns on the management cluster. The children target the remote
+      # cluster via valuesObject.destination.server below.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/machinery/install
+        helm:
+          releaseName: 'machinery-{{ .name }}'
+          valuesObject:
+            applicationName: 'machinery-{{ .name }}'
+            project: '{{ .name }}'
+            # Target the labelled remote cluster, not the management one.
+            destination:
+              server: '{{ .server }}'
+              namespace: machinery
+
+            # Image + kustomize base tags are intentionally NOT overridden —
+            # they inherit apps/machinery/install/values.yaml, which Renovate
+            # keeps bumped. Keep it that way so cicd tracks the released chart
+            # default rather than a second pinned copy.
+
+            # Watch the stuttgart-things Crossplane v2 XRs present on cicd
+            # clusters. config.watch derives BOTH the MACHINERY_CONFIG resources
+            # map and the matching ClusterRole rules from the chart's kind
+            # catalog, so config and RBAC can never drift — rbac.rules stays
+            # empty.
+            config:
+              watch:
+                - AnsibleRun
+                - HarvesterVM
+                - VsphereVM
+                - StoragePlatform
+                - NetworkIntegration
+                - SecurityPlatform
+            rbac:
+              rules: []
+
+            httpRoute:
+              enabled: true
+              hostname: 'machinery.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              gateway:
+                name: '{{ .name }}-gateway'
+                namespace: default
+
+            grpcRoute:
+              enabled: true
+              hostname: 'machinery-grpc.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              gateway:
+                name: '{{ .name }}-gateway'
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
