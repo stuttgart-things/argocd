@@ -20,7 +20,7 @@ chartVersion: 10.0.1
 replicas: 1
 image:
   repository: ghcr.io/zitadel/zitadel
-  tag: v4.15.0
+  tag: v4.15.1
   pullPolicy: IfNotPresent
 
 # ZITADEL runtime configuration.
