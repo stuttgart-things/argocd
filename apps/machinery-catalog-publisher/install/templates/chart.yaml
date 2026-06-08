@@ -1,0 +1,65 @@
+{{/*
+Workload Application: the publisher kustomize OCI base, with the image patched
+in, the per-PR config.yaml patched into the base ConfigMap, the connection
+Secret wired via envFrom, and the namespace rewritten so per-PR previews don't
+all land in `machinery-catalog-publisher`.
+*/}}
+{{- $appName := include "publisher.appName" . }}
+{{- $container := dict
+      "name" "machinery-catalog-publisher"
+      "image" (printf "%s:%s" .Values.image.repository .Values.image.tag)
+}}
+{{- if .Values.connectionSecret }}
+{{-   $_ := set $container "envFrom" (list (dict "secretRef" (dict "name" .Values.connectionSecret))) }}
+{{- end }}
+{{- $deployPatch := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" "machinery-catalog-publisher")
+      "spec" (dict "template" (dict "spec" (dict "containers" (list $container))))
+}}
+{{- $cmPatch := dict
+      "apiVersion" "v1"
+      "kind" "ConfigMap"
+      "metadata" (dict "name" "machinery-catalog-publisher-config")
+      "data" (dict "config.yaml" (include "publisher.configYaml" .))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  # Cascade prune the kustomize-rendered workload before this App is removed,
+  # instead of orphaning it on the destination cluster when the PR closes.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "publisher.kustomizeRepo" . | quote }}
+    targetRevision: {{ .Values.kustomize.targetRevision | quote }}
+    path: .
+    kustomize:
+      # The base bakes `namespace: machinery-catalog-publisher` into every
+      # resource (KCL schema default). Rewrite it so per-PR previews land in
+      # their own namespace and the metrics Service/HTTPRoute line up.
+      namespace: {{ .Values.destination.namespace | quote }}
+      patches:
+        - target:
+            kind: Deployment
+            name: machinery-catalog-publisher
+          patch: |
+{{ toYaml $deployPatch | indent 12 }}
+        - target:
+            kind: ConfigMap
+            name: machinery-catalog-publisher-config
+          patch: |
+{{ toYaml $cmPatch | indent 12 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

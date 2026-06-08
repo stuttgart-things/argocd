@@ -1,0 +1,98 @@
+---
+# Reference back to this catalog repo — used by the httpRoute sub-Application
+# to load apps/machinery-catalog-publisher/httproute from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where the workload deploys.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: machinery-catalog-publisher
+
+# Name of the rendered child Application. Leave empty to derive one from the
+# destination server hash; the PR-preview AppSet sets it to
+# machinery-catalog-publisher-pr-<n>.
+applicationName: ""
+
+# Publisher OCI kustomize base (ghcr.io/stuttgart-things/machinery-catalog-publisher-kustomize).
+# The chart prepends `oci://` automatically if missing — Argo CD 2.13+ needs
+# the prefix to treat the repoURL as a kustomize OCI source rather than git.
+# Keep the kustomize base and the image on the SAME release/tag.
+kustomize:
+  repoURL: ghcr.io/stuttgart-things/machinery-catalog-publisher-kustomize
+  targetRevision: v0.1.0
+
+# Publisher container image — patched into the Deployment rendered by the base.
+image:
+  repository: ghcr.io/stuttgart-things/machinery-catalog-publisher
+  tag: v0.1.0
+
+# S3/MinIO connection Secret consumed by the Deployment via envFrom. It carries
+# S3_ENDPOINT / S3_ACCESS_KEY / S3_SECRET_KEY / S3_CA_BUNDLE / S3_INSECURE_SKIP_VERIFY.
+# Either materialize it out-of-band, or have the chart self-provision it from
+# Vault via connectionSecretExternal below. The chart only references it by name
+# — credentials never land in git or an Application manifest.
+connectionSecret: minio-homerun
+
+# Optional: self-provision `connectionSecret` from Vault (ESO) as a sub-App, so
+# the preview env doesn't need the Secret projected in out-of-band. Requires the
+# ClusterSecretStore + Vault KV path to exist on the destination cluster.
+connectionSecretExternal:
+  enabled: false
+  refreshInterval: 1m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: vault-homerun2-pr
+  endpoint: https://artifacts.homerun2-dev.sthings-vsphere.labul.sva.de
+  region: us-east-1
+  insecureSkipVerify: "false"
+  vault:
+    secret: minio
+    accessKeyProperty: root-user
+    secretKeyProperty: root-password
+
+# Publisher config — rendered into the base ConfigMap's config.yaml (overrides
+# the value baked into the kustomize base at build time). Lets each preview env
+# target its own bucket / key-prefix without rebuilding the base.
+config:
+  interval: 5m
+  owner: platform-team
+  source:
+    machineryAddr: machinery.machinery-system.svc:50051
+    kinds: ["*"]
+  sink:
+    bucket: backstage-status
+    keyPrefix: status/
+    layout: PerResource
+    entityNamespace: default
+
+# Optional metrics/health HTTPRoute sub-Application. The publisher is headless
+# (only /metrics + /healthz), so this is what gives a preview env a URL. Routes
+# the gateway hostname to the publisher's metrics Service (port 8080). Plain
+# HTTP/1.1 — no h2 needed, so the homerun2-dev gateway's HTTP/1.1-only listener
+# is fine here (unlike machinery's gRPC route).
+httpRoute:
+  enabled: false
+  hostname: machinery-catalog-publisher.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

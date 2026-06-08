@@ -1,0 +1,65 @@
+---
+# Dedicated AppProject for machinery-catalog-publisher PR previews.
+#
+# The repo's default pattern is one AppProject per cluster (config/cluster-project,
+# named after the cluster) — machinery-pr-preview reuses that via
+# `project: '{{ .name }}'`. This project instead scopes previews tightly: only
+# the publisher's sources, and only the `machinery-catalog-publisher-pr-*`
+# namespaces on the workload clusters (plus argocd ns on the management cluster,
+# where the parent + child Application CRDs live).
+#
+# Deployed as part of this platform bundle (kustomization.yaml), so it exists
+# before the ApplicationSet's generated Applications reference it.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: machinery-catalog-publisher-pr-preview
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Per-PR preview environments for stuttgart-things/machinery-catalog-publisher
+
+  # Only the argocd catalog repo (charts + AppSet source) and the publisher's
+  # per-PR kustomize OCI base. The runtime image is pulled by the kubelet, not
+  # Argo, so it doesn't need a sourceRepos entry.
+  sourceRepos:
+    - https://github.com/stuttgart-things/argocd.git
+    - oci://ghcr.io/stuttgart-things/machinery-catalog-publisher-kustomize
+
+  destinations:
+    # Parent + child Application CRDs live in argocd ns on the management cluster.
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+    # Workload + httproute + externalsecret land in per-PR namespaces on any
+    # labelled preview cluster. The namespace glob is the real isolation: a
+    # preview App can only touch machinery-catalog-publisher-pr-* namespaces.
+    - server: '*'
+      namespace: 'machinery-catalog-publisher-pr-*'
+
+  # Resource kinds the previews actually create. Cluster-scoped: just the
+  # per-PR Namespace (CreateNamespace=true). Namespaced: the workload set +
+  # Argo Applications (the app-of-apps children).
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: ''
+      kind: Secret
+    - group: apps
+      kind: Deployment
+    - group: argoproj.io
+      kind: Application
+    - group: external-secrets.io
+      kind: ExternalSecret
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+
+  orphanedResources:
+    warn: true

@@ -1,0 +1,32 @@
+---
+# Name of the materialized Secret. Must match the install chart's
+# `connectionSecret` (default `minio-homerun`) — the Deployment envFrom's it.
+secretName: minio-homerun
+
+# Namespace the Secret lands in (set by the install chart's destination.namespace).
+namespace: machinery-catalog-publisher
+
+# How often ESO re-pulls from Vault. Per-PR previews churn, so default is short.
+refreshInterval: 1m
+
+# ClusterSecretStore (Vault) backing the pull. Provisioned out-of-band — see
+# infra/external-secrets/cluster-secret-store-vault. `vault-homerun2-pr` is the
+# homerun2-dev/pr store (KV mount `homerun2-pr`).
+secretStoreRef:
+  kind: ClusterSecretStore
+  name: vault-homerun2-pr
+
+# Non-secret connection fields, written verbatim into the Secret's S3_* keys
+# alongside the Vault-pulled credentials. Set `endpoint` to the MinIO S3 API.
+endpoint: https://artifacts.homerun2-dev.sthings-vsphere.labul.sva.de
+region: us-east-1
+insecureSkipVerify: "false"
+
+# Vault KV (v2) lookup for the MinIO root credentials. CONFIRM these against
+# the actual Vault layout — `<store path>/minio` with properties `root-user` /
+# `root-password` follows the apps/minio `existingSecret: minio-auth` convention
+# (keys root-user / root-password). Adjust if your KV path differs.
+vault:
+  secret: minio
+  accessKeyProperty: root-user
+  secretKeyProperty: root-password

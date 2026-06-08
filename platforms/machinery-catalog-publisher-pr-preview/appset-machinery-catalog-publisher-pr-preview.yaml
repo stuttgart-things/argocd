@@ -1,0 +1,156 @@
+---
+# Per-PR preview environments for stuttgart-things/machinery-catalog-publisher.
+#
+# Fans out across (clusters labelled machinery-catalog-publisher-pr-preview:
+# "true") × (open PRs on the repo carrying the `preview` label). One parent
+# Application per (cluster, PR) cell, rendering apps/machinery-catalog-publisher/install
+# with PR-specific values.
+#
+# Reviewer flow:
+#   1. Open a PR on machinery-catalog-publisher, label it `preview`.
+#   2. push-kustomize-pr.yaml publishes
+#      ghcr.io/stuttgart-things/machinery-catalog-publisher:pr-<n>-<sha>
+#      ghcr.io/stuttgart-things/machinery-catalog-publisher-kustomize:pr-<n>-<sha>
+#   3. This AppSet picks the PR up on its next 600s requeue and deploys those
+#      artifacts into namespace `machinery-catalog-publisher-pr-<n>`.
+#   4. comment-preview-url.yaml posts the URL on the PR:
+#      https://machinery-catalog-publisher-pr-<n>.homerun2-dev.… (→ /healthz, /metrics)
+#   5. On PR close, Argo prunes the Application (finalizer) and
+#      cleanup-pr-artifacts.yaml deletes the OCI tags.
+#
+# Per-PR isolation: each preview writes to its OWN S3 key prefix
+# (status/pr-<n>/), so previews never clobber each other or the prod prefix.
+#
+# The AppProject (appproject.yaml) is bundled alongside this AppSet, so it is
+# not a prereq.
+#
+# Prereqs not declared here:
+#   - Secret `homerun2-omni-pitcher-pat` in argocd ns (reused PAT — covers any
+#     public stuttgart-things repo).
+#   - Target cluster registered as an Argo cluster with label
+#     machinery-catalog-publisher-pr-preview: "true".
+#   - The `vault-homerun2-pr` ClusterSecretStore + the MinIO creds in Vault on
+#     the target cluster. The `minio-homerun` connection Secret itself is
+#     self-provisioned per env (connectionSecretExternal → ESO sub-App), so it
+#     does NOT need projecting in out-of-band.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: machinery-catalog-publisher-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  machinery-catalog-publisher-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: machinery-catalog-publisher
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      # `-platform` suffix so the AppSet's parent Application doesn't collide
+      # with the chart-rendered child Application (named via applicationName:
+      # machinery-catalog-publisher-pr-<n>).
+      name: 'machinery-catalog-publisher-pr-{{ .number }}-platform'
+      labels:
+        machinery.stuttgart-things.com/pr: '{{ .number }}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      # Dedicated, namespace-scoped preview project (see appproject.yaml),
+      # rather than the per-cluster project machinery-pr-preview reuses.
+      project: machinery-catalog-publisher-pr-preview
+      # Parent App = the rendered install chart; its output is more Argo
+      # Application CRDs, which land in argocd ns on the management cluster.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/machinery-catalog-publisher/install
+        helm:
+          releaseName: 'machinery-catalog-publisher-pr-{{ .number }}'
+          valuesObject:
+            applicationName: 'machinery-catalog-publisher-pr-{{ .number }}'
+            project: machinery-catalog-publisher-pr-preview
+            # Deploy to the labelled remote cluster, not the management one.
+            destination:
+              server: '{{ .server }}'
+              namespace: 'machinery-catalog-publisher-pr-{{ .number }}'
+
+            # Per-PR artifacts, tagged pr-<number>-<full-sha> to match .head_sha.
+            kustomize:
+              repoURL: ghcr.io/stuttgart-things/machinery-catalog-publisher-kustomize
+              targetRevision: 'pr-{{ .number }}-{{ .head_sha }}'
+            image:
+              repository: ghcr.io/stuttgart-things/machinery-catalog-publisher
+              tag: 'pr-{{ .number }}-{{ .head_sha }}'
+
+            # S3 connection Secret. Self-provisioned from Vault per preview env
+            # (ESO sub-App), so no out-of-band projection into the PR namespace
+            # is needed — only the vault-homerun2-pr ClusterSecretStore + the
+            # MinIO creds in Vault must exist on the target cluster.
+            connectionSecret: minio-homerun
+            connectionSecretExternal:
+              enabled: true
+              refreshInterval: 1m
+              secretStoreRef:
+                kind: ClusterSecretStore
+                name: vault-homerun2-pr
+              endpoint: https://artifacts.homerun2-dev.sthings-vsphere.labul.sva.de
+              region: us-east-1
+              insecureSkipVerify: "false"
+              vault:
+                secret: minio
+                accessKeyProperty: root-user
+                secretKeyProperty: root-password
+
+            # Publisher config. keyPrefix is per-PR so the preview's objects
+            # are isolated in the bucket.
+            config:
+              interval: 5m
+              owner: platform-team
+              source:
+                machineryAddr: machinery.machinery-system.svc:50051
+                kinds: ["*"]
+              sink:
+                bucket: backstage-status
+                keyPrefix: 'status/pr-{{ .number }}/'
+                layout: PerResource
+                entityNamespace: default
+
+            # Headless service → expose /healthz + /metrics so the preview URL
+            # resolves. Plain HTTP/1.1, so the homerun2-dev gateway is fine.
+            httpRoute:
+              enabled: true
+              hostname: 'machinery-catalog-publisher-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              gateway:
+                name: homerun2-dev-gateway
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
