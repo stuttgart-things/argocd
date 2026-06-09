@@ -62,3 +62,31 @@ configs:
             in_cluster_config = true
           }
         }
+
+  # provider-kubeconfig (kubeconfig.stuttgart-things.com) — NOT shipped by
+  # default. It manages remote kubeconfigs from a SOPS-encrypted Git repo, so
+  # every config is consumer-specific: it references a SOPS age-key Secret
+  # (and, for private repos, a git-credentials Secret) that must already exist
+  # in crossplane-system. Baking it into the shared baseline would render a
+  # broken ClusterProviderConfig on every cluster missing those Secrets.
+  #
+  # Wire it up per-cluster: copy the block below into your consumer
+  # Application's `helm.values` (under `configs:`), set your repo URL/branch,
+  # and land the referenced Secret(s) via SOPS/ESO. Drop `git.secretRef` for a
+  # public repo. See the provider's examples/provider/{config,config-private-repo}.yaml.
+  #
+  # - name: default
+  #   apiVersion: kubeconfig.stuttgart-things.com/v1alpha1
+  #   kind: ClusterProviderConfig
+  #   spec:
+  #     git:
+  #       url: https://github.com/my-org/my-cluster-configs.git
+  #       branch: main
+  #       secretRef:                      # omit for a public repo
+  #         name: git-credentials
+  #         namespace: crossplane-system
+  #     decryption:
+  #       provider: sops
+  #       secretRef:
+  #         name: age-key
+  #         namespace: crossplane-system
