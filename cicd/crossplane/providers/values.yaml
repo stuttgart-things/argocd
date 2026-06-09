@@ -36,6 +36,13 @@ providers:
     package: xpkg.upbound.io/upbound/provider-opentofu:v1.1.2
     rbac:
       clusterRole: cluster-admin
+  # stuttgart-things provider managing remote kubeconfigs from SOPS-encrypted
+  # Git repos. No `rbac` block: it declares its own permissions via the package
+  # metadata (spec.permissions.rules + safe-start), which Crossplane grants to
+  # the provider ServiceAccount — unlike the contrib helm/kubernetes providers
+  # above, which need the cluster-admin binding for their InjectedIdentity SA.
+  - name: provider-kubeconfig
+    package: ghcr.io/stuttgart-things/provider-kubeconfig-xpkg:v0.11.12
 
 # AWS family sugar. Upbound publishes one xpkg per AWS service under
 # xpkg.upbound.io/upbound/provider-aws-<service>:<version>. Each enabled
