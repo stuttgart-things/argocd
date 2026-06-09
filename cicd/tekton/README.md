@@ -180,6 +180,41 @@ spec:
 
 Should sync after the Operator has stood up `tekton-dashboard` — if ordering matters in your setup, wrap the Applications in an app-of-apps with `sync-wave` annotations.
 
+### Troubleshooting: Dashboard returns HTTP 500 on first bring-up
+
+If the route is `Synced`/`Healthy` in ArgoCD but the Dashboard URL returns an
+empty-body `500` (`server: envoy`) while a port-forward to the `tekton-dashboard`
+Service returns `200`, the cause is a **stale Cilium gateway translation**, not a
+catalog bug.
+
+When the HTTPRoute is created before the Operator has installed the
+`tekton-dashboard` Service, Cilium records `ResolvedRefs: False`
+(`reason: BackendNotFound`) and does not always re-resolve it when the Service
+appears later. The route's `CiliumEnvoyConfig` keeps serving a `500` local reply
+even though the backend is now healthy. ArgoCD can't see this — the HTTPRoute
+manifest is correct and reconciled, so re-syncing it does nothing.
+
+Confirm and fix:
+
+```bash
+# Smoking gun: ResolvedRefs=False / BackendNotFound frozen at the route's creation time
+kubectl -n tekton-pipelines get httproute tekton-dashboard -o yaml | yq '.status.parents'
+
+# Backend is actually healthy (proves it's the gateway hop, not the app)
+kubectl -n tekton-pipelines port-forward svc/tekton-dashboard 9097:9097 &
+curl -is http://localhost:9097/      # expect 200 + text/html
+
+# Force Cilium to regenerate the gateway translation
+kubectl -n kube-system rollout restart deploy/cilium-operator
+kubectl -n kube-system rollout restart ds/cilium
+curl -is https://tekton.<cluster>.example.com/   # now 200
+```
+
+A metadata-only annotation nudge on the HTTPRoute does **not** trigger
+re-resolution — the `cilium-operator`/`cilium` restart is what regenerates the
+config. Newer Cilium releases self-heal `ResolvedRefs=BackendNotFound` on backend
+appearance, so a Cilium upgrade removes the need for the manual restart.
+
 ## Pruner caveat
 
 The Operator's pruner is a single cluster-wide CronJob. If PipelineRuns are managed externally (e.g. by Crossplane's `provider-kubernetes`), deletions trigger re-creates in a loop. The `ci-namespace/` chart is the mitigation — namespaces annotated with `operator.tekton.dev/prune.skip: "true"` are bypassed while global pruning continues elsewhere.
