@@ -19,7 +19,24 @@ pipeline:
   # "false" or "true". Empty string ("") = operator default.
   disableInlineSpec: ""
 
+# Tekton resource pruner (operator-managed CronJob that trims old TaskRuns /
+# PipelineRuns). The operator's validating webhook rejects the *entire*
+# TektonConfig unless spec.pruner carries `resources` AND exactly one of
+# `keep` / `keep-since` — and when the field is omitted the operator defaults
+# an incomplete pruner that fails its own validation, wedging reconciliation
+# (components, incl. Dashboard, never finish installing). So always render a
+# complete, valid pruner. `disabled: true` keeps it valid while turning the
+# CronJob off (no automatic cleanup); `keep`/`schedule` are inert while
+# disabled but must be present to satisfy the webhook.
+pruner:
+  disabled: true
+  resources:
+    - taskrun
+    - pipelinerun
+  keep: 100
+  schedule: "0 1 * * *"
+
 # Deep-merged onto the rendered TektonConfig.spec. Use for any Operator
-# setting not exposed as a first-class value above (addon params, pruner,
+# setting not exposed as a first-class value above (addon params,
 # dashboard, hub, chains config, etc.).
 extraSpec: {}
