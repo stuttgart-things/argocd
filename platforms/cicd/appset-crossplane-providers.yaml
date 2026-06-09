@@ -32,6 +32,8 @@ spec:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
         path: cicd/crossplane/providers
+        helm:
+          releaseName: 'crossplane-providers-{{ .name }}'
       syncPolicy:
         automated:
           prune: true

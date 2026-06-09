@@ -32,6 +32,8 @@ spec:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
         path: cicd/crossplane/functions
+        helm:
+          releaseName: 'crossplane-functions-{{ .name }}'
       syncPolicy:
         automated:
           prune: true
