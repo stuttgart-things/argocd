@@ -38,6 +38,7 @@ component at `'false'` rather than omitting it.
 | `cicd-platform/kargo` | `appset-kargo` (+ httproute) | — |
 | `cicd-platform/argo-rollouts` | `appset-argo-rollouts` | — |
 | `cicd-platform/openebs` | `appset-openebs` (cicd) | — (prefer `storage-platform/openebs`; keep mutually exclusive) |
+| `cicd-platform/machinery` | `machinery-cicd` (resource dashboard + gRPC ResourceService → `apps/machinery/install`) | `…/fqdn` *(auto)*, `…/allocation-ip` *(auto)* — clusterbook-registered clusters only |
 
 ### `network-platform` — Cilium + cert-manager + trust-manager
 | Label | AppSet | Needs annotations |
@@ -105,6 +106,7 @@ spec:
     cicd-platform/crossplane: 'true'
     cicd-platform/kro: 'true'
     cicd-platform/tekton: 'true'
+    cicd-platform/machinery: 'true'                  # resource dashboard + gRPC ResourceService
     network-platform: 'true'
     network-platform/cilium-lb: 'true'
     network-platform/cilium-gateway: 'true'

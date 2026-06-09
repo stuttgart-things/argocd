@@ -74,6 +74,7 @@ spec:
     cicd-platform/crossplane: 'true'    # → appset-crossplane (+ -configs/-functions/-provider-configs/-providers)
     cicd-platform/kro: 'true'           # → appset-kro
     cicd-platform/tekton: 'true'        # → appset-tekton (+ -config, -dashboard-httproute)
+    cicd-platform/machinery: 'true'     # → machinery-cicd (resource dashboard + gRPC ResourceService) [ann: fqdn]
     cicd-platform/dapr: 'false'         # → appset-dapr
     cicd-platform/kargo: 'false'        # → appset-kargo (+ -httproute)
     cicd-platform/argo-rollouts: 'false'# → appset-argo-rollouts
