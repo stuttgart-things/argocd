@@ -24,6 +24,7 @@ Catalog entries rendered:
 | `tekton-cicd`        | `cicd/tekton/operator`         | `tekton-operator`  | Tekton operator (control plane for the rest) |
 | `tekton-config-cicd` | `cicd/tekton/config`           | `tekton-pipelines` | `TektonConfig` CR, profile `all` (Pipelines + Triggers + Dashboard + Chains + Results). Uniform across clusters today; per-cluster override via cluster-Secret annotation can be added when needed |
 | `tekton-dashboard-httproute-cicd` | `cicd/tekton/dashboard-httproute` | `tekton-pipelines` | Gateway API `HTTPRoute` exposing `tekton-dashboard:9097` on `tekton.<cluster-fqdn>`. **Additionally gated on** `clusterbook.stuttgart-things.com/allocation-ip` — clusterbook clusters only (same reason as `kargo-httproute-cicd`) |
+| `machinery-cicd` | `apps/machinery/install` | `machinery` | App-of-apps rendering the machinery resource dashboard + gRPC `ResourceService` (workload + config + RBAC + HTTPRoute + GRPCRoute) on `machinery.<cluster-fqdn>` / `machinery-grpc.<cluster-fqdn>`. **Additionally gated on** `clusterbook.stuttgart-things.com/allocation-ip` — needs the `<cluster>-gateway` Gateway and `<cluster>-gateway-tls` wildcard cert, so clusterbook clusters only |
 
 **Ordering:** `openebs-cicd` carries sync-wave `-10`, the others wave `0`. As noted in `platforms/network`, sync-wave on top-level Applications is informational (each ApplicationSet fires independently). Convergence on fresh clusters relies on each component's `syncPolicy.retry` — e.g. dapr scheduler PVCs stay `Pending` until OpenEBS installs the default StorageClass, then Argo re-syncs dapr.
 
@@ -98,6 +99,7 @@ Default behaviour: labelling a cluster with `cicd-platform: "true"` enrols it in
 | `cicd-platform/crossplane: "false"`            | Skip `crossplane-cicd`, `crossplane-providers-cicd` **and** `crossplane-provider-configs-cicd` (shared key) |
 | `cicd-platform/kargo: "false"`                 | Skip `kargo-cicd` **and** `kargo-httproute-cicd` (shared key) |
 | `cicd-platform/tekton: "false"`                | Skip `tekton-cicd`, `tekton-config-cicd` **and** `tekton-dashboard-httproute-cicd` (shared key) |
+| `cicd-platform/machinery: "false"`             | Skip `machinery-cicd` |
 
 Semantics: each ApplicationSet selector is `cicd-platform=true` AND `cicd-platform/<component> NotIn ["false"]`. Absent label = included (default). Only the explicit string `"false"` opts out.
 
