@@ -30,6 +30,9 @@ spec:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
         path: infra/cert-manager/selfsigned
+        helm:
+          valuesObject:
+            name: selfsigned
       syncPolicy:
         automated:
           prune: true
