@@ -4,6 +4,11 @@
     "pipeline" (dict
         "enable-api-fields"   .Values.pipeline.enableApiFields
         "disable-inline-spec" .Values.pipeline.disableInlineSpec)
+    "pruner" (dict
+        "disabled"  .Values.pruner.disabled
+        "schedule"  .Values.pruner.schedule
+        "keep"      (.Values.pruner.keep | int)
+        "resources" .Values.pruner.resources)
 }}
 {{- $extra := .Values.extraSpec | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
