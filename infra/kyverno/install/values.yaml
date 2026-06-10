@@ -27,6 +27,11 @@ syncPolicy:
   syncOptions:
     - CreateNamespace=true
     - ServerSideApply=true
+    # Diff via a server-side dry-run against the live object's managed fields.
+    # Without this, ServerSideApply still diffs client-side and reports false
+    # OutOfSync on server-defaulted/empty fields (CRD spec.conversion, the
+    # chart's empty metadata.labels {}) that the controller can't own.
+    - ServerSideDiff=true
     # Honour the chart's ignoreDifferences during sync/selfHeal so it never
     # tries to rewrite the server-defaulted CRD/Job fields it can't change.
     - RespectIgnoreDifferences=true
