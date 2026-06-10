@@ -28,10 +28,13 @@ providers:
     package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
     rbac:
       clusterRole: cluster-admin
-  - name: provider-kubernetes
-    package: xpkg.crossplane.io/crossplane-contrib/provider-kubernetes:v1.2.1
-    rbac:
-      clusterRole: cluster-admin
+  # provider-kubernetes is intentionally NOT installed explicitly here: every
+  # crossplane-configurations Configuration `dependsOn` it, so Crossplane pulls
+  # it as a transitive dependency (Provider crossplane-contrib-provider-kubernetes
+  # from xpkg.crossplane.io). Installing it explicitly too creates a SECOND lock
+  # node for the same source → "node ... already exists" → the package resolver
+  # freezes for every Configuration. Manage it via dependsOn only (same rule as
+  # the Configuration building blocks). See crossplane-configurations CLAUDE.md.
   - name: provider-opentofu
     package: xpkg.upbound.io/upbound/provider-opentofu:v1.1.2
     rbac:
