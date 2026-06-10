@@ -16,6 +16,6 @@
 # one chart + one ApplicationSet per profile.
 configurations:
   - name: namespace
-    package: ghcr.io/stuttgart-things/crossplane-configurations/namespace:v0.1.1
+    package: ghcr.io/stuttgart-things/crossplane-configurations/namespace:v0.1.2
   - name: volume-claim
     package: ghcr.io/stuttgart-things/crossplane-configurations/volume-claim:v0.1.0
