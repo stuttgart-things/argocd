@@ -29,7 +29,7 @@ providers:
     rbac:
       clusterRole: cluster-admin
   - name: provider-kubernetes
-    package: xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1
+    package: xpkg.crossplane.io/crossplane-contrib/provider-kubernetes:v1.2.1
     rbac:
       clusterRole: cluster-admin
   - name: provider-opentofu
