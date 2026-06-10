@@ -27,6 +27,9 @@ syncPolicy:
   syncOptions:
     - CreateNamespace=true
     - ServerSideApply=true
+    # Honour the chart's ignoreDifferences during sync/selfHeal so it never
+    # tries to rewrite the server-defaulted CRD/Job fields it can't change.
+    - RespectIgnoreDifferences=true
   retry:
     limit: 5
     backoff:

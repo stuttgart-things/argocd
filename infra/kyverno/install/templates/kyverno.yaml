@@ -24,5 +24,28 @@ spec:
   destination:
     server: {{ .Values.destination.server | quote }}
     namespace: {{ .Values.destination.namespace | quote }}
+  # Suppress permanent OutOfSync from server-side defaulted fields the upstream
+  # chart doesn't set (Kyverno is otherwise Healthy). Verified diffs:
+  #   * CRDs: the API server defaults spec.conversion to {strategy: None}.
+  #   * kyverno-migrate-resources: a completed Helm post-upgrade hook Job; Jobs
+  #     are immutable and the controller auto-populates selector/labels/defaults.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .spec.conversion
+    - group: batch
+      kind: Job
+      name: kyverno-migrate-resources
+      namespace: {{ .Values.destination.namespace | quote }}
+      jqPathExpressions:
+        - .spec.selector
+        - .spec.completionMode
+        - .spec.completions
+        - .spec.manualSelector
+        - .spec.parallelism
+        - .spec.podReplacementPolicy
+        - .spec.suspend
+        - .spec.template.metadata.labels
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
