@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-platform-cicd
+  namespace: argocd
+# Per-cluster crossplane platform components (ESO stores, ClusterProviderConfigs,
+# EnvironmentConfigs, RBAC) from the stuttgart-things monorepo. Each component is
+# a Helm chart under crossplane/platform/<component>/ with per-env values in
+# vars/<env>.yaml. The git *files* generator discovers one vars file per
+# (component, env); matrixed with the clusters generator and keyed on each
+# cluster's `env` label, it deploys exactly the components whose vars/<env>.yaml
+# exists to the clusters in that env.
+#
+# Opt-in model: a cluster gets a component iff that component ships a
+# vars/<its-env>.yaml. Add an env to a component = add one vars file. Onboard a
+# cluster = label it (cicd-platform/crossplane + env).
+#
+# Requires every selected cluster to carry an `env` label (e.g. env: LabDA);
+# it is lowercased to match the vars filename. A cluster missing the label
+# matches no files and gets nothing (no error).
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  cicd-platform: "true"
+                matchExpressions:
+                  - key: cicd-platform/crossplane
+                    operator: NotIn
+                    values: ["false"]
+          - git:
+              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+              revision: main
+              files:
+                - path: 'crossplane/platform/*/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+  template:
+    metadata:
+      name: 'cxp-platform-{{ .name }}-{{ trimSuffix "/vars" .path.path | base }}'
+      annotations:
+        # After the shared provider/provider-config appsets (wave 0) so the
+        # ClusterProviderConfig CRDs exist; before xrs (wave 2).
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+        targetRevision: main
+        path: '{{ trimSuffix "/vars" .path.path }}'
+        helm:
+          releaseName: 'cxp-{{ trimSuffix "/vars" .path.path | base }}-{{ .name }}'
+          valueFiles:
+            - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
