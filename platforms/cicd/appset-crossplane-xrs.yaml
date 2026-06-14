@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-xrs-cicd
+  namespace: argocd
+# Per-cluster crossplane XR instances (the actual claims/composites — NativeVsphereVM,
+# RemoteCluster, …) from the stuttgart-things monorepo. Unlike platform components,
+# XRs are concrete instances of intent, not reusable templates — so they stay PLAIN
+# manifests under crossplane/xrs/<component>/<env>/ and are deployed as-is (kustomize),
+# not rendered through Helm.
+#
+# A git *directories* generator, matrixed with the clusters generator and keyed on
+# each cluster's `env` label, deploys every component whose <component>/<env>/ folder
+# exists to the clusters in that env. Opt-in = the env folder exists.
+#
+# Runs at sync-wave 2 (after platform wave 1), so the ProviderConfigs /
+# EnvironmentConfigs the XRs depend on already exist.
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  cicd-platform: "true"
+                matchExpressions:
+                  - key: cicd-platform/crossplane
+                    operator: NotIn
+                    values: ["false"]
+          - git:
+              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+              revision: main
+              directories:
+                - path: 'crossplane/xrs/*/{{ index .metadata.labels "env" | lower }}'
+  template:
+    metadata:
+      # .path.path = crossplane/xrs/<component>/<env>; basename of its dir = <component>
+      name: 'cxp-xr-{{ .name }}-{{ dir .path.path | base }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+        targetRevision: main
+        path: '{{ .path.path }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
