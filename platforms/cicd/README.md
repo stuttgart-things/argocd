@@ -136,15 +136,17 @@ the env file says *how* it is configured for that env.
 |---|---|---|---|---|
 | `crossplane-platform-baseline-cicd` | `cicd-platform=true` AND `cicd-platform/crossplane != false` (opt-**out**) | `crossplane/platform/baseline/*/vars/<env>.yaml` (Helm) | env | 0 |
 | `crossplane-platform-<cap>-cicd` | `cicd-platform/crossplane-<cap>=true` (opt-**in**) | `crossplane/platform/capabilities/<cap>/vars/<env>.yaml` (Helm) | env | 1 |
-| `crossplane-xrs-<cap>-cicd` | `cicd-platform/crossplane-<cap>=true` (opt-**in**) | `crossplane/xrs/<cap>/<cluster>/` (plain manifests) | **cluster** | 2 |
+| `crossplane-xrs-<cap>-cicd` | `cicd-platform/crossplane-<cap>=true` (opt-**in**) | `crossplane/xrs/<cap>/<env>/<cluster>/` (plain manifests) | **cluster** (grouped by env) | 2 |
 
 A *capability* is one opt-in label (`cicd-platform/crossplane-<cap>`). Its platform
 config (wave 1) is **env-keyed** — reusable across clusters in the env. Its XRs
-(wave 2) are **cluster-keyed** — concrete instances belong to exactly one cluster,
-so two clusters with the same capability in the same env each own a separate
-`xrs/<cap>/<cluster>/` folder (no shared or duplicated claims). A cluster can hold
-a capability with **no** XR folder: provider config installed, no instances
-declared yet.
+(wave 2) are **cluster-keyed**, grouped by env — concrete instances belong to
+exactly one cluster, so two clusters with the same capability in the same env each
+own a separate `xrs/<cap>/<env>/<cluster>/` folder (no shared or duplicated
+claims). The `<env>` level mirrors the platform tree and guards against misfiling:
+a folder under the wrong env won't match the cluster. A cluster can hold a
+capability with **no** XR folder: provider config installed, no instances declared
+yet.
 
 Capabilities are deliberately fine-grained — one concern each, so they compose:
 
@@ -167,19 +169,20 @@ crossplane/
     baseline/<chart>/vars/<env>.yaml      # opt-out, env-keyed (e.g. provider-kubeconfig)
     capabilities/<cap>/vars/<env>.yaml    # opt-in per capability, env-keyed (one chart per cap)
   xrs/
-    <cap>/<cluster>/                       # plain manifests, opt-in per capability, CLUSTER-keyed
+    <cap>/<env>/<cluster>/                 # plain manifests, opt-in per capability, CLUSTER-keyed (grouped by env)
 ```
 
 > **Note:** as drafted, the only env content in the monorepo is `labda`, while the
 > registered clusters are labelled `env: LabUL`. The monorepo must grow the
 > matching `<env>` vars files (or clusters be relabelled) before any of these
-> appsets produce Applications. XR folders must be (re)named after the **owning
-> cluster** (e.g. `xrs/vspherevm/test-k3s/`), not the env.
+> appsets produce Applications. XR folders are keyed by **owning cluster under its
+> env** (e.g. `xrs/vspherevm/labul/test-k3s/`), so the existing `xrs/vspherevm/labda/`
+> must become `xrs/vspherevm/labda/<cluster>/`.
 
 ### Adding a capability
 
 1. In the monorepo: add `crossplane/platform/capabilities/<cap>/` (a Helm chart
-   with `vars/<env>.yaml`) and, if it has instances, `crossplane/xrs/<cap>/<cluster>/`.
+   with `vars/<env>.yaml`) and, if it has instances, `crossplane/xrs/<cap>/<env>/<cluster>/`.
 2. Here: copy `appset-cxp-vspherevm.yaml` (platform + XRs) or `appset-cxp-ansible.yaml`
    (platform-only) → `appset-cxp-<cap>.yaml`, swap the label key + the monorepo
    paths, and add the file to `kustomization.yaml`.

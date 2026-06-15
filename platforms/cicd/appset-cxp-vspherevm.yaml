@@ -98,11 +98,14 @@ spec:
               repoURL: https://github.com/stuttgart-things/stuttgart-things.git
               revision: main
               # Concrete XR instances are plain manifests (kustomize), one folder
-              # PER OWNING CLUSTER: crossplane/xrs/vspherevm/<cluster>/. A cluster
+              # PER OWNING CLUSTER, grouped by env:
+              #   crossplane/xrs/vspherevm/<env>/<cluster>/
+              # env mirrors the platform tree and guards against misfiling (a
+              # folder under the wrong env won't match this cluster). A cluster
               # with the capability but no folder gets the provider config but no
               # claims yet (finer opt-in). `.name` is the ArgoCD cluster name.
               directories:
-                - path: 'crossplane/xrs/vspherevm/{{ .name }}'
+                - path: 'crossplane/xrs/vspherevm/{{ index .metadata.labels "env" | lower }}/{{ .name }}'
   template:
     metadata:
       name: 'cxp-xr-vspherevm-{{ .name }}'
