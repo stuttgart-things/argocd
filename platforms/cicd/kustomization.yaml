@@ -11,6 +11,9 @@ resources:
   - appset-crossplane-provider-configs.yaml
   - appset-crossplane-functions.yaml
   - appset-crossplane-configs.yaml
+  - appset-crossplane-platform-baseline.yaml
+  - appset-cxp-ansible.yaml
+  - appset-cxp-vspherevm.yaml
   - appset-kargo.yaml
   - appset-kargo-httproute.yaml
   - appset-tekton.yaml

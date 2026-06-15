@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-platform-baseline-cicd
+  namespace: argocd
+# BASELINE crossplane platform components — the shared substrate every crossplane
+# management cluster in an env needs regardless of what it is *used for*: ESO
+# ClusterSecretStores, crossplane RBAC, and the env-wide EnvironmentConfig. Each
+# is a Helm chart under crossplane/platform/baseline/<component>/ with per-env
+# values in vars/<env>.yaml.
+#
+# SELECTION is env-only here (every cxp cluster gets the baseline): the git
+# *files* generator discovers one vars file per (component, env), matrixed with
+# the clusters generator and keyed on each cluster's `env` label. Use-case /
+# provider selection lives in the per-capability appsets (appset-cxp-<cap>.yaml),
+# NOT here — keep baseline limited to what is identical across all use cases.
+#
+# Requires every selected cluster to carry an `env` label (e.g. env: LabUL); it
+# is lowercased to match the vars filename. A cluster missing the label matches
+# no files and gets nothing (no error).
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  cicd-platform: "true"
+                matchExpressions:
+                  - key: cicd-platform/crossplane
+                    operator: NotIn
+                    values: ["false"]
+          - git:
+              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+              revision: main
+              files:
+                - path: 'crossplane/platform/baseline/*/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+  template:
+    metadata:
+      name: 'cxp-baseline-{{ .name }}-{{ trimSuffix "/vars" .path.path | base }}'
+      annotations:
+        # Wave 0: after the shared provider/provider-config appsets so the
+        # ClusterProviderConfig CRDs exist; before capability platform (wave 1)
+        # and capability xrs (wave 2).
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+        targetRevision: main
+        path: '{{ trimSuffix "/vars" .path.path }}'
+        helm:
+          releaseName: 'cxp-{{ trimSuffix "/vars" .path.path | base }}-{{ .name }}'
+          valueFiles:
+            - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+          # authMountPath is PER-CLUSTER (the cluster's own Vault k8s auth backend),
+          # not per-env — inject it from the cluster name (<cluster>-eso) so one env
+          # vars file can serve every cluster in the env. Overrides vars/<env>.yaml.
+          parameters:
+            - name: vault.authMountPath
+              value: '{{ .name }}-eso'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

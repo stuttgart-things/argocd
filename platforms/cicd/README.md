@@ -117,6 +117,85 @@ Clean-up is manual: `kubectl delete ns <namespace>` (or equivalent) on the targe
 2. Add the filename to `kustomization.yaml`.
 3. Commit — the `cicd-platform` Application self-heals and reconciles.
 
+## Crossplane: baseline vs. capabilities
+
+The crossplane management-cluster config is split along **two independent axes** so
+that not every cxp cluster has to be identical:
+
+- **env** (`env` label, e.g. `LabUL`) decides *which values* — endpoints, ESO
+  stores, placement — via `vars/<env>.yaml`. This is the **configuration** axis,
+  and it is *reusable*: every cluster in an env shares it.
+- **capability** (a per-cluster opt-in label) decides *which components install at
+  all* — vSphere provider config vs. ansible runtime vs. … This is the
+  **selection** axis, driven by the cluster's *planned usage*.
+
+Selection and configuration are kept separate: a label says *what* a cluster runs,
+the env file says *how* it is configured for that env.
+
+| ApplicationSet | Cluster selector | Monorepo source | Keyed by | Wave |
+|---|---|---|---|---|
+| `crossplane-platform-baseline-cicd` | `cicd-platform=true` AND `cicd-platform/crossplane != false` (opt-**out**) | `crossplane/platform/baseline/*/vars/<env>.yaml` (Helm) | env | 0 |
+| `crossplane-platform-<cap>-cicd` | `cicd-platform/crossplane-<cap>=true` (opt-**in**) | `crossplane/platform/capabilities/<cap>/vars/<env>.yaml` (Helm) | env | 1 |
+| `crossplane-xrs-<cap>-cicd` | `cicd-platform/crossplane-<cap>=true` (opt-**in**) | `crossplane/xrs/<cap>/<env>/<cluster>/` (plain manifests) | **cluster** (grouped by env) | 2 |
+
+A *capability* is one opt-in label (`cicd-platform/crossplane-<cap>`). Its platform
+config (wave 1) is **env-keyed** — reusable across clusters in the env. Its XRs
+(wave 2) are **cluster-keyed**, grouped by env — concrete instances belong to
+exactly one cluster, so two clusters with the same capability in the same env each
+own a separate `xrs/<cap>/<env>/<cluster>/` folder (no shared or duplicated
+claims). The `<env>` level mirrors the platform tree and guards against misfiling:
+a folder under the wrong env won't match the cluster. A cluster can hold a
+capability with **no** XR folder: provider config installed, no instances declared
+yet.
+
+Capabilities are deliberately fine-grained — one concern each, so they compose:
+
+| File | Capability | Label | XRs? |
+|---|---|---|---|
+| `appset-cxp-vspherevm.yaml` | build vSphere VMs (provider config + `NativeVsphereVM` XRs) | `cicd-platform/crossplane-vspherevm` | yes (cluster-keyed) |
+| `appset-cxp-ansible.yaml` | Ansible runtime (standalone; usable by other use cases) | `cicd-platform/crossplane-ansible` | no (platform-only) |
+
+**Why per-capability appsets and not one wildcard with a dynamic label?** ArgoCD
+`clusters` selectors only match *static* label keys, and a template can't skip an
+app — so a component discovered dynamically from git can't be gated on a
+dynamically-named label inside one appset. One appset per capability is the
+idiomatic, implementable path (and mirrors every other `appset-*.yaml` here).
+
+**Per-cluster Vault auth mount.** The ESO `ClusterSecretStore`s these charts
+deploy authenticate via the cluster's *own* Vault k8s auth backend, named
+`<cluster>-eso` — a **per-cluster** value that must not live in a per-env vars
+file. The baseline and capability appsets inject it as a Helm parameter
+(`vault.authMountPath` / `secretStore.authMountPath` = `{{ .name }}-eso`), which
+overrides the vars-file fallback. This is what lets one `vars/<env>.yaml` safely
+serve every cluster in the env.
+
+### Monorepo layout this expects (`stuttgart-things` repo)
+
+```
+crossplane/
+  platform/
+    baseline/<chart>/vars/<env>.yaml      # opt-out, env-keyed (e.g. provider-kubeconfig)
+    capabilities/<cap>/vars/<env>.yaml    # opt-in per capability, env-keyed (one chart per cap)
+  xrs/
+    <cap>/<env>/<cluster>/                 # plain manifests, opt-in per capability, CLUSTER-keyed (grouped by env)
+```
+
+> **Note:** the monorepo ships `labda` (dormant — no LabDA clusters yet) and
+> `labul` (active) env content side by side; a cluster resolves only its own `env`
+> label, so the two never interfere. A component with no `vars/<env>.yaml` for a
+> cluster's env is simply skipped on that cluster (no error). XR folders are keyed
+> by **owning cluster under its env** (e.g. `xrs/vspherevm/labul/test-k3s/`).
+
+### Adding a capability
+
+1. In the monorepo: add `crossplane/platform/capabilities/<cap>/` (a Helm chart
+   with `vars/<env>.yaml`) and, if it has instances, `crossplane/xrs/<cap>/<env>/<cluster>/`.
+2. Here: copy `appset-cxp-vspherevm.yaml` (platform + XRs) or `appset-cxp-ansible.yaml`
+   (platform-only) → `appset-cxp-<cap>.yaml`, swap the label key + the monorepo
+   paths, and add the file to `kustomization.yaml`.
+3. Onboard a cluster: label its Secret `cicd-platform/crossplane-<cap>: "true"`
+   (a use-case is just a preset of these labels applied at provisioning).
+
 ## Related
 
 - [`cicd/dapr`](../../cicd/dapr/), [`cicd/kro`](../../cicd/kro/) — catalog entries rendered by these ApplicationSets.
