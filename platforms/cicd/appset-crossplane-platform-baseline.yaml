@@ -1,23 +1,23 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: crossplane-platform-cicd
+  name: crossplane-platform-baseline-cicd
   namespace: argocd
-# Per-cluster crossplane platform components (ESO stores, ClusterProviderConfigs,
-# EnvironmentConfigs, RBAC) from the stuttgart-things monorepo. Each component is
-# a Helm chart under crossplane/platform/<component>/ with per-env values in
-# vars/<env>.yaml. The git *files* generator discovers one vars file per
-# (component, env); matrixed with the clusters generator and keyed on each
-# cluster's `env` label, it deploys exactly the components whose vars/<env>.yaml
-# exists to the clusters in that env.
+# BASELINE crossplane platform components — the shared substrate every crossplane
+# management cluster in an env needs regardless of what it is *used for*: ESO
+# ClusterSecretStores, crossplane RBAC, and the env-wide EnvironmentConfig. Each
+# is a Helm chart under crossplane/platform/baseline/<component>/ with per-env
+# values in vars/<env>.yaml.
 #
-# Opt-in model: a cluster gets a component iff that component ships a
-# vars/<its-env>.yaml. Add an env to a component = add one vars file. Onboard a
-# cluster = label it (cicd-platform/crossplane + env).
+# SELECTION is env-only here (every cxp cluster gets the baseline): the git
+# *files* generator discovers one vars file per (component, env), matrixed with
+# the clusters generator and keyed on each cluster's `env` label. Use-case /
+# provider selection lives in the per-capability appsets (appset-cxp-<cap>.yaml),
+# NOT here — keep baseline limited to what is identical across all use cases.
 #
-# Requires every selected cluster to carry an `env` label (e.g. env: LabDA);
-# it is lowercased to match the vars filename. A cluster missing the label
-# matches no files and gets nothing (no error).
+# Requires every selected cluster to carry an `env` label (e.g. env: LabUL); it
+# is lowercased to match the vars filename. A cluster missing the label matches
+# no files and gets nothing (no error).
 spec:
   goTemplate: true
   goTemplateOptions:
@@ -39,14 +39,15 @@ spec:
               repoURL: https://github.com/stuttgart-things/stuttgart-things.git
               revision: main
               files:
-                - path: 'crossplane/platform/*/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+                - path: 'crossplane/platform/baseline/*/vars/{{ index .metadata.labels "env" | lower }}.yaml'
   template:
     metadata:
-      name: 'cxp-platform-{{ .name }}-{{ trimSuffix "/vars" .path.path | base }}'
+      name: 'cxp-baseline-{{ .name }}-{{ trimSuffix "/vars" .path.path | base }}'
       annotations:
-        # After the shared provider/provider-config appsets (wave 0) so the
-        # ClusterProviderConfig CRDs exist; before xrs (wave 2).
-        argocd.argoproj.io/sync-wave: "1"
+        # Wave 0: after the shared provider/provider-config appsets so the
+        # ClusterProviderConfig CRDs exist; before capability platform (wave 1)
+        # and capability xrs (wave 2).
+        argocd.argoproj.io/sync-wave: "0"
     spec:
       project: '{{ .name }}'
       destination:

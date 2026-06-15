@@ -1,0 +1,131 @@
+# CAPABILITY: vspherevm — "this cluster builds vSphere VMs".
+#
+# A capability is the use-case unit that diverges between crossplane management
+# clusters: it bundles the provider-level config (ClusterProviderConfig,
+# EnvironmentConfig, RBAC for the vsphere/ansible providers) AND the concrete XRs
+# (NativeVsphereVM claims/composites) that exercise it. A cluster that manages GH
+# runners gets a *different* capability; not every cxp cluster needs this one.
+#
+# OPT-IN (unlike baseline, which is opt-out): a cluster gets this capability iff
+# its Secret carries
+#     cicd-platform/crossplane-vspherevm: "true"
+# Absent / any other value => the cluster matches nothing here. This is the knob
+# that selects provider config by planned cluster usage.
+#
+# CONFIG stays env-driven: the `env` label (lowercased) picks the values file
+# (platform) and the manifest folder (xrs), exactly like baseline. So selection =
+# capability label, configuration = env — the two axes are independent.
+#
+# To add another capability, copy this file to appset-cxp-<cap>.yaml, swap the
+# label key + the two monorepo paths, and register it in kustomization.yaml.
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-platform-vspherevm-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  cicd-platform/crossplane-vspherevm: "true"
+          - git:
+              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+              revision: main
+              files:
+                - path: 'crossplane/platform/capabilities/vspherevm/*/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+  template:
+    metadata:
+      name: 'cxp-platform-vspherevm-{{ .name }}-{{ trimSuffix "/vars" .path.path | base }}'
+      annotations:
+        # Wave 1: after baseline (wave 0); before this capability's XRs (wave 2).
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+        targetRevision: main
+        path: '{{ trimSuffix "/vars" .path.path }}'
+        helm:
+          releaseName: 'cxp-{{ trimSuffix "/vars" .path.path | base }}-{{ .name }}'
+          valueFiles:
+            - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-xrs-vspherevm-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  cicd-platform/crossplane-vspherevm: "true"
+          - git:
+              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+              revision: main
+              # Concrete XR instances are plain manifests (kustomize), one folder
+              # per env under this capability: crossplane/xrs/vspherevm/<env>/.
+              directories:
+                - path: 'crossplane/xrs/vspherevm/{{ index .metadata.labels "env" | lower }}'
+  template:
+    metadata:
+      name: 'cxp-xr-vspherevm-{{ .name }}-{{ .path.basename }}'
+      annotations:
+        # Wave 2: after the capability's provider config (wave 1) so the
+        # ProviderConfig / EnvironmentConfig the XRs depend on already exist.
+        argocd.argoproj.io/sync-wave: "2"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+        targetRevision: main
+        path: '{{ .path.path }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
