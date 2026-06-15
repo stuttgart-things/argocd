@@ -97,7 +97,8 @@ spec:
           - git:
               repoURL: https://github.com/stuttgart-things/stuttgart-things.git
               revision: main
-              # Concrete XR instances are plain manifests (kustomize), one folder
+              # Concrete XR instances are plain manifests (applied as a directory
+              # source — no kustomization.yaml needed), one folder
               # PER OWNING CLUSTER, grouped by env:
               #   crossplane/xrs/vspherevm/<env>/<cluster>/
               # env mirrors the platform tree and guards against misfiling (a
