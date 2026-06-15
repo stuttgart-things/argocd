@@ -1,23 +1,24 @@
 # CAPABILITY: vspherevm — "this cluster builds vSphere VMs".
 #
 # A capability is the use-case unit that diverges between crossplane management
-# clusters: it bundles the provider-level config (ClusterProviderConfig,
-# EnvironmentConfig, RBAC for the vsphere/ansible providers) AND the concrete XRs
-# (NativeVsphereVM claims/composites) that exercise it. A cluster that manages GH
-# runners gets a *different* capability; not every cxp cluster needs this one.
+# clusters. vspherevm bundles the provider-level config (the vspherevm
+# Configuration, its ClusterProviderConfig, the placement EnvironmentConfig, and
+# the vsphere-creds ESO wiring) AND the concrete XRs (NativeVsphereVM claims) that
+# exercise it.
 #
 # OPT-IN (unlike baseline, which is opt-out): a cluster gets this capability iff
 # its Secret carries
 #     cicd-platform/crossplane-vspherevm: "true"
-# Absent / any other value => the cluster matches nothing here. This is the knob
-# that selects provider config by planned cluster usage.
+# This is the knob that selects provider config by planned cluster usage.
 #
-# CONFIG stays env-driven: the `env` label (lowercased) picks the values file
-# (platform) and the manifest folder (xrs), exactly like baseline. So selection =
-# capability label, configuration = env — the two axes are independent.
+# TWO INDEPENDENT AXES:
+#   - platform config is ENV-keyed   -> vars/<env>.yaml  (reusable per env)
+#   - XRs are CLUSTER-keyed          -> xrs/.../<cluster> (concrete per-cluster
+#     intent; two clusters in the same env each own a separate folder, so
+#     ownership is unambiguous — no shared/duplicated claims)
 #
 # To add another capability, copy this file to appset-cxp-<cap>.yaml, swap the
-# label key + the two monorepo paths, and register it in kustomization.yaml.
+# label key + the monorepo paths, and register it in kustomization.yaml.
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -41,10 +42,10 @@ spec:
               repoURL: https://github.com/stuttgart-things/stuttgart-things.git
               revision: main
               files:
-                - path: 'crossplane/platform/capabilities/vspherevm/*/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+                - path: 'crossplane/platform/capabilities/vspherevm/vars/{{ index .metadata.labels "env" | lower }}.yaml'
   template:
     metadata:
-      name: 'cxp-platform-vspherevm-{{ .name }}-{{ trimSuffix "/vars" .path.path | base }}'
+      name: 'cxp-platform-vspherevm-{{ .name }}'
       annotations:
         # Wave 1: after baseline (wave 0); before this capability's XRs (wave 2).
         argocd.argoproj.io/sync-wave: "1"
@@ -58,7 +59,7 @@ spec:
         targetRevision: main
         path: '{{ trimSuffix "/vars" .path.path }}'
         helm:
-          releaseName: 'cxp-{{ trimSuffix "/vars" .path.path | base }}-{{ .name }}'
+          releaseName: 'cxp-vspherevm-{{ .name }}'
           valueFiles:
             - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
       syncPolicy:
@@ -97,12 +98,14 @@ spec:
               repoURL: https://github.com/stuttgart-things/stuttgart-things.git
               revision: main
               # Concrete XR instances are plain manifests (kustomize), one folder
-              # per env under this capability: crossplane/xrs/vspherevm/<env>/.
+              # PER OWNING CLUSTER: crossplane/xrs/vspherevm/<cluster>/. A cluster
+              # with the capability but no folder gets the provider config but no
+              # claims yet (finer opt-in). `.name` is the ArgoCD cluster name.
               directories:
-                - path: 'crossplane/xrs/vspherevm/{{ index .metadata.labels "env" | lower }}'
+                - path: 'crossplane/xrs/vspherevm/{{ .name }}'
   template:
     metadata:
-      name: 'cxp-xr-vspherevm-{{ .name }}-{{ .path.basename }}'
+      name: 'cxp-xr-vspherevm-{{ .name }}'
       annotations:
         # Wave 2: after the capability's provider config (wave 1) so the
         # ProviderConfig / EnvironmentConfig the XRs depend on already exist.

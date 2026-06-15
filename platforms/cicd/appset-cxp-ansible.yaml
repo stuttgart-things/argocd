@@ -1,0 +1,66 @@
+# CAPABILITY: ansible — Ansible runtime for crossplane (ansible-run
+# EnvironmentConfig, tekton-ci ManagedNamespace, scoped provider-kubernetes RBAC,
+# and the ansible-credentials ESO wiring).
+#
+# Its own capability — NOT folded into vspherevm — because ansible is used
+# standalone and by other crossplane use cases, not only for configuring built
+# VMs. A cluster opts in independently:
+#     cicd-platform/crossplane-ansible: "true"
+#
+# Platform-only: ansible ships no XRs, so there is no xrs ApplicationSet here.
+# Config is env-keyed (vars/<env>.yaml), like every other platform component.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-platform-ansible-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  cicd-platform/crossplane-ansible: "true"
+          - git:
+              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+              revision: main
+              files:
+                - path: 'crossplane/platform/capabilities/ansible/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+  template:
+    metadata:
+      name: 'cxp-platform-ansible-{{ .name }}'
+      annotations:
+        # Wave 1: after baseline (wave 0). Independent of vspherevm.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+        targetRevision: main
+        path: '{{ trimSuffix "/vars" .path.path }}'
+        helm:
+          releaseName: 'cxp-ansible-{{ .name }}'
+          valueFiles:
+            - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
