@@ -161,6 +161,14 @@ app — so a component discovered dynamically from git can't be gated on a
 dynamically-named label inside one appset. One appset per capability is the
 idiomatic, implementable path (and mirrors every other `appset-*.yaml` here).
 
+**Per-cluster Vault auth mount.** The ESO `ClusterSecretStore`s these charts
+deploy authenticate via the cluster's *own* Vault k8s auth backend, named
+`<cluster>-eso` — a **per-cluster** value that must not live in a per-env vars
+file. The baseline and capability appsets inject it as a Helm parameter
+(`vault.authMountPath` / `secretStore.authMountPath` = `{{ .name }}-eso`), which
+overrides the vars-file fallback. This is what lets one `vars/<env>.yaml` safely
+serve every cluster in the env.
+
 ### Monorepo layout this expects (`stuttgart-things` repo)
 
 ```
@@ -172,12 +180,11 @@ crossplane/
     <cap>/<env>/<cluster>/                 # plain manifests, opt-in per capability, CLUSTER-keyed (grouped by env)
 ```
 
-> **Note:** as drafted, the only env content in the monorepo is `labda`, while the
-> registered clusters are labelled `env: LabUL`. The monorepo must grow the
-> matching `<env>` vars files (or clusters be relabelled) before any of these
-> appsets produce Applications. XR folders are keyed by **owning cluster under its
-> env** (e.g. `xrs/vspherevm/labul/test-k3s/`), so the existing `xrs/vspherevm/labda/`
-> must become `xrs/vspherevm/labda/<cluster>/`.
+> **Note:** the monorepo ships `labda` (dormant — no LabDA clusters yet) and
+> `labul` (active) env content side by side; a cluster resolves only its own `env`
+> label, so the two never interfere. A component with no `vars/<env>.yaml` for a
+> cluster's env is simply skipped on that cluster (no error). XR folders are keyed
+> by **owning cluster under its env** (e.g. `xrs/vspherevm/labul/test-k3s/`).
 
 ### Adding a capability
 

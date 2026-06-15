@@ -62,6 +62,10 @@ spec:
           releaseName: 'cxp-vspherevm-{{ .name }}'
           valueFiles:
             - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+          # Per-cluster Vault auth mount (see baseline appset) — overrides vars/<env>.yaml.
+          parameters:
+            - name: secretStore.authMountPath
+              value: '{{ .name }}-eso'
       syncPolicy:
         automated:
           prune: true

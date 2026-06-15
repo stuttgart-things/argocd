@@ -61,6 +61,12 @@ spec:
           releaseName: 'cxp-{{ trimSuffix "/vars" .path.path | base }}-{{ .name }}'
           valueFiles:
             - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+          # authMountPath is PER-CLUSTER (the cluster's own Vault k8s auth backend),
+          # not per-env — inject it from the cluster name (<cluster>-eso) so one env
+          # vars file can serve every cluster in the env. Overrides vars/<env>.yaml.
+          parameters:
+            - name: vault.authMountPath
+              value: '{{ .name }}-eso'
       syncPolicy:
         automated:
           prune: true
