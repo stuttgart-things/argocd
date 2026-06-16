@@ -153,6 +153,7 @@ Capabilities are deliberately fine-grained — one concern each, so they compose
 | File | Capability | Label | XRs? |
 |---|---|---|---|
 | `appset-cxp-vspherevm.yaml` | build vSphere VMs (provider config + `NativeVsphereVM` XRs) | `cicd-platform/crossplane-vspherevm` | yes (cluster-keyed) |
+| `appset-cxp-proxmoxvm.yaml` | build Proxmox VE VMs, native bpg (provider config + `NativeProxmoxVM` XRs) | `cicd-platform/crossplane-proxmoxvm` | yes (cluster-keyed) |
 | `appset-cxp-ansible.yaml` | Ansible runtime (standalone; usable by other use cases) | `cicd-platform/crossplane-ansible` | no (platform-only) |
 
 **Why per-capability appsets and not one wildcard with a dynamic label?** ArgoCD
