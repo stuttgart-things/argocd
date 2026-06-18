@@ -8,6 +8,7 @@ destination:
   namespace: kube-system
 
 # Upstream Cilium Helm chart version (https://helm.cilium.io).
+# renovate: datasource=helm depName=cilium registryUrl=https://helm.cilium.io
 chartVersion: 1.18.5
 
 # k8s API endpoint used by kubeProxyReplacement. Override per cluster when the

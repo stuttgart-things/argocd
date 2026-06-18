@@ -8,6 +8,7 @@ destination:
   namespace: redis-stack
 
 # Upstream stuttgart-things/redis Helm chart (OCI: ghcr.io/stuttgart-things/charts/redis).
+# renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/redis/redis
 chartVersion: 17.1.4
 
 # Root Redis password. Set `password` for an inline literal (don't check real
@@ -24,6 +25,7 @@ auth:
 image:
   registry: ghcr.io
   repository: stuttgart-things/redis-stack-server
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/redis-stack-server
   tag: 7.2.0-v18
 
 # Sentinel sidecar — enabled by default so the cluster runs in HA mode.
@@ -36,6 +38,7 @@ sentinel:
   image:
     registry: ghcr.io
     repository: stuttgart-things/redis-sentinel
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/redis-sentinel
     tag: 7.4.2-debian-12-r9
 
 # Persistence — shared by master + replica StatefulSets.

@@ -29,6 +29,7 @@ kustomize:
 # Publisher container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/machinery-catalog-publisher
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/machinery-catalog-publisher
   tag: v0.1.1
 
 # S3/MinIO connection Secret consumed by the Deployment via envFrom. It carries

@@ -14,6 +14,7 @@ destination:
   namespace: harbor
 
 # Upstream bitnami harbor OCI chart version.
+# renovate: datasource=docker depName=registry-1.docker.io/bitnamicharts/harbor
 chartVersion: 27.0.3
 
 # Public hostname Harbor is exposed on (single label + apex domain).
@@ -68,6 +69,7 @@ httpRoute:
 # of the form `<project>.<hostname>.<domain>` to the right Harbor project.
 projectProxy:
   enabled: false
+  # renovate: datasource=docker depName=ghcr.io/hiddenmarten/harbor-project-proxy
   chartVersion: 0.0.1
   replicaCount: 1
   ingress:

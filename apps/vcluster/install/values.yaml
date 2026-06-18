@@ -18,6 +18,7 @@ vclusterName: vcluster-dev
 # As of vcluster 0.20+ the only supported control-plane distro is k8s (real
 # kube-apiserver + etcd) — k3s/k0s were removed. The chart picks a sensible
 # distro automatically; advanced overrides go via `extraValues`.
+# renovate: datasource=helm depName=vcluster registryUrl=https://charts.loft.sh
 chartVersion: 0.33.1
 
 # Persistence for the control-plane StatefulSet PVC (holds the etcd state).

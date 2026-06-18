@@ -14,6 +14,7 @@ destination:
   namespace: cattle-system
 
 # Upstream Rancher chart version (rancher-stable Helm repo).
+# renovate: datasource=helm depName=rancher registryUrl=https://releases.rancher.com/server-charts/stable
 chartVersion: 2.14.2
 
 # Public hostname Rancher is exposed on (single label + apex domain).

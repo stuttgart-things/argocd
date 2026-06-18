@@ -8,6 +8,7 @@ destination:
   namespace: crossplane-system
 
 # Upstream crossplane/crossplane Helm chart version.
+# renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable
 chartVersion: "2.2.1"
 
 # Crossplane runtime args.

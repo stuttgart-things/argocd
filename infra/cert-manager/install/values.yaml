@@ -8,6 +8,7 @@ destination:
   namespace: cert-manager
 
 # Upstream jetstack/cert-manager Helm chart version.
+# renovate: datasource=helm depName=cert-manager registryUrl=https://charts.jetstack.io
 chartVersion: v1.19.2
 
 # Install cert-manager CRDs via the chart.

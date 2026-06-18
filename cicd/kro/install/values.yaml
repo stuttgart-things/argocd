@@ -8,6 +8,7 @@ destination:
   namespace: kro-system
 
 # Upstream kro OCI Helm chart version (registry.k8s.io/kro/charts/kro).
+# renovate: datasource=docker depName=registry.k8s.io/kro/charts/kro
 chartVersion: "0.9.1"
 
 # Deep-merged on top of the valuesObject passed to the upstream chart.

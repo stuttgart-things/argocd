@@ -27,6 +27,7 @@ kustomize:
 # Machinery container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/machinery
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/machinery
   tag: v1.13.4
 
 # Optional MACHINERY_CONFIG. Three opt-in paths:

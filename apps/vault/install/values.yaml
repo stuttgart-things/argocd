@@ -14,12 +14,14 @@ destination:
   namespace: vault
 
 # Upstream Vault OCI chart (stuttgart-things mirror).
+# renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/vault/vault
 chartVersion: 1.9.0
 
 # Vault server image.
 image:
   registry: ghcr.io
   repository: stuttgart-things/vault
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/vault
   tag: 1.20.2-debian-12-r2
   pullPolicy: IfNotPresent
 
@@ -38,6 +40,7 @@ injector:
   image:
     registry: ghcr.io
     repository: stuttgart-things/vault-k8s
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/vault-k8s
     tag: 1.7.0-debian-12-r4
     pullPolicy: IfNotPresent
 
@@ -47,6 +50,7 @@ volumePermissions:
   image:
     registry: ghcr.io
     repository: stuttgart-things/os-shell
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/os-shell
     tag: 12-debian-12-r50
     pullPolicy: IfNotPresent
 
@@ -73,6 +77,7 @@ httpRoute:
 # https://pytoshka.github.io/vault-autounseal.
 autounseal:
   enabled: false
+  # renovate: datasource=helm depName=vault-autounseal registryUrl=https://pytoshka.github.io/vault-autounseal
   chartVersion: 0.5.3
   repoURL: https://pytoshka.github.io/vault-autounseal
   vaultURL: http://vault-server.vault.svc:8200

@@ -14,6 +14,7 @@ destination:
   namespace: portal
 
 # Upstream backstage Helm chart (oci://ghcr.io/backstage/charts).
+# renovate: datasource=docker depName=ghcr.io/backstage/charts/backstage
 chartVersion: 2.6.3
 
 # Backstage container.

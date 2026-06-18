@@ -8,6 +8,7 @@ destination:
   namespace: kargo
 
 # Upstream akuity/kargo OCI Helm chart version.
+# renovate: datasource=docker depName=ghcr.io/akuity/kargo-charts/kargo
 chartVersion: "1.9.6"
 
 # Kargo API configuration.
