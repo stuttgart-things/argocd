@@ -9,7 +9,7 @@ destination:
 
 # Upstream loft-sh/vcluster Helm chart version.
 # renovate: datasource=helm depName=vcluster registryUrl=https://charts.loft.sh
-chartVersion: 0.34.0
+chartVersion: 0.34.3
 
 # Kubernetes version inside the virtual cluster (controlPlane.distro.k8s.image.tag).
 k8sVersion: v1.33.4
