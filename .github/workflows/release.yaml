@@ -1,0 +1,43 @@
+---
+# Cuts a SemVer git tag + GitHub Release on every push to main, based on the
+# Conventional Commit history (feat -> minor, fix -> patch, ! / BREAKING -> major).
+# Tags are what clusters pin their ArgoCD targetRevision to, so merging to main
+# no longer silently changes deployed state — promotion is a deliberate tag bump.
+name: release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write       # create tags + releases
+  issues: write         # semantic-release success/fail comments
+  pull-requests: write  # semantic-release PR comments
+
+# Never run two releases concurrently — they would race on the tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history so commit-analyzer sees every commit
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          npx --yes
+          -p semantic-release
+          -p conventional-changelog-conventionalcommits
+          semantic-release
