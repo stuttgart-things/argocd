@@ -3,6 +3,8 @@
   "extends": [
     "config:recommended"
   ],
+  "minimumReleaseAge": "3 days",
+  "prConcurrentLimit": 10,
   "customManagers": [
     {
       "customType": "regex",
@@ -11,6 +13,37 @@
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?(?: versioning=(?<versioning>\\S+))?\\s+[\\w.]+: ?\"?(?<currentValue>[^\\s\"]+)\"?"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group all stuttgart-things first-party images into a single PR",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/stuttgart-things/**"
+      ],
+      "groupName": "stuttgart-things images"
+    },
+    {
+      "description": "Auto-merge patch and digest updates once CI passes — keeps low-risk bumps from piling up",
+      "matchUpdateTypes": [
+        "patch",
+        "digest"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Flag major updates for manual review; never auto-merge",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "major-update"
       ]
     }
   ]
