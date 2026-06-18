@@ -9,7 +9,8 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/values\\.yaml$/"
+        "/values\\.yaml$/",
+        "/platforms/.+\\.yaml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?(?: versioning=(?<versioning>\\S+))?\\s+[\\w.]+: ?\"?(?<currentValue>[^\\s\"]+)\"?"
@@ -44,6 +45,20 @@
       "automerge": false,
       "addLabels": [
         "major-update"
+      ]
+    },
+    {
+      "description": "Catalog self-pin (targetRevision). Promotion is deliberate: never auto-merge — a human merges the bump PR to roll a new release out to clusters. minimumReleaseAge=0 so the PR appears as soon as a tag is cut.",
+      "matchDatasources": [
+        "github-tags"
+      ],
+      "matchPackageNames": [
+        "stuttgart-things/argocd"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "0 days",
+      "addLabels": [
+        "platform-promotion"
       ]
     }
   ]
