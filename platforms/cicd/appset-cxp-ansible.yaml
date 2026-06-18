@@ -7,7 +7,9 @@
 # VMs. A cluster opts in independently:
 #     cicd-platform/crossplane-ansible: "true"
 #
-# Platform-only: ansible ships no XRs, so there is no xrs ApplicationSet here.
+# TWO ApplicationSets (like vspherevm/proxmoxvm):
+#   - platform config is ENV-keyed   -> vars/<env>.yaml  (reusable per env)
+#   - XRs are CLUSTER-keyed          -> crossplane/xrs/ansiblerun/<env>/<cluster>/
 # Config is env-keyed (vars/<env>.yaml), like every other platform component.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -51,6 +53,67 @@ spec:
           releaseName: 'cxp-ansible-{{ .name }}'
           valueFiles:
             - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-xrs-ansible-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  cicd-platform/crossplane-ansible: "true"
+          - git:
+              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+              revision: main
+              # Concrete XR instances are plain manifests (applied as a directory
+              # source — no kustomization.yaml needed), one folder
+              # PER OWNING CLUSTER, grouped by env:
+              #   crossplane/xrs/ansiblerun/<env>/<cluster>/
+              # env mirrors the platform tree and guards against misfiling (a
+              # folder under the wrong env won't match this cluster). A cluster
+              # with the capability but no folder gets the ansible runtime but no
+              # AnsibleRuns yet (finer opt-in). `.name` is the ArgoCD cluster name.
+              directories:
+                - path: 'crossplane/xrs/ansiblerun/{{ index .metadata.labels "env" | lower }}/{{ .name }}'
+  template:
+    metadata:
+      name: 'cxp-xr-ansible-{{ .name }}'
+      annotations:
+        # Wave 2: after the ansible runtime (wave 1) so the EnvironmentConfig /
+        # ManagedNamespace / RBAC the AnsibleRuns depend on already exist.
+        argocd.argoproj.io/sync-wave: "2"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+        targetRevision: main
+        path: '{{ .path.path }}'
       syncPolicy:
         automated:
           prune: true
