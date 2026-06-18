@@ -37,7 +37,8 @@ spec:
         namespace: tekton-pipelines
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
-        targetRevision: main
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.2.0
         path: cicd/tekton/config
         helm:
           # Defaults from cicd/tekton/config/values.yaml are what we want for
