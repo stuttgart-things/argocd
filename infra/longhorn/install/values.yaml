@@ -8,6 +8,7 @@ destination:
   namespace: longhorn-system
 
 # Upstream Longhorn Helm chart version (https://charts.longhorn.io).
+# renovate: datasource=helm depName=longhorn registryUrl=https://charts.longhorn.io
 chartVersion: 1.11.2
 
 # Mark the rendered `longhorn` StorageClass as the cluster's default

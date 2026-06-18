@@ -22,6 +22,7 @@ kustomize:
 # Clusterbook container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/clusterbook
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterbook
   tag: 1.25.9
 
 # PowerDNS integration — patched into the clusterbook-config ConfigMap rendered by the base.

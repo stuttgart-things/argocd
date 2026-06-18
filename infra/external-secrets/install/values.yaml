@@ -8,6 +8,7 @@ destination:
   namespace: external-secrets
 
 # Upstream external-secrets/external-secrets Helm chart version.
+# renovate: datasource=helm depName=external-secrets registryUrl=https://charts.external-secrets.io
 chartVersion: 2.4.1
 
 # Install ESO CRDs via the chart (ClusterSecretStore, ExternalSecret, …).

@@ -57,6 +57,7 @@ authToken: ""                             # pragma: allowlist secret
 # redis-stack sub-Application (delegates to apps/redis-stack/install in this catalog).
 redisStack:
   enabled: true
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/redis/redis
   chartVersion: 17.1.4
   serviceType: ClusterIP
   # Optional: have redis-stack read its password from a pre-existing Secret
@@ -75,10 +76,12 @@ redisStack:
   image:
     registry: ghcr.io
     repository: stuttgart-things/redis-stack-server
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/redis-stack-server
     tag: 7.2.0-v18
   sentinel:
     registry: ghcr.io
     repository: stuttgart-things/redis-sentinel
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/redis-sentinel
     tag: 7.4.2-debian-12-r9
 
 # omni-pitcher (HTTP gateway → Redis Streams).

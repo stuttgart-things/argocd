@@ -21,6 +21,7 @@ kustomize:
 # Container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/claim-machinery-api
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/claim-machinery-api
   tag: v0.21.1
 
 # Application config patched into the claim-machinery-api ConfigMap.

@@ -9,6 +9,7 @@ destination:
 
 # Upstream vmware-tanzu/velero Helm chart version
 # (https://vmware-tanzu.github.io/helm-charts).
+# renovate: datasource=helm depName=velero registryUrl=https://vmware-tanzu.github.io/helm-charts
 chartVersion: 9.0.0
 
 # Velero plugin image (e.g. for-aws — also used as the MinIO/S3-compatible
@@ -16,6 +17,7 @@ chartVersion: 9.0.0
 # chart's `initContainers` into /target so the velero binary discovers it.
 pluginAws:
   image: velero/velero-plugin-for-aws
+  # renovate: datasource=docker depName=velero/velero-plugin-for-aws
   tag: 1.14.0
 
 # Secret in the velero namespace carrying the AWS-style credentials INI
@@ -94,6 +96,7 @@ cleanUpCRDs: false
 kubectl:
   image:
     repository: docker.io/bitnamilegacy/kubectl
+    # renovate: datasource=docker depName=docker.io/bitnamilegacy/kubectl
     tag: 1.33.4
 
 # Deep-merged on top of the computed valuesObject passed to the upstream

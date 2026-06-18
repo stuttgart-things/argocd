@@ -8,6 +8,7 @@ destination:
   namespace: dapr-system
 
 # Upstream dapr/dapr Helm chart version.
+# renovate: datasource=helm depName=dapr registryUrl=https://dapr.github.io/helm-charts/
 chartVersion: "1.17.4"
 
 # Global chart flags. `ha.enabled: false` → single-replica control-plane;

@@ -9,6 +9,7 @@ destination:
   namespace: cert-manager
 
 # Upstream jetstack/trust-manager Helm chart version.
+# renovate: datasource=helm depName=trust-manager registryUrl=https://charts.jetstack.io
 chartVersion: "0.22.0"
 
 # Namespace trust-manager watches for its source Secrets/ConfigMaps.

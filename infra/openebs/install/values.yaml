@@ -8,6 +8,7 @@ destination:
   namespace: openebs
 
 # Upstream OpenEBS umbrella chart version (https://openebs.github.io/openebs).
+# renovate: datasource=helm depName=openebs registryUrl=https://openebs.github.io/openebs
 chartVersion: 4.4.0
 
 # Mark the rendered `openebs-hostpath` StorageClass as the cluster's default
