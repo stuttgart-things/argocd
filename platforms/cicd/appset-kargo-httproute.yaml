@@ -49,7 +49,8 @@ spec:
         namespace: kargo
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
-        targetRevision: main
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.2.0
         path: cicd/kargo/httproute
         helm:
           valuesObject:
