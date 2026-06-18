@@ -22,7 +22,8 @@ replicas: 1
 image:
   registry: ghcr.io
   repository: stuttgart-things/sthings-backstage
-  tag: latest
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/sthings-backstage
+  tag: v1.5.1
 
 # Storage class for the bundled PostgreSQL StatefulSet.
 storageClass: nfs4-csi
