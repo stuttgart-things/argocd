@@ -9,7 +9,7 @@ destination:
 
 # Upstream argoproj/argo-rollouts Helm chart version.
 # renovate: datasource=helm depName=argo-rollouts registryUrl=https://argoproj.github.io/argo-helm
-chartVersion: "2.40.9"
+chartVersion: "2.41.0"
 
 # CRD install + retention. Keep CRDs on uninstall so in-flight Rollouts
 # aren't cascaded away.
