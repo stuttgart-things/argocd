@@ -31,7 +31,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.5.0
+        targetRevision: v0.6.0
         path: infra/cert-manager/selfsigned
         helm:
           valuesObject:
