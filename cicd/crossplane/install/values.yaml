@@ -9,7 +9,7 @@ destination:
 
 # Upstream crossplane/crossplane Helm chart version.
 # renovate: datasource=helm depName=crossplane registryUrl=https://charts.crossplane.io/stable
-chartVersion: "2.2.1"
+chartVersion: "2.3.2"
 
 # Crossplane runtime args.
 #   --enable-usages      exposes the Usage API
