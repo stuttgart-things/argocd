@@ -15,7 +15,7 @@ destination:
 
 # Upstream Headlamp Helm chart (kubernetes-sigs/headlamp) version.
 # renovate: datasource=helm depName=headlamp registryUrl=https://kubernetes-sigs.github.io/headlamp/
-chartVersion: 0.42.0
+chartVersion: 0.43.0
 
 # Gateway API HTTPRoute exposing Headlamp.
 httpRoute:
