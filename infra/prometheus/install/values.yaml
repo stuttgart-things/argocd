@@ -15,7 +15,7 @@ destination:
 
 # Upstream prometheus-community/prometheus Helm chart version.
 # renovate: datasource=helm depName=prometheus registryUrl=https://prometheus-community.github.io/helm-charts
-chartVersion: 28.13.0
+chartVersion: 29.13.0
 
 # Persistent server storage.
 storageClass: nfs4-csi
