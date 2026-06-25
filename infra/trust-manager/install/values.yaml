@@ -10,7 +10,7 @@ destination:
 
 # Upstream jetstack/trust-manager Helm chart version.
 # renovate: datasource=helm depName=trust-manager registryUrl=https://charts.jetstack.io
-chartVersion: "v0.22.1"
+chartVersion: "v0.23.0"
 
 # Namespace trust-manager watches for its source Secrets/ConfigMaps.
 # Bundles can only reference sources in this namespace — keep it aligned
