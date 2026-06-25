@@ -10,7 +10,7 @@ destination:
 # Upstream vmware-tanzu/velero Helm chart version
 # (https://vmware-tanzu.github.io/helm-charts).
 # renovate: datasource=helm depName=velero registryUrl=https://vmware-tanzu.github.io/helm-charts
-chartVersion: 9.2.0
+chartVersion: 12.0.3
 
 # Velero plugin image (e.g. for-aws — also used as the MinIO/S3-compatible
 # backend, since velero-plugin-for-aws speaks plain S3). Loaded by the
