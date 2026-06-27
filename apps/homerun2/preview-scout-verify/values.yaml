@@ -10,7 +10,7 @@ namespacePrefix: "homerun2-scout-pr-*"
 # Container image for the verify Job. curlimages/curl ships sh + curl in a
 # tiny rootless container; we only need polling + a small jq-free numeric
 # extraction via sed/awk.
-image: curlimages/curl:8.20.0
+image: curlimages/curl:8.21.0
 
 # Service hostname scout exposes inside the PR namespace.
 # kustomize.namespace rewrites place the Service in the same namespace
