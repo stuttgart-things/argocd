@@ -9,7 +9,7 @@ destination:
 
 # Upstream OpenEBS umbrella chart version (https://openebs.github.io/openebs).
 # renovate: datasource=helm depName=openebs registryUrl=https://openebs.github.io/openebs
-chartVersion: 4.4.0
+chartVersion: 4.5.1
 
 # Mark the rendered `openebs-hostpath` StorageClass as the cluster's default
 # (adds annotation storageclass.kubernetes.io/is-default-class: "true").
