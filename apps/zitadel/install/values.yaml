@@ -15,7 +15,7 @@ destination:
 
 # Upstream ZITADEL chart (https://charts.zitadel.com).
 # renovate: datasource=helm depName=zitadel registryUrl=https://charts.zitadel.com
-chartVersion: 10.0.3
+chartVersion: 10.0.4
 
 # ZITADEL server.
 replicas: 1
