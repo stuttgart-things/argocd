@@ -9,7 +9,7 @@ destination:
 
 # Upstream jetstack/cert-manager Helm chart version.
 # renovate: datasource=helm depName=cert-manager registryUrl=https://charts.jetstack.io
-chartVersion: v1.20.2
+chartVersion: v1.20.3
 
 # Install cert-manager CRDs via the chart.
 crds:
