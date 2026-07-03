@@ -15,7 +15,7 @@ destination:
 
 # Upstream Rancher chart version (rancher-stable Helm repo).
 # renovate: datasource=helm depName=rancher registryUrl=https://releases.rancher.com/server-charts/stable
-chartVersion: 2.14.2
+chartVersion: 2.14.3
 
 # Public hostname Rancher is exposed on (single label + apex domain).
 # The chart's `hostname` is set to "<hostname>.<domain>".
