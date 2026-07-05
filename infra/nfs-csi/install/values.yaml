@@ -9,7 +9,7 @@ destination:
 
 # Upstream csi-driver-nfs Helm chart version.
 # renovate: datasource=helm depName=csi-driver-nfs registryUrl=https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
-chartVersion: 4.13.3
+chartVersion: 4.13.4
 
 # External snapshotter sidecar.
 externalSnapshotter:
