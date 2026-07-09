@@ -12,7 +12,7 @@
 # This is the knob that selects provider config by planned cluster usage.
 #
 # TWO INDEPENDENT AXES:
-#   - platform config is ENV-keyed   -> vars/<env>.yaml  (reusable per env)
+#   - platform config is ENV-keyed   -> --set environment=<env> (chart env-map)
 #   - XRs are CLUSTER-keyed          -> xrs/.../<cluster> (concrete per-cluster
 #     intent; two clusters in the same env each own a separate folder, so
 #     ownership is unambiguous — no shared/duplicated claims)
@@ -32,17 +32,13 @@ spec:
   syncPolicy:
     preserveResourcesOnDeletion: true
   generators:
-    - matrix:
-        generators:
-          - clusters:
-              selector:
-                matchLabels:
-                  cicd-platform/crossplane-vspherevm: "true"
-          - git:
-              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
-              revision: main
-              files:
-                - path: 'crossplane/platform/capabilities/vspherevm/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+    # env comes from the cluster's `env` label; the chart carries all per-env
+    # placement under environments.<env> (selected via the `environment`
+    # parameter below), so no git files generator / vars/<env>.yaml lookup.
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform/crossplane-vspherevm: "true"
   template:
     metadata:
       name: 'cxp-platform-vspherevm-{{ .name }}'
@@ -57,13 +53,15 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/stuttgart-things.git
         targetRevision: main
-        path: '{{ trimSuffix "/vars" .path.path }}'
+        path: 'crossplane/platform/capabilities/vspherevm'
         helm:
           releaseName: 'cxp-vspherevm-{{ .name }}'
-          valueFiles:
-            - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
-          # Per-cluster Vault auth mount (see baseline appset) — overrides vars/<env>.yaml.
           parameters:
+            # Select the chart's environments.<env> block from the cluster label.
+            - name: environment
+              value: '{{ index .metadata.labels "env" | lower }}'
+            # Per-cluster Vault auth mount (see baseline appset) — overrides
+            # environments.<env>.secretStore.authMountPath.
             - name: secretStore.authMountPath
               value: '{{ .name }}-eso'
       syncPolicy:
