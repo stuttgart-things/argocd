@@ -8,9 +8,9 @@
 #     cicd-platform/crossplane-ansible: "true"
 #
 # TWO ApplicationSets (like vspherevm/proxmoxvm):
-#   - platform config is ENV-keyed   -> vars/<env>.yaml  (reusable per env)
+#   - platform config is ENV-keyed   -> --set environment=<env> (chart env-map)
 #   - XRs are CLUSTER-keyed          -> crossplane/xrs/ansiblerun/<env>/<cluster>/
-# Config is env-keyed (vars/<env>.yaml), like every other platform component.
+# Config is env-keyed (chart env-map), like every other platform component.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -23,17 +23,13 @@ spec:
   syncPolicy:
     preserveResourcesOnDeletion: true
   generators:
-    - matrix:
-        generators:
-          - clusters:
-              selector:
-                matchLabels:
-                  cicd-platform/crossplane-ansible: "true"
-          - git:
-              repoURL: https://github.com/stuttgart-things/stuttgart-things.git
-              revision: main
-              files:
-                - path: 'crossplane/platform/capabilities/ansible/vars/{{ index .metadata.labels "env" | lower }}.yaml'
+    # env comes from the cluster's `env` label; the chart carries all per-env
+    # config under environments.<env> (selected via the `environment` parameter
+    # below), so no git files generator / vars/<env>.yaml lookup.
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform/crossplane-ansible: "true"
   template:
     metadata:
       name: 'cxp-platform-ansible-{{ .name }}'
@@ -48,11 +44,13 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/stuttgart-things.git
         targetRevision: main
-        path: '{{ trimSuffix "/vars" .path.path }}'
+        path: 'crossplane/platform/capabilities/ansible'
         helm:
           releaseName: 'cxp-ansible-{{ .name }}'
-          valueFiles:
-            - 'vars/{{ index .metadata.labels "env" | lower }}.yaml'
+          parameters:
+            # Select the chart's environments.<env> block from the cluster label.
+            - name: environment
+              value: '{{ index .metadata.labels "env" | lower }}'
       syncPolicy:
         automated:
           prune: true
