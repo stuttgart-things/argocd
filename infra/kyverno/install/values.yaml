@@ -9,7 +9,7 @@ destination:
 
 # Upstream kyverno/kyverno Helm chart version.
 # renovate: datasource=helm depName=kyverno registryUrl=https://kyverno.github.io/kyverno/
-chartVersion: 3.8.1
+chartVersion: 3.8.2
 
 # Install Kyverno CRDs via the chart (ClusterPolicy, Policy, PolicyException, …).
 installCRDs: true
