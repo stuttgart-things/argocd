@@ -52,25 +52,53 @@
         "auth": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "tokenSecretRef"
-          ],
+          "description": "How the ClusterIssuer authenticates to Vault. With method \"token\" a static Secret-backed token is used, which nothing renews and which Vault caps at 768h — prefer \"kubernetes\", where cert-manager mints a short-lived ServiceAccount token per request. Both sub-objects may be present; only the one matching `method` is rendered, which lets the ApplicationSet pass both unconditionally (bare-line conditionals in helm.valuesObject break kustomize build).",
           "properties": {
+            "method": {
+              "type": "string",
+              "enum": [
+                "",
+                "token",
+                "kubernetes"
+              ],
+              "default": "token",
+              "description": "Defaults to \"token\" when absent or empty, so existing callers are unaffected. The empty string is allowed because ApplicationSet templating renders a missing cluster annotation as \"\"."
+            },
             "tokenSecretRef": {
               "type": "object",
               "additionalProperties": false,
-              "required": [
-                "name",
-                "key"
-              ],
+              "description": "Used when method is \"token\". Values may be empty strings when method is \"kubernetes\".",
               "properties": {
                 "name": {
-                  "type": "string",
-                  "minLength": 1
+                  "type": "string"
                 },
                 "key": {
+                  "type": "string"
+                }
+              }
+            },
+            "kubernetes": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Used when method is \"kubernetes\". Values may be empty strings when method is \"token\".",
+              "properties": {
+                "mountPath": {
                   "type": "string",
-                  "minLength": 1
+                  "description": "Vault Kubernetes auth mount including the /v1/auth/ prefix, e.g. \"/v1/auth/my-cluster-certmanager\"."
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Vault role name on that mount."
+                },
+                "serviceAccountRef": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "ServiceAccount cert-manager presents when logging in. Defaults to the role name when empty.",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }

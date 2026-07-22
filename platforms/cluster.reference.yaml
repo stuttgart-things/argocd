@@ -89,7 +89,7 @@ spec:
     network-platform/cert-manager-install: 'true'     # → appset-cert-manager-install
     network-platform/cert-manager-selfsigned: 'true'  # → appset-cert-manager-selfsigned
     network-platform/cert-manager-cluster-ca: 'true'  # → appset-cert-manager-cluster-ca  [ann: fqdn, wildcard-issuer-name]
-    network-platform/cert-manager-vault-pki: 'true'   # → appset-cert-manager-vault-pki   [ann: vault-server, vault-pki-path, vault-token-secret]
+    network-platform/cert-manager-vault-pki: 'true'   # → appset-cert-manager-vault-pki   [ann: vault-server, vault-pki-path, vault-token-secret | vault-auth-method+vault-k8s-auth-*]
     network-platform/trust-manager-install: 'true'    # → appset-trust-manager-install
     network-platform/trust-manager-bundle: 'true'     # → appset-trust-manager-bundle
 
@@ -137,7 +137,24 @@ spec:
     # ---- [user] network: cert-manager Vault-PKI ClusterIssuer ----
     clusterbook.stuttgart-things.com/vault-server: https://vault.infra.sthings-vsphere.labul.sva.de
     clusterbook.stuttgart-things.com/vault-pki-path: pki/sign/sthings-vsphere
+    # Auth method: "token" (default when unset) or "kubernetes".
+    #
+    # token      — vault-token-secret must name a Secret in the cert-manager
+    #              namespace holding a Vault token. NOTHING RENEWS THAT TOKEN.
+    #              Vault caps token TTLs at 768h, so issuance breaks roughly a
+    #              month after registration — silently, because the ClusterIssuer
+    #              keeps reporting Ready=True while every issuance fails.
+    #
+    # kubernetes — cert-manager mints a short-lived ServiceAccount token per
+    #              request. Nothing expires. Needs a Vault Kubernetes auth mount
+    #              and role for this cluster, plus a TokenRequest grant for the
+    #              ServiceAccount (the chart-shipped cert-manager-tokenrequest
+    #              Role covers only the "cert-manager" ServiceAccount).
     clusterbook.stuttgart-things.com/vault-token-secret: cert-manager-vault-token
+    # clusterbook.stuttgart-things.com/vault-auth-method: kubernetes
+    # clusterbook.stuttgart-things.com/vault-k8s-auth-mount: /v1/auth/<cluster>-certmanager
+    # clusterbook.stuttgart-things.com/vault-k8s-auth-role: certmanager-vault
+    # clusterbook.stuttgart-things.com/vault-k8s-auth-sa: certmanager-vault   # defaults to the role name
     # ---- [user] network: gateway TLS wildcard issuer (cert-manager-cluster-ca) ----
     # clusterbook.stuttgart-things.com/wildcard-issuer-name: vault-pki
     # ---- [user] kind: expose gateway/cluster-ca externally ----
