@@ -1,8 +1,21 @@
 ---
-# cert-manager ClusterIssuer of type `vault` using token auth.
-# The referenced Secret (auth.tokenSecretRef.name) must already exist in
-# the cert-manager namespace and carry the Vault token under the configured
-# key — provisioned out-of-band (e.g. by Terraform vault-cert-issuer).
+# cert-manager ClusterIssuer of type `vault`.
+#
+# Two authentication methods are supported, selected by `vault.auth.method`:
+#
+#   token       (default) — a static Vault token in a Secret. The Secret must
+#               already exist in the cert-manager namespace, provisioned
+#               out-of-band (e.g. by argocd.create-vault-issuer). NOTE: nothing
+#               renews that token, so Vault auth breaks once it expires — and
+#               the ClusterIssuer keeps reporting Ready=True while every
+#               issuance fails. Vault caps token TTLs at 768h by default.
+#
+#   kubernetes  — cert-manager mints a short-lived ServiceAccount token per
+#               request via the TokenRequest API. Nothing expires. Requires a
+#               Kubernetes auth mount and role on the Vault side, and a
+#               TokenRequest grant for the referenced ServiceAccount.
+#
+# Prefer `kubernetes`.
 
 # ClusterIssuer name as referenced from `Certificate.spec.issuerRef.name`.
 name: vault-pki
@@ -13,8 +26,24 @@ vault:
   # Vault PKI sign path, e.g. `pki/sign/<role>`.
   path: "pki/sign/example"
   auth:
+    # "token" or "kubernetes".
+    method: token
     tokenSecretRef:
       # Secret in the cert-manager namespace holding the Vault token.
       name: vault-pki-token
       # Key inside the Secret holding the raw token value.
       key: token
+    kubernetes:
+      # Vault Kubernetes auth mount, WITH the /v1/auth/ prefix,
+      # e.g. "/v1/auth/my-cluster-certmanager".
+      mountPath: ""
+      # Vault role name on that mount.
+      role: ""
+      serviceAccountRef:
+        # ServiceAccount cert-manager presents when logging in. Defaults to the
+        # role name. It must be listed in the Vault role's
+        # bound_service_account_names, and the cert-manager controller needs
+        # permission to create tokens for it — the chart-shipped
+        # cert-manager-tokenrequest Role is scoped to the "cert-manager"
+        # ServiceAccount only, so any other one needs its own grant.
+        name: ""

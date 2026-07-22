@@ -31,7 +31,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.6.0
+        targetRevision: v0.8.0
         path: infra/cert-manager/vault-pki
         helm:
           valuesObject:
@@ -43,9 +43,20 @@ spec:
                 name: vault-pki-ca
                 key: ca.crt
               auth:
+                # Both blocks are always passed; the chart renders only the one
+                # matching `method`. Deliberately no bare-line {{- if }} here —
+                # conditionals outside quoted strings break kustomize build
+                # upstream of ArgoCD. Missing annotations render as "", and the
+                # chart treats an empty method as "token".
+                method: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-auth-method" }}'
                 tokenSecretRef:
                   name: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-token-secret" }}'
                   key: token
+                kubernetes:
+                  mountPath: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-k8s-auth-mount" }}'
+                  role: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-k8s-auth-role" }}'
+                  serviceAccountRef:
+                    name: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/vault-k8s-auth-sa" }}'
       syncPolicy:
         automated:
           prune: true
