@@ -38,7 +38,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.6.0
+        targetRevision: v0.8.0
         path: cicd/tekton/config
         helm:
           # Defaults from cicd/tekton/config/values.yaml are what we want for
