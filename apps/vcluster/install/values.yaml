@@ -19,7 +19,7 @@ vclusterName: vcluster-dev
 # kube-apiserver + etcd) — k3s/k0s were removed. The chart picks a sensible
 # distro automatically; advanced overrides go via `extraValues`.
 # renovate: datasource=helm depName=vcluster registryUrl=https://charts.loft.sh
-chartVersion: 0.35.2
+chartVersion: 0.36.0
 
 # Persistence for the control-plane StatefulSet PVC (holds the etcd state).
 # Disable only for ephemeral throwaway vclusters.
