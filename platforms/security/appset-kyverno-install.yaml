@@ -17,7 +17,17 @@ spec:
         selector:
           matchLabels:
             security-platform: "true"
-            security-platform/kyverno: "true"
+          matchExpressions:
+            # Opt-out, wie in 33 der uebrigen AppSets und wie platforms/README.md
+            # es beschreibt: der Dach-Schalter reicht, eine Komponente wird nur
+            # durch ein explizites "false" abgewaehlt. Vorher stand hier ein
+            # zweites matchLabels — damit fiel ein Cluster mit
+            # `security-platform: 'true'` und ohne Komponentenlabel stillschweigend
+            # durch, ohne Meldung und entgegen der dokumentierten Konvention.
+            - key: security-platform/kyverno
+              operator: NotIn
+              values:
+                - "false"
   template:
     metadata:
       name: kyverno-install-security-{{ .name }}
