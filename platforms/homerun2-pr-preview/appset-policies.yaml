@@ -533,12 +533,18 @@ spec:
                     namespacePrefix: "homerun2-k8s-pitcher-pr-*"
   template:
     metadata:
-      # No `-{{ .name }}` cluster suffix because today only `homerun2-dev`
-      # opts in; keeping the bare releaseName matches the names the
-      # cluster overlay previously used, so the transition is a no-op.
-      # If a second cluster ever opts in, names will collide — add the
-      # suffix back then.
-      name: '{{ .releaseName }}'
+      # The `-{{ .name }}` cluster suffix is required, not cosmetic: this is
+      # a (clusters × list) matrix, so the bare releaseName is only unique
+      # while exactly one cluster carries the opt-in label. A second one
+      # did on 2026-08-18 (`homerun2-test1`), and the AppSet stopped
+      # generating one second later with
+      #   ApplicationValidationError: contains applications with duplicate
+      #   name: homerun2-scout-preview-verify (and 29 more)
+      # — 2 clusters × 30 rows onto 30 names. Generation halts entirely, so
+      # the new cluster silently received no quota, secrets, seed-data or
+      # sweep at all. Keep the suffix even if the opt-in list shrinks back
+      # to one cluster.
+      name: '{{ .releaseName }}-{{ .name }}'
       labels:
         homerun2.stuttgart-things.com/component: '{{ .component }}'
         homerun2.stuttgart-things.com/policy: '{{ .policy }}'
