@@ -548,8 +548,15 @@ spec:
       labels:
         homerun2.stuttgart-things.com/component: '{{ .component }}'
         homerun2.stuttgart-things.com/policy: '{{ .policy }}'
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
+      # No `resources-finalizer.argocd.argoproj.io` here. It used to be set,
+      # and it silently defeated the `preserveResourcesOnDeletion: true`
+      # above: that flag only stops the AppSet controller from ADDING the
+      # finalizer, it cannot override one written into the template. So
+      # every removed Application cascade-deleted its ClusterPolicies after
+      # all — the exact opposite of what the syncPolicy comment promises.
+      # Worse against an unreachable cluster: the cascade can never finish
+      # and the Application wedges in Terminating forever. Hit on
+      # homerun2-dev, whose apiserver went away for good on 2026-08-19.
     spec:
       project: '{{ .name }}'
       source:
