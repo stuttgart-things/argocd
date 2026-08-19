@@ -58,7 +58,7 @@ That's it. Argo syncs the Application, which renders the platform directory, whi
 
 ## Cluster-specific values (currently hardcoded)
 
-These are baked into the AppSets because only `homerun2-dev` consumes the platform today. Lifting to per-cluster overrides requires moving them onto cluster Secret annotations and templating via `{{ index .metadata.annotations "..." }}`:
+These are baked into the AppSets from the days when only `homerun2-dev` consumed the platform. That is no longer true: `homerun2-test1` carries the `homerun2-pr-preview: "true"` label since 2026-08-18, and `appset-policies.yaml` now fans out to both. The per-component AppSets below have **not** caught up — their hostnames and gateway still point at `homerun2-dev`, so a second cluster gets correct policies but wrong ingress. Lifting to per-cluster overrides requires moving them onto cluster Secret annotations and templating via `{{ index .metadata.annotations "..." }}`:
 
 | Value | Where used |
 |-------|------------|
