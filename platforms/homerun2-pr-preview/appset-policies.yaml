@@ -570,6 +570,32 @@ spec:
       destination:
         name: '{{ .name }}'
         namespace: kyverno
+      # Without these every Application sits at OutOfSync forever, even
+      # though the sync itself reports "successfully synced (all tasks
+      # run)" and the policies are demonstrably on the cluster. The cause
+      # is not a mutating webhook but plain CRD schema defaults: the API
+      # server fills fields the charts never set, so ArgoCD diffs the
+      # rendered manifest against a live object that legitimately has
+      # more in it. Verified field by field against a live object on
+      # homerun2-test1 — this list is exactly what differed, not a
+      # precautionary sweep.
+      ignoreDifferences:
+        - group: kyverno.io
+          kind: ClusterPolicy
+          jsonPointers:
+            - /spec/admission
+            - /spec/background
+            - /spec/emitWarning
+            - /spec/validationFailureAction
+          jqPathExpressions:
+            # defaulted into every rule, so it has to be a jq path
+            - .spec.rules[].skipBackgroundRequests
+        - group: kyverno.io
+          kind: ClusterCleanupPolicy
+          jqPathExpressions:
+            # `method: GET` — the single field that kept all eight
+            # preview-sweep Applications OutOfSync.
+            - .spec.context[].apiCall.method
       syncPolicy:
         automated:
           prune: true
