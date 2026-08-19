@@ -7,8 +7,17 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
-  syncPolicy:
-    preserveResourcesOnDeletion: true
+  # No `preserveResourcesOnDeletion` here, deliberately. It reads like it
+  # protects the workloads this AppSet rolls out; it does not. What it
+  # protects is the child *Application* -- and keeping that around is
+  # exactly how a deregistered cluster leaves an orphan behind that then
+  # blocks its own AppProject from finalizing (see #324).
+  #
+  # The workloads are safe without it: the Application this chart renders
+  # carries no resources-finalizer, so deleting it never cascades into the
+  # CRDs, policies, StorageClasses or namespaces it manages. Verified per
+  # chart -- `apps/machinery/install` is the one that DOES render a
+  # finalizer, which is why appset-machinery.yaml keeps the flag.
   generators:
     - clusters:
         selector:
