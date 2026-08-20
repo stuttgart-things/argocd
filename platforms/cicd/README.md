@@ -105,11 +105,17 @@ Semantics: each ApplicationSet selector is `cicd-platform=true` AND `cicd-platfo
 
 If the cluster is managed by `clusterbook-operator`, add the label to the `ClusterbookCluster` CR's `spec.labels` — the operator propagates it onto the Argo Secret on the next reconcile.
 
-### Opt-out safety: `preserveResourcesOnDeletion`
+### Opt-out and teardown
 
-Each ApplicationSet sets `spec.syncPolicy.preserveResourcesOnDeletion: true`. When a cluster flips from included → opted out, the child `Application` CR is deleted, **but the workload resources it managed stay in place** (StorageClass, namespaces, DaemonSets, CRDs). This avoids tearing out live state — especially for storage (OpenEBS) and CRD owners (kro) — on a flag flip.
+The app-of-apps ApplicationSets here — `appset-crossplane`, `-kro`, `-tekton`, `-dapr`, `-kargo`, `-argo-rollouts`, `-openebs` — deliberately do **not** set `spec.syncPolicy.preserveResourcesOnDeletion`. What that flag preserves for an app-of-apps parent are child `Application` CRs, not workloads. Preserving them leaves orphans in the `argocd` namespace that outlive a deregistered cluster and then block its `proj-<cluster>` from finalizing (#324).
 
-Clean-up is manual: `kubectl delete ns <namespace>` (or equivalent) on the target cluster if you want the resources gone. Until then, the cluster keeps running what was deployed; ArgoCD just stops managing it.
+Without the flag the parent Application carries `resources-finalizer.argocd.argoproj.io`, so deleting it collects the child Application with it. That cascade never reaches the target cluster: the parent's own destination is `https://kubernetes.default.svc` / `argocd`, and the child Application renders no finalizer of its own — so the deletion stops at the `Application` CR and never touches CRDs, namespaces, StorageClasses or DaemonSets.
+
+**What a cluster loses on opt-out is not the workloads but ArgoCD's management of them.** They keep running exactly as deployed; there is just no more self-heal, drift correction or upgrade. Clean-up stays manual: `kubectl delete ns <namespace>` (or equivalent) on the target cluster if you want the resources gone.
+
+`appset-machinery.yaml` is the deliberate exception and keeps the flag: `apps/machinery/install` renders its Applications **with** a `resources-finalizer`, so there the cascade would be a real deletion of workloads — and against an already-deregistered cluster it would hang in `Terminating`. Dropping the flag there means first dropping the finalizer from the chart.
+
+ApplicationSets that roll out workloads rather than Applications keep the flag, where it does what it says: `appset-crossplane-providers`, `-configs`, `-functions`, `-provider-configs`, `appset-crossplane-platform-baseline`, `appset-cxp-*`, `appset-tekton-config`, `appset-kargo-httproute`, `appset-tekton-dashboard-httproute`.
 
 ## Adding a catalog entry
 

@@ -58,11 +58,15 @@ Missing or any non-`"true"` value = excluded.
 
 If the cluster is managed by `clusterbook-operator`, add the labels to the `ClusterbookCluster` CR's `spec.labels` — the operator propagates them onto the Argo Secret on the next reconcile.
 
-### Opt-out safety: `preserveResourcesOnDeletion`
+### Opt-out and teardown
 
-Each ApplicationSet sets `spec.syncPolicy.preserveResourcesOnDeletion: true`. When a cluster's per-component label is flipped from `"true"` → anything else (or removed), the child `Application` CR is deleted, **but the workload resources it managed stay in place** (CRDs, namespace, deployments). Critical for ESO — pruning its CRDs would delete every `ExternalSecret` and `ClusterSecretStore` referenced by other apps, and the materialised K8s Secrets would be cleaned up on the next reconcile, breaking running workloads.
+Both ApplicationSets here are app-of-apps parents and deliberately do **not** set `spec.syncPolicy.preserveResourcesOnDeletion`. What that flag preserves for such a parent are child `Application` CRs, not workloads. Preserving them leaves orphans in the `argocd` namespace that outlive a deregistered cluster and then block its `proj-<cluster>` from finalizing (#324).
 
-Clean-up is manual: `kubectl delete ns external-secrets` plus the CRDs if you want the resources gone. Until then, the cluster keeps running what was deployed; ArgoCD just stops managing it.
+Without the flag the parent Application carries `resources-finalizer.argocd.argoproj.io`, so deleting it collects the child Application with it. That cascade never reaches the target cluster: the parent's own destination is `https://kubernetes.default.svc` / `argocd`, and the child Application renders no finalizer of its own — so the deletion stops at the `Application` CR and never touches CRDs, namespaces, StorageClasses or DaemonSets.
+
+**What a cluster loses on opt-out is not the workloads but ArgoCD's management of them.** They keep running exactly as deployed; there is just no more self-heal, drift correction or upgrade. Clean-up stays manual: `kubectl delete ns <namespace>` (or equivalent) on the target cluster if you want the resources gone.
+
+Concretely for ESO and Kyverno: flipping a cluster's per-component label away from `"true"` deletes the child `Application`, but every `ClusterSecretStore`, `ExternalSecret`, `ClusterPolicy`, `Policy` and `PolicyException` — and the CRDs behind them — stays in place. Clean-up is `kubectl delete ns external-secrets` plus the CRDs if you want them gone.
 
 ## ClusterSecretStores live per-cluster, not here
 
