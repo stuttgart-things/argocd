@@ -36,8 +36,16 @@ jobs:
       - name: semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Both majors are PINNED on purpose. Unpinned, npx resolved
+        # conventional-changelog-conventionalcommits to v10, which needs
+        # conventional-changelog-writer@9+, while semantic-release@25 ships
+        # @semantic-release/release-notes-generator@14 -> writer@8. The
+        # preset then fails plugin validation with `Missing helper: ...`
+        # and no tag is cut at all -- silently, because the job failure
+        # looks like any other red run and nothing downstream complains.
+        # Bump these two together, never one alone.
         run: >-
           npx --yes
-          -p semantic-release
-          -p conventional-changelog-conventionalcommits
+          -p semantic-release@25
+          -p conventional-changelog-conventionalcommits@8
           semantic-release
