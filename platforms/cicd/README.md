@@ -113,7 +113,14 @@ Without the flag the parent Application carries `resources-finalizer.argocd.argo
 
 **What a cluster loses on opt-out is not the workloads but ArgoCD's management of them.** They keep running exactly as deployed; there is just no more self-heal, drift correction or upgrade. Clean-up stays manual: `kubectl delete ns <namespace>` (or equivalent) on the target cluster if you want the resources gone.
 
-`appset-machinery.yaml` is the deliberate exception and keeps the flag: `apps/machinery/install` renders its Applications **with** a `resources-finalizer`, so there the cascade would be a real deletion of workloads — and against an already-deregistered cluster it would hang in `Terminating`. Dropping the flag there means first dropping the finalizer from the chart.
+`appset-machinery.yaml` needed a second step. `apps/machinery/install` renders its five child Applications **with** a `resources-finalizer` — deliberately, because the same chart backs `platforms/machinery-pr-preview`, where a closed PR has to take its whole namespace with it. Dropping that finalizer outright would have broken preview teardown, so it became a chart value instead:
+
+| Consumer | `cascadingDelete` | On delete |
+|---|---|---|
+| `platforms/machinery-pr-preview` | `true` (chart default) | Prunes the workloads — full teardown on PR close |
+| `appset-machinery.yaml` (this platform) | `false` | Leaves the workloads, deletes only the `Application` |
+
+With the finalizer gone from the children here, the flag could go too, and machinery now behaves like the other seven: an opt-out stops ArgoCD from managing it, and a teardown against a deregistered cluster has nothing left to prune, so nothing hangs in `Terminating`.
 
 ApplicationSets that roll out workloads rather than Applications keep the flag, where it does what it says: `appset-crossplane-providers`, `-configs`, `-functions`, `-provider-configs`, `appset-crossplane-platform-baseline`, `appset-cxp-*`, `appset-tekton-config`, `appset-kargo-httproute`, `appset-tekton-dashboard-httproute`.
 

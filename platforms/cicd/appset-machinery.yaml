@@ -18,8 +18,13 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
-  syncPolicy:
-    preserveResourcesOnDeletion: true
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # Machinery needed a second step the other twelve did not: its chart
+  # renders the children WITH a resources-finalizer, so the cascade would
+  # have been a real deletion. `cascadingDelete: false` below turns that off
+  # for this long-lived install. See README.md, "Opt-out and teardown".
   generators:
     - clusters:
         selector:
@@ -62,13 +67,22 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.8.1
+        targetRevision: v0.9.0
         path: apps/machinery/install
         helm:
           releaseName: 'machinery-{{ .name }}'
           valuesObject:
             applicationName: 'machinery-{{ .name }}'
             project: '{{ .name }}'
+
+            # Long-lived platform install: an opt-out should stop ArgoCD
+            # managing machinery, not uninstall it -- and against an already
+            # deregistered cluster a prune can never complete, leaving the
+            # child Applications stuck in Terminating (#324). The per-PR
+            # preview appset keeps the default (true); there a closed PR must
+            # take its namespace with it.
+            cascadingDelete: false
+
             # Target the labelled remote cluster, not the management one.
             destination:
               server: '{{ .server }}'
