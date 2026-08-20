@@ -67,7 +67,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.9.0
+        targetRevision: v0.9.1
         path: apps/machinery/install
         helm:
           releaseName: 'machinery-{{ .name }}'
