@@ -7,8 +7,11 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
-  syncPolicy:
-    preserveResourcesOnDeletion: true
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # The Tekton operator and its CRDs stay put either way. See README.md, "Opt-
+  # out and teardown".
   generators:
     - clusters:
         selector:

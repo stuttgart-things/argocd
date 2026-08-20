@@ -7,11 +7,11 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
-  # Keep child resources if the cluster opts out later (label → "false").
-  # Without this, dropping out would delete the child Application and prune
-  # kro's CRDs and controller it manages.
-  syncPolicy:
-    preserveResourcesOnDeletion: true
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # Kro's CRDs and controller stay put either way. See README.md, "Opt-out and
+  # teardown".
   generators:
     - clusters:
         selector:
