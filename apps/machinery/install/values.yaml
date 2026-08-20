@@ -147,6 +147,22 @@ auth:
   #   key: token             # key in the Secret carrying the token bytes (default: token)
   # tokenMountPath: /var/run/machinery-auth/token   # where to mount the file inside the Pod (default shown)
 
+# Whether the child Applications this chart renders carry
+# `resources-finalizer.argocd.argoproj.io` — ArgoCD's cascading deletion.
+#
+# true (default)  Deleting a child App prunes what it deployed on the
+#                 destination cluster first. What a per-PR preview needs:
+#                 closing the PR must take the whole namespace with it.
+#
+# false           Deleting a child App leaves its resources on the
+#                 destination cluster, unmanaged. What a long-lived
+#                 platform install wants: a cluster opting out should stop
+#                 ArgoCD from managing machinery, not uninstall it — and
+#                 against an already deregistered cluster a prune can never
+#                 complete, so the Application would hang in Terminating and
+#                 block its AppProject (stuttgart-things/argocd#324).
+cascadingDelete: true
+
 # Sync policy applied to all rendered Applications.
 syncPolicy:
   automated:

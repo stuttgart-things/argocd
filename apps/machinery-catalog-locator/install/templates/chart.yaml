@@ -94,7 +94,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
   # Finalizer so deleting the parent App prunes the kustomize-rendered
   # Deployment/Service/etc. on the destination cluster before this App is
-  # removed — otherwise they're orphaned. See apps/machinery/install.
+  # removed — otherwise they're orphaned. Unconditional here because this
+  # chart only ever backs per-PR previews, which must tear their namespace
+  # down on close. apps/machinery/install gates the same finalizer behind
+  # `cascadingDelete` because it also backs a long-lived platform install.
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

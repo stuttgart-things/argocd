@@ -109,14 +109,22 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-  # Without this, deleting the parent App leaves the workloads on the
-  # destination cluster orphaned: the parent's finalizer prunes the child
-  # Application CRDs from argocd ns instantly, taking their reference to
-  # the destination resources with them. Finalizer here makes Argo prune
-  # the kustomize-rendered Deployment/Service/etc. before this App is
-  # removed.
+  # `cascadingDelete` (default true) decides whether deleting the parent
+  # App also prunes the workloads on the destination cluster. Without the
+  # finalizer the parent's own finalizer removes this child Application
+  # from argocd ns instantly, taking its reference to the destination
+  # resources with it, and they are left behind unmanaged. With it, Argo
+  # prunes the kustomize-rendered Deployment/Service/etc. first.
+  #
+  # Preview envs want it on: a closed PR must take its namespace with it.
+  # A long-lived platform install wants it off — there an opt-out should
+  # stop managing machinery, not delete it, and against an already
+  # deregistered cluster the prune can never complete and the Application
+  # hangs in Terminating (stuttgart-things/argocd#324).
+  {{- if .Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
 spec:
   project: {{ .Values.project | quote }}
   source:
