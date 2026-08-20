@@ -206,6 +206,10 @@
         }
       }
     },
+    "cascadingDelete": {
+      "type": "boolean",
+      "description": "Whether the rendered child Applications carry resources-finalizer.argocd.argoproj.io. true (default): deleting a child App prunes what it deployed on the destination cluster first — what a per-PR preview needs, so closing the PR tears its namespace down. false: the resources stay on the destination cluster unmanaged — for long-lived platform installs, where an opt-out should stop management rather than uninstall, and where a prune against an already deregistered cluster would hang the Application in Terminating."
+    },
     "syncPolicy": {
       "type": "object",
       "description": "ArgoCD sync policy applied to all rendered Applications.",

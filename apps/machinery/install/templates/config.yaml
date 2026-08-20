@@ -43,10 +43,12 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
-  # See chart.yaml — without the finalizer the ConfigMap on the
-  # destination cluster is orphaned when the parent App is deleted.
+  # See chart.yaml — with `cascadingDelete` off the ConfigMap on the
+  # destination cluster is left in place when the parent App is deleted.
+  {{- if .Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
 spec:
   project: {{ .Values.project | quote }}
   source:

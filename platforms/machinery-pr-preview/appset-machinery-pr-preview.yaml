@@ -91,6 +91,13 @@ spec:
           valuesObject:
             applicationName: 'machinery-pr-{{ .number }}'
             project: '{{ .name }}'
+
+            # Explicit, though it is the chart default: the child Apps must
+            # keep their resources-finalizer so a closed PR prunes the
+            # workloads on the destination cluster and takes its namespace
+            # with it. The cicd platform install sets this to false -- there
+            # the install is long-lived and the cluster may already be gone.
+            cascadingDelete: true
             # Target the labelled remote cluster, not the management one.
             # `.server` from the cluster generator is the cluster API URL
             # Argo registered for that cluster.
