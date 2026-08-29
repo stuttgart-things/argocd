@@ -1,0 +1,57 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+#
+# `namespace` defaults to `postgres` to match stuttgart-things/helm's
+# `database/postgres.yaml.gotmpl`. This is a deliberate deviation from
+# upstream's own `cnpg-system` convention — consistency across the two sibling
+# repos wins, and it is a one-value override either way. Don't "fix" it.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: postgres
+
+# Upstream CloudNativePG operator Helm chart (https://cloudnative-pg.github.io/charts).
+# renovate: datasource=helm depName=cloudnative-pg registryUrl=https://cloudnative-pg.github.io/charts
+chartVersion: 0.29.0
+
+# Operator Deployment replica count. 1 is fine for most clusters — the operator
+# leader-elects, so >1 buys failover, not throughput.
+replicaCount: 1
+
+# Prometheus Operator integration for the *operator* pod itself (not for the
+# PostgreSQL clusters it manages — those are configured in `../cluster`).
+# Requires the Prometheus Operator CRDs to be registered on the target cluster.
+monitoring:
+  podMonitorEnabled: false
+
+# Resource requests/limits for the operator container. Empty = upstream default
+# (unset), which lets the operator run in BestEffort. Set both on clusters with
+# a ResourceQuota or a LimitRange that rejects unbounded pods.
+resources: {}
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above
+# (config.*, webhook.*, nodeSelector, tolerations, affinity, crds.create,
+# additionalArgs/Env, image overrides, …).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+#
+# ServerSideApply is NOT optional: the clusters.postgresql.cnpg.io CRD is far
+# past the 262144-byte limit for the kubectl.kubernetes.io/last-applied-
+# configuration annotation, so a client-side apply fails outright.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

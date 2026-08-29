@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cloudnative-pg install app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Argo destination for the rendered Application. Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. Template prefers `name` when both are set (so consumers can override the chart's default `server` with a `name` without nulling). `namespace` defaults to `postgres`, not upstream's `cnpg-system`.",
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["namespace"],
+      "anyOf": [
+        { "required": ["server"] },
+        { "required": ["name"] }
+      ]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "replicaCount": { "type": "integer", "minimum": 1 },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Prometheus Operator integration for the operator pod itself. Requires the Prometheus Operator CRDs on the target cluster.",
+      "properties": {
+        "podMonitorEnabled": { "type": "boolean" }
+      },
+      "required": ["podMonitorEnabled"]
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Resource requests/limits for the operator container. Empty object = upstream default (unset).",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "integer"] }
+        },
+        "requests": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "integer"] }
+        }
+      }
+    },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed valuesObject passed to the upstream chart.",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

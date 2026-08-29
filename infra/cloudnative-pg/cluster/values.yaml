@@ -1,0 +1,119 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+#
+# There is NO good default for `namespace` — it is `required` in the schema and
+# is the value a consumer is most likely to get wrong. A CNPG Cluster belongs in
+# the namespace of the app that consumes it (backstage's cluster in `backstage`,
+# zitadel's in `zitadel`), NOT in the operator's namespace (`postgres`). The
+# value below is a placeholder so the chart renders standalone — override it.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: cnpg-cluster
+
+# Official CloudNativePG cluster Helm chart (https://cloudnative-pg.github.io/charts).
+# renovate: datasource=helm depName=cluster registryUrl=https://cloudnative-pg.github.io/charts
+chartVersion: 0.8.1
+
+# Name of the Cluster CR (upstream nameOverride + fullnameOverride). Also seeds
+# the derived Application name, so two Clusters on one target cluster don't
+# collide. Renaming this creates a NEW Cluster and orphans the old PVC —
+# see the teardown caveat in the README.
+clusterName: postgres-cluster
+
+# Cluster flavour: postgresql | postgis | timescaledb.
+type: postgresql
+
+# Bootstrap mode: standalone | recovery | replica.
+# `recovery` and `replica` need their own upstream config — use extraValues.
+mode: standalone
+
+# Major PostgreSQL version. Quoted — upstream expects a string.
+postgresqlVersion: "17"
+
+# Number of PostgreSQL instances.
+#
+# 1 is lab-shaped, matching stuttgart-things/helm's database/postgres-cluster.yaml.gotmpl.
+# At 1 an instance failure is downtime and possible data loss — there is no
+# replica to fail over to. Raise to 3 for anything you care about.
+instances: 1
+
+# PGDATA volume. Empty storageClass = the cluster's default StorageClass.
+storage:
+  size: 8Gi
+  storageClass: ""
+
+# Separate volume for the write-ahead log. Off by default; enable to keep WAL
+# I/O off the data volume on busy clusters.
+walStorage:
+  enabled: false
+  size: 1Gi
+
+# initdb bootstrap: the application database and its owner role.
+database: app
+owner: app
+
+# Name of an existing Secret holding the owner's credentials — must be a
+# kubernetes.io/basic-auth Secret with `username` / `password` (and `dbname`).
+#
+# Leave EMPTY to let CNPG generate `<clusterName>-app` itself. An empty
+# `secret.name` reaching the upstream chart breaks bootstrap, so the template
+# emits `cluster.initdb.secret` only when this is non-empty.
+#
+# Point it at a Secret materialised by External Secrets — see the README.
+appSecretName: ""
+
+# Superuser (`postgres`) access. Off by default: when disabled the operator
+# blanks the postgres password, so the only way in is the owner role.
+enableSuperuserAccess: false
+
+# PodDisruptionBudget. Off by default because it blocks node drains on a
+# single-instance cluster. Turn on together with `instances: 3`.
+enablePDB: false
+
+# Prometheus Operator integration for the PostgreSQL pods. All off by default;
+# each requires the Prometheus Operator CRDs on the target cluster.
+# `podMonitor` and `prometheusRule` are additionally gated by `enabled`.
+monitoring:
+  enabled: false
+  podMonitor: false
+  prometheusRule: false
+
+# Backups. Off by default, which is why the upstream chart prints
+#   Warning! Backups not enabled. Recovery will not be possible!
+# Enabling backups needs an object-store target — configure the rest of the
+# upstream `backups.*` tree through extraValues.
+backups:
+  enabled: false
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above
+# (backups.barmanObjectStore, cluster.resources, cluster.affinity,
+# cluster.postgresql.parameters, poolers, recovery.*, replica.*, …).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+#
+# ServerSideApply is NOT optional: the clusters.postgresql.cnpg.io CRD is far
+# past the 262144-byte limit for the kubectl.kubernetes.io/last-applied-
+# configuration annotation, so a client-side apply fails outright.
+#
+# The retry block is load-bearing, not boilerplate: sync waves only order
+# resources WITHIN one Argo Application, so syncing this entry against a cluster
+# whose operator isn't up yet fails the dry-run on the unknown
+# postgresql.cnpg.io/v1 kind. The retry is what recovers it. Keep it.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

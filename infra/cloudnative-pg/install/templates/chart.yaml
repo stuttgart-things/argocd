@@ -1,0 +1,43 @@
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $defaultName := printf "cloudnative-pg-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+The operator chart needs almost nothing from us — only the knobs a cluster
+actually varies get a first-class value. Everything else goes via extraValues.
+*/}}
+{{- $computed := dict
+      "replicaCount" (int .Values.replicaCount)
+      "monitoring"   (dict "podMonitorEnabled" .Values.monitoring.podMonitorEnabled)
+      "resources"    (.Values.resources | default dict)
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # -10 alongside cert-manager / crossplane / external-secrets / kyverno:
+    # the postgresql.cnpg.io CRDs must register before any Cluster CR is applied.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: cloudnative-pg
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: cloudnative-pg
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

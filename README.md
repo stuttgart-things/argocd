@@ -27,6 +27,7 @@ Version columns show what the child `Application` currently pins. `—` in the V
 |---|---|---|---|
 | [`cert-manager`](./infra/cert-manager/) | `install` / `selfsigned` / `cluster-ca` / `vault-pki` | `v1.19.2` + — + — + — | cert-manager chart, self-signed `ClusterIssuer`, CA chain (`cluster-ca` Certificate + ClusterIssuer + one or two wildcards), Vault PKI `ClusterIssuer` (token auth) |
 | [`cilium`](./infra/cilium/) | `chart` / `lb` / `gateway` | `1.18.5` + — + — | CNI with kube-proxy replacement, L2 LoadBalancer IP pool, Gateway API `Gateway` |
+| [`cloudnative-pg`](./infra/cloudnative-pg/) | `install` / `cluster` | `0.29.0` + `0.8.1` | CloudNativePG operator + a PostgreSQL `Cluster` CR (official `cnpg/cluster` chart) |
 | [`external-secrets`](./infra/external-secrets/) | `install` / `cluster-secret-store-vault` | `2.4.1` + — | External Secrets Operator (ESO) + a templated `ClusterSecretStore` for Vault (k8s-auth, KV v2). Cluster overlays consume `cluster-secret-store-vault` per `(cluster, KV path)` pair |
 | [`kyverno`](./infra/kyverno/) | `install` | `3.8.0` | Kyverno admission controller (policy engine) — `ClusterPolicy` / `Policy` / `PolicyException` CRDs. Controller only; policies are cluster-specific |
 | [`longhorn`](./infra/longhorn/) | `install` | `1.11.2` | Longhorn distributed block storage; GitOps-friendly defaults (`preUpgradeChecker.jobEnabled: false`, `defaultClassReplicaCount: 1` for single-node-safe install) |
