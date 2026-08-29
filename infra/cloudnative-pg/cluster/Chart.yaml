@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: cloudnative-pg-cluster
+description: App-of-apps chart packaging the official CloudNativePG cluster Helm chart (cnpg/cluster) — renders one postgresql.cnpg.io/v1 Cluster
+type: application
+version: 0.1.0
+appVersion: "0.8.1"

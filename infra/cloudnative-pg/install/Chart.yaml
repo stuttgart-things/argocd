@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: cloudnative-pg-install
+description: App-of-apps chart packaging the upstream CloudNativePG operator Helm chart (cnpg/cloudnative-pg)
+type: application
+version: 0.1.0
+appVersion: "1.30.0"

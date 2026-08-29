@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cloudnative-pg cluster app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion", "clusterName"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a name derived from clusterName + destination, so several Postgres clusters can land on one target cluster without colliding."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Argo destination for the rendered Application. Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. Template prefers `name` when both are set. `namespace` is required and has no good default: a CNPG Cluster belongs in the namespace of the app that consumes it, not in the operator's namespace.",
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["namespace"],
+      "anyOf": [
+        { "required": ["server"] },
+        { "required": ["name"] }
+      ]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "clusterName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+      "description": "Name of the Cluster CR (upstream nameOverride + fullnameOverride). Renaming creates a new Cluster and orphans the old PVC."
+    },
+    "type": {
+      "type": "string",
+      "enum": ["postgresql", "postgis", "timescaledb"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["standalone", "recovery", "replica"]
+    },
+    "postgresqlVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$",
+      "description": "Major PostgreSQL version, as a string."
+    },
+    "instances": { "type": "integer", "minimum": 1 },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "size":         { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" },
+        "storageClass": { "type": "string", "description": "Empty string = the target cluster's default StorageClass." }
+      },
+      "required": ["size"]
+    },
+    "walStorage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "size":    { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" }
+      },
+      "required": ["enabled"]
+    },
+    "database": { "type": "string", "minLength": 1 },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^{}]*$",
+      "description": "Owner role for the application database. Upstream runs this value through `tpl`, so Go-template braces are forbidden here."
+    },
+    "appSecretName": {
+      "type": "string",
+      "description": "Existing kubernetes.io/basic-auth Secret with the owner's credentials. Empty = CNPG generates `<clusterName>-app`. Emitted to the upstream chart only when non-empty."
+    },
+    "enableSuperuserAccess": { "type": "boolean" },
+    "enablePDB": { "type": "boolean" },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Prometheus Operator integration for the PostgreSQL pods. `podMonitor` and `prometheusRule` are gated by `enabled`.",
+      "properties": {
+        "enabled":        { "type": "boolean" },
+        "podMonitor":     { "type": "boolean" },
+        "prometheusRule": { "type": "boolean" }
+      },
+      "required": ["enabled"]
+    },
+    "backups": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Backups are off by default; the upstream chart warns that recovery will not be possible. Configure the object-store target through extraValues.",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      },
+      "required": ["enabled"]
+    },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed valuesObject passed to the upstream chart.",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

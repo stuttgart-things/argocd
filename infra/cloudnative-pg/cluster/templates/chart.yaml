@@ -1,0 +1,84 @@
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{/*
+Derive from clusterName + destination, not destination alone: several Postgres
+clusters can land on one target cluster and must not collide.
+*/}}
+{{- $defaultName := printf "cnpg-cluster-%s" (sha1sum (printf "%s@%s" .Values.clusterName $destKey) | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+initdb — emit `secret` ONLY when appSecretName is non-empty. Otherwise CNPG
+generates `<clusterName>-app` (a kubernetes.io/basic-auth Secret carrying
+username/password/dbname), and an empty `secret.name` breaks bootstrap.
+
+Note: upstream runs `cluster.initdb.owner` through `tpl`, so a literal
+`{{ ... }}` reaching that value is evaluated by the upstream chart. The schema
+forbids braces in `owner` to keep that from happening.
+*/}}
+{{- $initdb := dict
+      "database" .Values.database
+      "owner"    .Values.owner
+}}
+{{- if .Values.appSecretName }}
+  {{- $_ := set $initdb "secret" (dict "name" .Values.appSecretName) }}
+{{- end }}
+{{- $clusterBlock := dict
+      "instances" (int .Values.instances)
+      "storage" (dict
+        "size"         .Values.storage.size
+        "storageClass" .Values.storage.storageClass
+      )
+      "walStorage" (dict
+        "enabled" .Values.walStorage.enabled
+        "size"    .Values.walStorage.size
+      )
+      "initdb"                $initdb
+      "enableSuperuserAccess" .Values.enableSuperuserAccess
+      "enablePDB"             .Values.enablePDB
+      "monitoring" (dict
+        "enabled"        .Values.monitoring.enabled
+        "podMonitor"     (dict "enabled" .Values.monitoring.podMonitor)
+        "prometheusRule" (dict "enabled" .Values.monitoring.prometheusRule)
+      )
+}}
+{{- $computed := dict
+      "nameOverride"     .Values.clusterName
+      "fullnameOverride" .Values.clusterName
+      "type"             .Values.type
+      "mode"             .Values.mode
+      "version"          (dict "postgresql" .Values.postgresqlVersion)
+      "cluster"          $clusterBlock
+      "backups"          (dict "enabled" .Values.backups.enabled)
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # 0 — after the operator's -10 wave, so the CRDs exist before the Cluster CR.
+    # Sync waves only order resources within ONE Application: syncing this entry
+    # against a cluster with no operator fails the dry-run on the unknown
+    # postgresql.cnpg.io/v1 kind, and syncPolicy.retry is what recovers it.
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: cluster
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: {{ .Values.clusterName | quote }}
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
