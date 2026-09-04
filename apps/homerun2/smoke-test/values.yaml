@@ -22,24 +22,39 @@ podSecurityContext:
   runAsUser: 100
   runAsGroup: 101
 
-# ArgoCD hook wiring. With `enabled: true` the Job carries
-# `argocd.argoproj.io/hook: PostSync`, so it runs after the Application's
-# resources are healthy and re-runs on every sync — the `helm test` idea,
-# expressed the way ArgoCD does it. Set false to render a plain Job
-# (created once, then inert until deleted).
+# ArgoCD hook wiring. OFF by default, and that default is load-bearing.
 #
-# deletePolicy BeforeHookCreation keeps the finished Job (and its logs)
-# around until the next run. HookSucceeded would delete it the moment it
-# passes, which throws away the evidence that it passed.
+# When this chart is a standalone Application (which is how
+# apps/homerun2/install consumes it) the Job is the ONLY thing it renders.
+# With `enabled: true` that Application's desired state consists purely of
+# hooks — nothing to apply — so ArgoCD reports it Synced/Healthy without
+# ever running a sync operation, and a hook that needs an operation to fire
+# never fires. Observed on homerun2-test1: Application Synced, Healthy, zero
+# resources, no operationState, no Job.
+#
+# As a regular resource the Job is applied on creation, runs immediately,
+# and ArgoCD's built-in Job health check makes the Application Progressing
+# while it runs, Healthy when it succeeds and Degraded when it fails — which
+# is the signal we wanted from the hook anyway. Re-run it by deleting the
+# Job: automated sync recreates it.
+#
+# Turn hooks on only when embedding this chart in an Application that also
+# carries regular resources, so a sync operation actually happens.
+# deletePolicy BeforeHookCreation then keeps the finished Job and its logs
+# until the next run; HookSucceeded would delete the evidence on success.
 hook:
-  enabled: true
+  enabled: false
   deletePolicy: BeforeHookCreation
 
 job:
   # Never, not OnFailure: a failed assertion should end the pod and surface
   # as a failed sync, not silently retry inside the same pod.
   backoffLimit: 2
-  ttlSecondsAfterFinished: 86400
+  # Empty = no TTL: the finished Job stays as the record of the last run
+  # (`kubectl logs job/<name>`). Setting a TTL turns the test into a
+  # RECURRING one — the Job is garbage-collected, ArgoCD notices the drift
+  # and recreates it, so the smoke test re-runs every ttl seconds.
+  ttlSecondsAfterFinished: null
   activeDeadlineSeconds: 900
 
 # The in-cluster Service under test. Addressed as http://<service>:<port>

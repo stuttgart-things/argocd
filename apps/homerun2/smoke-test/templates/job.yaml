@@ -13,7 +13,9 @@ metadata:
   {{- end }}
 spec:
   backoffLimit: {{ .Values.job.backoffLimit }}
-  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  {{- with .Values.job.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
   activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
   template:
     metadata:

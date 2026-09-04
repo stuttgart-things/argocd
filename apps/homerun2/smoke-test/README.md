@@ -1,8 +1,9 @@
 # apps/homerun2/smoke-test
 
 A one-shot `Job` that proves a deployed **omni-pitcher** actually works — the
-`helm test` idea, without Helm. Rendered as an ArgoCD **PostSync hook**, so it
-re-runs on every sync of its Application and a failed assertion fails the sync.
+`helm test` idea, without Helm. ArgoCD applies the Job like any other resource
+and its built-in Job health check does the rest: **Progressing** while the test
+runs, **Healthy** when it passes, **Degraded** when an assertion fails.
 
 Consumed as a sub-Application by [`apps/homerun2/install`](../install/) via
 `smokeTest.enabled: true`, or standalone with `helm template`.
@@ -61,18 +62,23 @@ cannot prove the user is non-root: the container never starts, and the only
 evidence is `CreateContainerConfigError` on the pod — no logs, no event that
 names the chart.
 
-## Re-running
-
-The Job is a hook with `hook-delete-policy: BeforeHookCreation`, so the finished
-Job and its logs survive until the next run:
+## Re-running, and why this is not an ArgoCD hook
 
 ```bash
-kubectl -n <ns> logs job/<release>-smoke-test
-argocd app sync <release>-smoke-test     # or hit Sync in the UI
+kubectl -n <ns> logs job/<release>-smoke-test      # the last run
+kubectl -n <ns> delete job <release>-smoke-test    # automated sync recreates it → re-runs
 ```
 
-Set `hook.enabled: false` to render a plain Job instead (runs once on create;
-ArgoCD then treats it as ordinary desired state).
+`hook.enabled` exists and defaults to **false**, deliberately. A PostSync hook
+only fires as part of a sync *operation*, and an Application whose desired state
+is nothing but hooks has nothing to apply — ArgoCD marks it Synced/Healthy and
+never runs an operation. Observed exactly that on homerun2-test1: Application
+`Synced`/`Healthy`, `status.resources` empty, no `operationState`, and no Job on
+the cluster. Turn hooks on only when embedding this chart in an Application that
+also carries regular resources.
+
+Setting `job.ttlSecondsAfterFinished` turns the test into a **recurring** one:
+the finished Job is garbage-collected, ArgoCD sees the drift and recreates it.
 
 ## Values
 
