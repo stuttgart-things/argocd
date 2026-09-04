@@ -1,0 +1,131 @@
+{{- if .Values.notificationCatcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-notification-catcher" }}
+{{- $ns := .Values.destination.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-notification-catcher" $appName | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "notification-catcher" | quote }}
+    targetRevision: {{ .Values.notificationCatcher.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+        {{- /* Unlike every other component, this base does NOT bake its own
+               tag in: it ships `image: …-notification-catcher:latest`, and no
+               `latest` is published. Without this patch the Deployment goes
+               straight to ImagePullBackOff. */}}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.notificationCatcher.version) | indent 12 }}
+        {{- /* Redis connection lives in the env ConfigMap here, not in the
+               container env, so the usual redisAddrPatch does not apply. */}}
+        - target:
+            kind: ConfigMap
+            name: {{ printf "%s-env" $name }}
+          patch: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ printf "%s-env" $name }}
+            data:
+              REDIS_ADDR: {{ printf "redis-stack.%s.svc.cluster.local" $ns }}
+              REDIS_PORT: "6379"
+              REDIS_STREAM: {{ .Values.notificationCatcher.redisStream | quote }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: {{ $name }}
+                      env:
+                        - name: DRY_RUN
+                          value: {{ .Values.notificationCatcher.dryRun | quote }}
+        {{- /* The routing config (which stream entries go to which webhook)
+               is mounted from a ConfigMap this chart does NOT create — it is
+               cluster-specific, the same way k8s-pitcher's profile is. The
+               base names `homerun2-notification-catcher-notify`; point the
+               volume elsewhere by overriding notifyConfigMap. */}}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+            spec:
+              template:
+                spec:
+                  volumes:
+                    - name: notify-config
+                      configMap:
+                        name: {{ .Values.notificationCatcher.notifyConfigMap | quote }}
+                        items:
+                          - key: config.yaml
+                            path: config.yaml
+{{- if .Values.redisPassword }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.redisPasswordPatch" (dict "secretName" (printf "%s-redis" $name) "password" .Values.redisPassword) | indent 12 }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-redis" $name)) | indent 12 }}
+{{- end }}
+        {{- /* The base ships this Secret carrying the literal string
+               `${TEAMS_WEBHOOK_URL}` — an unexpanded placeholder the catcher
+               would happily POST to. Patch it from a value, or delete it so an
+               out-of-band / ESO-managed Secret of the same name takes over.
+               Never leave the base's copy standing. */}}
+{{- if .Values.notificationCatcher.teamsWebhookUrl }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-secrets" $name }}
+          patch: |
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ printf "%s-secrets" $name }}
+            stringData:
+              TEAMS_WEBHOOK_URL: {{ .Values.notificationCatcher.teamsWebhookUrl | quote }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-secrets" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-secrets" $name)) | indent 12 }}
+{{- end }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
