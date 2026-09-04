@@ -85,19 +85,25 @@ spec:
                 curl -s -m 15 -o /dev/null -w '%{http_code}' -X "$m" "$u" "$@" || true
               }
 
-              probe_health() {
-                base=$1; label=$2; shift 2
-                echo "[$label] waiting for $base/health ..."
+              # $1 base URL, $2 label, $3 path, $4... extra curl args.
+              probe_url() {
+                base=$1; label=$2; path=$3; shift 3
+                echo "[$label] waiting for $base$path ..."
                 i=1
                 while [ "$i" -le "$HEALTH_ATTEMPTS" ]; do
-                  if curl -sf -m 15 -o /dev/null "$@" "$base/health"; then
-                    echo "[$label] /health 200 after $i attempt(s)"
+                  if curl -sf -m 15 -o /dev/null "$@" "$base$path"; then
+                    echo "[$label] $path 200 after $i attempt(s)"
                     return 0
                   fi
                   i=$((i + 1))
                   sleep "$HEALTH_INTERVAL"
                 done
-                fail "[$label] /health never returned 200 after $HEALTH_ATTEMPTS attempts"
+                fail "[$label] $path never returned 200 after $HEALTH_ATTEMPTS attempts"
+              }
+
+              probe_health() {
+                base=$1; label=$2; shift 2
+                probe_url "$base" "$label" /health "$@"
               }
 
               probe_unauthenticated() {
@@ -129,6 +135,11 @@ spec:
               {{- range .Values.events }}
               post_event "$INTERNAL_URL" internal '{{ toJson . }}'
               {{- end }}
+              {{- range .Values.extraProbes }}
+
+              echo "=== in-cluster Service: {{ .name }} ==="
+              probe_url "http://{{ .service }}:{{ .port }}" {{ .name | quote }} {{ .path | default "/health" | quote }}
+              {{- end }}
 
               if [ -n "$EXTERNAL_URL" ]; then
                 echo "=== HTTPRoute + gateway: $EXTERNAL_URL (tls: ${CURL_TLS_OPTS:-system CA store}) ${CONNECT_TO_OPTS} ==="
@@ -139,6 +150,17 @@ spec:
                 post_event "$EXTERNAL_URL" external \
                   '{"title":"Smoke Test","message":"omni-pitcher smoke test — authenticated pitch via the public HTTPRoute","severity":"info","author":"smoke-test","system":"smoke-test","tags":"smoke,external"}' \
                   $CURL_TLS_OPTS $CONNECT_TO_OPTS
+                {{- range .Values.extraProbes }}
+                {{- if .hostname }}
+
+                echo "=== HTTPRoute + gateway: {{ .name }} ({{ .hostname }}) ==="
+                # Same --connect-to target: one gateway serves every hostname,
+                # and the Host header / SNI still carry this component's own
+                # FQDN, so the route match and its certificate are both real.
+                probe_url "https://{{ .hostname }}" {{ printf "%s-external" .name | quote }} {{ .path | default "/health" | quote }} \
+                  $CURL_TLS_OPTS {{ if $ext.connectTo }}--connect-to {{ .hostname }}:443:{{ $ext.connectTo }}:443{{ end }}
+                {{- end }}
+                {{- end }}
               else
                 echo "=== external pass disabled (external.enabled=false) ==="
               fi

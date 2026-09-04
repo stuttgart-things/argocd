@@ -22,6 +22,14 @@ chain.
 | 3 | `POST /pitch` with the bearer token, once per `events` entry | 200/201/202 |
 | 4-6 | the same three through `https://<external.hostname>` | as above, with the certificate verified |
 
+`extraProbes` adds a GET liveness check per entry — on the in-cluster Service,
+and through the HTTPRoute too when the entry carries a `hostname`, which proves
+that component's own route match and certificate. `apps/homerun2/install`
+derives entries for **core-catcher** and **scout** when they are enabled (both
+serve `/health` on port 80 in every published base) and appends whatever else
+you list in `smokeTest.extraProbes`. These are GET-only: the catchers and
+dashboards carry no bearer token, so there is no auth assertion to make.
+
 Probe 2 is the one worth having. A stack whose auth-token Secret never
 materialised looks perfectly healthy — pod Running, `/health` 200 — while
 `/pitch` accepts anything from anyone. Only a negative probe catches that.

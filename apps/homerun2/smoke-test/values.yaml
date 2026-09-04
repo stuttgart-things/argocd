@@ -107,6 +107,22 @@ external:
   # while hiding a broken certificate chain.
   insecure: false
 
+# Additional components to liveness-probe alongside omni-pitcher. Each entry
+# is checked on its in-cluster Service, and — when the external pass is on and
+# `hostname` is set — through the public HTTPRoute as well, which proves that
+# component's own route match and certificate.
+#
+# These are GET-only: the catchers and dashboards carry no bearer token, so
+# there is no auth assertion to make. apps/homerun2/install fills this list in
+# from whichever components are enabled.
+#
+#   - name: core-catcher              label in the log output
+#     service: homerun2-core-catcher  in-cluster Service name
+#     port: 80
+#     path: /health                   optional, defaults to /health
+#     hostname: ""                    FQDN on the HTTPRoute; empty = internal only
+extraProbes: []
+
 # Events posted to /pitch during the authenticated probe. Rendered into the
 # script one `post_event` call per entry, so no JSON parsing happens in sh.
 #
