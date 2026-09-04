@@ -1,0 +1,66 @@
+{{- if and .Values.smokeTest.enabled .Values.omniPitcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- /* connectTo: an explicit override wins; otherwise derive the Cilium
+       gateway's own Service from httpRoute.gateway, because a Cilium
+       L2-announced LoadBalancer VIP is not reachable from Pods on the same
+       cluster. Set `connectToGateway: false` on a cluster whose VIP does
+       hairpin, or whose gateway Service is named by another convention. */}}
+{{- $connectTo := .Values.smokeTest.external.connectTo }}
+{{- if and (not $connectTo) .Values.smokeTest.external.connectToGateway }}
+  {{- $connectTo = printf "cilium-gateway-%s.%s.svc.cluster.local" .Values.httpRoute.gateway.name .Values.httpRoute.gateway.namespace }}
+{{- end }}
+{{- $ext := dict
+      "enabled"      .Values.smokeTest.external.enabled
+      "hostname"     .Values.omniPitcher.hostname
+      "caConfigMap"  .Values.smokeTest.external.caConfigMap
+      "caKey"        .Values.smokeTest.external.caKey
+      "connectTo"    $connectTo
+      "insecure"     .Values.smokeTest.external.insecure
+}}
+{{- $stValues := dict
+      "name"                 (printf "%s-smoke-test" $appName)
+      "namespace"            .Values.destination.namespace
+      "image"                .Values.smokeTest.image
+      "podSecurityContext"   .Values.smokeTest.podSecurityContext
+      "hook"                 .Values.smokeTest.hook
+      "job"                  .Values.smokeTest.job
+      "omniPitcher"          (dict "service" "homerun2-omni-pitcher" "port" 80)
+      "authTokenSecretName"  "homerun2-omni-pitcher-token"
+      "authTokenSecretKey"   "auth-token"
+      "healthCheck"          .Values.smokeTest.healthCheck
+      "unauthenticated"      .Values.smokeTest.unauthenticated
+      "external"             $ext
+      "events"               .Values.smokeTest.events
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-smoke-test" $appName | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # After the components (0) and their routes (10) — the external pass
+    # goes through the HTTPRoute, so the route has to exist first.
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/homerun2/smoke-test
+    helm:
+      releaseName: {{ printf "%s-smoke-test" $appName | quote }}
+      valuesObject:
+        {{- toYaml $stValues | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
