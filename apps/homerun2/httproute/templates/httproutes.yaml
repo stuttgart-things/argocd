@@ -23,7 +23,11 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: {{ .backend.name | quote }}
+          # Same defaulting as on parentRefs above: the admission webhook fills
+          # group and kind in, so a manifest without them never reaches Synced.
+        - group: ""
+          kind: Service
+          name: {{ .backend.name | quote }}
           port: {{ .backend.port }}
           # Render the Gateway API admission default explicitly so we
           # don't drift against the cilium-gateway-controller's
