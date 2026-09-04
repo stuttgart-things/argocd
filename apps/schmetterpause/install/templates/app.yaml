@@ -1,0 +1,99 @@
+{{- $name := include "schmetterpause.appName" . }}
+{{- $ns := .Values.destination.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    # The `oci://` prefix is required — without it Argo treats repoURL as a git
+    # URL and fails with "failed to list refs: repository not found".
+    repoURL: oci://ghcr.io/stuttgart-things/schmetterpause-kustomize
+    targetRevision: {{ .Values.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+        {{- /* Both routes: same Gateway, same hostname, different listener.
+               parentRefs is replaced wholesale rather than field by field, so
+               `sectionName` has to be repeated here — dropping it would attach
+               the route to every listener on the Gateway, which for the
+               redirect route means redirecting HTTPS to HTTPS. */}}
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: schmetterpause
+          patch: |-
+            - op: replace
+              path: /spec/parentRefs
+              value:
+                - group: gateway.networking.k8s.io
+                  kind: Gateway
+                  name: {{ .Values.gateway.name }}
+                  namespace: {{ .Values.gateway.namespace }}
+                  sectionName: https
+            - op: replace
+              path: /spec/hostnames
+              value:
+                - {{ .Values.hostname | quote }}
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: schmetterpause-redirect
+          patch: |-
+            - op: replace
+              path: /spec/parentRefs
+              value:
+                - group: gateway.networking.k8s.io
+                  kind: Gateway
+                  name: {{ .Values.gateway.name }}
+                  namespace: {{ .Values.gateway.namespace }}
+                  sectionName: http
+            - op: replace
+              path: /spec/hostnames
+              value:
+                - {{ .Values.hostname | quote }}
+        {{- /* Both ExternalSecrets read from the same store. */}}
+        {{- range $es := list "schmetterpause-app" "schmetterpause-db" }}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: {{ $es }}
+          patch: |-
+            - op: replace
+              path: /spec/secretStoreRef/kind
+              value: {{ $.Values.secretStore.kind }}
+            - op: replace
+              path: /spec/secretStoreRef/name
+              value: {{ $.Values.secretStore.name }}
+        {{- end }}
+        {{- /* SP_PUBLIC_BASE_URL is what the app puts into absolute links; it
+               has to agree with the hostname the routes answer on. */}}
+        - target:
+            kind: ConfigMap
+            name: schmetterpause-config
+          patch: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: schmetterpause-config
+            data:
+              SP_PUBLIC_BASE_URL: {{ printf "https://%s" .Values.hostname | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

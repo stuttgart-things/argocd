@@ -1,0 +1,5 @@
+apiVersion: v2
+name: schmetterpause-database
+description: CloudNativePG Cluster for schmetterpause. Split out of the published kustomize base on purpose — the base is environment-neutral and the database is the one piece whose every value (storage class, size, instances) is a property of the cluster it lands on. Requires the CNPG operator (infra/cloudnative-pg/install) and the Secret its bootstrap credentials come from.
+type: application
+version: 0.1.0

@@ -1,0 +1,43 @@
+{{- if .Values.database.enabled }}
+{{- $name := include "schmetterpause.appName" . }}
+{{- $dbValues := dict
+      "namespace"             .Values.destination.namespace
+      "name"                  .Values.database.name
+      "instances"             .Values.database.instances
+      "imageName"             .Values.database.imageName
+      "storage"               .Values.database.storage
+      "bootstrap"             .Values.database.bootstrap
+      "enableSuperuserAccess" .Values.database.enableSuperuserAccess
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-db" $name | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Ahead of the app: its Deployment mounts the Secret this database
+    # bootstraps from, and CNPG needs a moment to make the primary ready.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/schmetterpause/database
+    helm:
+      releaseName: {{ printf "%s-db" $name | quote }}
+      valuesObject:
+        {{- toYaml $dbValues | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

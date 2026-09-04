@@ -1,0 +1,5 @@
+apiVersion: v2
+name: schmetterpause-install
+description: App-of-apps entry for schmetterpause. Renders an Argo CD Application over the published kustomize OCI artifact (ghcr.io/stuttgart-things/schmetterpause-kustomize) with the environment patched in, plus a second Application for its CloudNativePG database. Replaces the `task kcl:up` hand-apply path from the schmetterpause repo's docs/deployment.md.
+type: application
+version: 0.1.0
