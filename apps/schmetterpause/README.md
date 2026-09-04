@@ -61,6 +61,13 @@ repository publishes SHAs and no semver tags at all, and renovate cannot order S
 annotation would look like tracking while tracking nothing. Add one once release-please cuts
 real tags ([schmetterpause#39](https://github.com/stuttgart-things/schmetterpause/issues/39)).
 
+The first tag will be **`v0.1.0`**, not `v1.0.0`, and the `0.x` is deliberate upstream: the
+patch surface this chart drives — gateway name, hostname in three places, both
+`secretStoreRef`s, the two listener names — is the interface between the two repositories
+and is still moving. Under `1.0.0` every rename in it would be a major bump and the signal
+would go dead; under `0.x` it is a minor. **So a minor bump of this package can require a
+change here** — do not auto-merge it on the assumption that only majors break.
+
 ## The database is not prunable, on purpose
 
 The CNPG `Cluster` carries `argocd.argoproj.io/sync-options: Prune=false,Delete=false`
