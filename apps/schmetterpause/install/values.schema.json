@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "schmetterpause app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "version", "hostname"],
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL":        { "type": "string", "format": "uri" },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repoURL", "targetRevision"]
+    },
+    "applicationName": { "type": "string", "minLength": 1 },
+    "project":         { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "description": "Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. If both are set (a consumer overriding the default `server` with a `name`), the templates prefer `name`; that is intentional, so a consumer does not have to null out the chart default.",
+      "required": ["namespace"],
+      "anyOf": [
+        { "required": ["server"] },
+        { "required": ["name"] }
+      ]
+    },
+    "syncPolicy": { "type": "object", "additionalProperties": true },
+    "version":    { "type": "string", "minLength": 1, "description": "Tag of the published kustomize artifact; CI gives it and the container image the same commit SHA." },
+    "hostname":   { "type": "string", "minLength": 1, "description": "FQDN patched into both HTTPRoutes and into SP_PUBLIC_BASE_URL." },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["name", "namespace"]
+    },
+    "secretStore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["kind", "name"]
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "CloudNativePG Cluster, rendered as its own Application from apps/schmetterpause/database. Needs the CNPG operator on the target cluster.",
+      "properties": {
+        "enabled":               { "type": "boolean" },
+        "name":                  { "type": "string", "minLength": 1 },
+        "instances":             { "type": "integer", "minimum": 1 },
+        "imageName":             { "type": "string", "minLength": 1 },
+        "enableSuperuserAccess": { "type": "boolean" },
+        "storage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "size":         { "type": "string", "pattern": "^[0-9]+(Mi|Gi|Ti)$" },
+            "storageClass": { "type": "string" }
+          },
+          "required": ["size"]
+        },
+        "bootstrap": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "database":      { "type": "string", "minLength": 1 },
+            "owner":         { "type": "string", "minLength": 1 },
+            "secretName":    { "type": "string", "minLength": 1 },
+            "encoding":      { "type": "string" },
+            "localeCollate": { "type": "string" },
+            "localeCType":   { "type": "string" }
+          },
+          "required": ["database", "owner", "secretName"]
+        }
+      },
+      "required": ["enabled"]
+    }
+  }
+}

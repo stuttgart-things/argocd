@@ -1,0 +1,91 @@
+---
+# Reference back to this catalog repo — the database sub-Application loads
+# apps/schmetterpause/database from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# Base name for the rendered Applications.
+applicationName: schmetterpause
+
+# AppProject both rendered Applications belong to.
+project: default
+
+# Where they deploy. Provide either `server` (cluster URL) or `name` (the
+# Argo-registered cluster name); mutually exclusive per ArgoCD.
+destination:
+  server: https://kubernetes.default.svc
+  # name: homerun2-test1
+  namespace: schmetterpause
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
+
+# Tag of the published kustomize artifact. CI tags the artifact and the
+# container image with the same commit SHA and bakes that image reference into
+# the rendered Deployment — so pinning this pins the application version too,
+# and no image patch is needed here.
+#
+# Deliberately NOT carrying a `# renovate:` comment yet. The repository
+# publishes commit SHAs and no semver tags at all (28 tags, all SHAs), and
+# renovate cannot order SHAs — an annotation would look like tracking while
+# tracking nothing. Add one once release-please cuts real tags
+# (stuttgart-things/schmetterpause#39); until then this pin is updated by hand
+# and that is the honest state.
+version: 59ec952
+
+# FQDN the app is served on. Patched into both HTTPRoutes and into
+# SP_PUBLIC_BASE_URL, which the app uses to build absolute links — the base
+# ships schmetterpause.cluster.example.com in all three places.
+hostname: schmetterpause.cluster.example.com
+
+# Gateway the HTTPRoutes attach to. The base names a Gateway called `gateway`
+# in `default`; `sectionName` is NOT configurable because the two routes must
+# keep the listeners they were rendered for: the main route on `https`, the
+# redirect on `http`.
+gateway:
+  name: gateway
+  namespace: default
+
+# ClusterSecretStore the two ExternalSecrets read from. The base points at
+# `vault-cluster`.
+#
+# The Vault entry name is not patched: the store carries the KV mount, and the
+# base already asks for the entry `schmetterpause` under it. An environment
+# that needs a different entry name should say so upstream rather than here.
+secretStore:
+  kind: ClusterSecretStore
+  name: vault-cluster
+
+# CloudNativePG database, rendered from apps/schmetterpause/database as its own
+# Application at sync-wave -10 — the app's Deployment waits on the Secret the
+# database bootstraps from, so the database goes first.
+#
+# Needs the CNPG operator on the target cluster (infra/cloudnative-pg/install).
+database:
+  enabled: true
+  name: schmetterpause-db
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  storage:
+    size: 8Gi
+    storageClass: ""
+  bootstrap:
+    database: schmetterpause
+    owner: schmetterpause
+    secretName: schmetterpause-db
+    encoding: UTF8
+    localeCollate: C
+    localeCType: C
+  enableSuperuserAccess: false

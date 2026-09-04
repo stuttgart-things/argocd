@@ -1,0 +1,40 @@
+---
+# Namespace the Cluster is created in. Must be the namespace the app runs in:
+# the app's SP_DATABASE_URL points at <name>-rw.<namespace>.svc.
+namespace: schmetterpause
+
+# Name of the CNPG Cluster. Drives the Service names CNPG creates
+# (<name>-rw, -ro, -r), which the app's connection string already encodes —
+# renaming this without renaming it there breaks the app, silently, at the
+# next restart.
+name: schmetterpause-db
+
+instances: 1
+
+# CNPG ships no default image; pin the major explicitly.
+imageName: ghcr.io/cloudnative-pg/postgresql:17
+
+storage:
+  size: 8Gi
+  # Explicit, always. A cluster with two default StorageClasses (which
+  # homerun2-test1 has — local-path and openebs-hostpath both carry the
+  # annotation) gives an unclassed PVC an undefined one of the two.
+  storageClass: openebs-hostpath
+
+bootstrap:
+  database: schmetterpause
+  owner: schmetterpause
+  # Secret holding username/password for the owner role. Materialised by the
+  # app's own ExternalSecret (target `schmetterpause-db`), which also composes
+  # SP_DATABASE_URL from the same two fields — so app and database agree by
+  # construction instead of by two people typing the same password.
+  secretName: schmetterpause-db
+  encoding: UTF8
+  localeCollate: C
+  localeCType: C
+
+# The app connects as the owner role; nothing needs superuser, so it stays off.
+enableSuperuserAccess: false
+
+# Inert pass-through so the catalog verifier's probe values validate.
+destination: {}
