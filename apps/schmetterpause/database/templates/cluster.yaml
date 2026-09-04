@@ -4,6 +4,21 @@ kind: Cluster
 metadata:
   name: {{ .Values.name | quote }}
   namespace: {{ .Values.namespace | quote }}
+  {{- if .Values.protect }}
+  annotations:
+    # The PVC carries an ownerReference to this Cluster, and CNPG has no
+    # retention flag — delete the Cluster and the volume is garbage-collected
+    # with it. Two ordinary GitOps events reach that: the resource falls out of
+    # the render (Prune), or the Application is deleted and its
+    # resources-finalizer cascades (Delete). Both are switched off here, on the
+    # RESOURCE rather than on the Application, so the protection travels with
+    # the object instead of depending on how a consumer wires its sync policy.
+    #
+    # The price is honest: this database has to be removed by hand. For an
+    # object whose deletion cannot be restored from git, that is the right
+    # trade.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+  {{- end }}
 spec:
   instances: {{ .Values.instances }}
   imageName: {{ .Values.imageName | quote }}

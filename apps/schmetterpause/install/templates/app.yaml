@@ -39,7 +39,7 @@ spec:
                   kind: Gateway
                   name: {{ .Values.gateway.name }}
                   namespace: {{ .Values.gateway.namespace }}
-                  sectionName: https
+                  sectionName: {{ .Values.gateway.sectionNameHTTPS }}
             - op: replace
               path: /spec/hostnames
               value:
@@ -57,7 +57,7 @@ spec:
                   kind: Gateway
                   name: {{ .Values.gateway.name }}
                   namespace: {{ .Values.gateway.namespace }}
-                  sectionName: http
+                  sectionName: {{ .Values.gateway.sectionNameHTTP }}
             - op: replace
               path: /spec/hostnames
               value:
@@ -102,6 +102,10 @@ spec:
   # server-side-applying cleanly. Observed on homerun2-test1: 7 of 8 resources
   # Synced, this one not. The main route declares its own matches and needs no
   # such exception.
+  # REMOVE THIS once `version` is pinned past 59ec952: the base declares the
+  # matches itself as of stuttgart-things/schmetterpause#168. Kept only for
+  # tags that predate it — left in place beyond that, the exception would hide
+  # a real deviation at exactly this field.
   ignoreDifferences:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute

@@ -34,10 +34,10 @@ Five patches, all of them places where the base names a placeholder:
 | `schmetterpause.cluster.example.com` (2 routes + `SP_PUBLIC_BASE_URL`) | `.Values.hostname` |
 | `secretStoreRef.name: vault-cluster` on both ExternalSecrets | `.Values.secretStore.name` / `.kind` |
 
-`sectionName` is **not** configurable: the main route belongs on the Gateway's `https`
-listener and the redirect on `http`. The patches replace `parentRefs` wholesale, so both
-repeat it — drop it and the redirect route would attach to every listener, redirecting
-HTTPS to HTTPS.
+The listener names come from `gateway.sectionNameHTTPS` / `sectionNameHTTP`. The patches
+replace `parentRefs` wholesale, so they have to be repeated — and getting them wrong is the
+quiet kind of wrong: both routes attach to *every* listener and the redirect sends HTTPS
+back to HTTPS, a loop with nothing red anywhere.
 
 The image is **not** patched. CI tags the artefact and the container image with the same
 commit SHA and bakes that reference into the Deployment, so `version` pins both.
@@ -60,6 +60,21 @@ when the entry is used for a single cluster and you want a readable name.
 repository publishes SHAs and no semver tags at all, and renovate cannot order SHAs — an
 annotation would look like tracking while tracking nothing. Add one once release-please cuts
 real tags ([schmetterpause#39](https://github.com/stuttgart-things/schmetterpause/issues/39)).
+
+## The database is not prunable, on purpose
+
+The CNPG `Cluster` carries `argocd.argoproj.io/sync-options: Prune=false,Delete=false`
+(`database.protect`, on by default). The PVC has an ownerReference to the Cluster and CNPG
+has no retention flag, so deleting the Cluster garbage-collects the volume — and two
+ordinary GitOps events reach that: the resource falling out of the render, or the
+Application being deleted and its `resources-finalizer` cascading. The annotation sits on
+the resource rather than the Application, so the protection travels with the object instead
+of depending on how a consumer wires its sync policy. The price: this database has to be
+removed by hand.
+
+The same reasoning is why the published artefact ships no `Cluster` at all — the upstream
+`kcl/database.k` is a separate entry point precisely so that no value anyone sets can put
+one into the base.
 
 ## Cluster preconditions
 
