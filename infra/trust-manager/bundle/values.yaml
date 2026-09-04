@@ -19,7 +19,14 @@ bundles: []
 
 # When set to the string "true" (or boolean true), every Bundle rendered by
 # this chart gets an additional `secret: { name: vault-pki-ca, key: ca.crt }`
-# source appended. Used by appset-trust-manager-bundle to conditionally
-# include the Vault PKI root CA on clusters with
-# `network-platform/cert-manager-vault-pki=true`. Default off.
+# source appended. Used by appset-trust-manager-bundle to include the Vault
+# PKI root CA on clusters whose gateway certificate is Vault-signed — either
+# `network-platform/cert-manager-vault-pki=true` (this AppSet family owns the
+# issuer) or the annotation `clusterbook.stuttgart-things.com/wildcard-issuer-name`
+# starting with `vault-pki` (the ClusterStack XR created `vault-pki-k8s`
+# instead). Without it such a cluster cannot verify its OWN gateway from the
+# inside. Default off.
+#
+# The Secret must exist in the trust namespace: a source pointing at a missing
+# Secret makes trust-manager stop syncing the whole Bundle.
 includeVaultPkiCa: "false"
