@@ -37,6 +37,14 @@ components:
   # redis-stack auth Secret consumed by the Bitnami chart's
   # `auth.existingSecret` path. Key MUST be `redis-password` (Bitnami's
   # default `auth.existingSecretPasswordKey`); change both if overriding.
+  # scout's /analytics/* endpoints take the same bearer token as
+  # omni-pitcher's /pitch. Its kustomize base ships the Secret containing the
+  # literal `changeme` and apps/homerun2/install deletes it, so in a preview
+  # namespace this ExternalSecret is the only thing that creates it.
+  - name: scout-token
+    secretName: homerun2-scout-token
+    dataKey: auth-token
+    vaultProperty: authToken
   - name: redis-stack-auth
     secretName: redis-stack-auth
     dataKey: redis-password

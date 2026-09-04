@@ -181,6 +181,17 @@ spec:
                         secretName: homerun2-scout-redis
                         dataKey: password
                         vaultProperty: redisPassword
+                      # Required since stuttgart-things/argocd#348: the chart
+                      # now deletes the `changeme` token Secret scout's base
+                      # ships, so nothing else creates it here — without this
+                      # entry the preview pod cannot resolve its AUTH_TOKEN
+                      # secretKeyRef and never starts. It also gives the
+                      # scout-verify Job a real token instead of the
+                      # placeholder for /analytics/summary.
+                      - name: scout-token
+                        secretName: homerun2-scout-token
+                        dataKey: auth-token
+                        vaultProperty: authToken
 
                 - releaseName: homerun2-scout-preview-seed-data
                   component: scout
