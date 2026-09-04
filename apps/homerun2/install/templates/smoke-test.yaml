@@ -31,6 +31,15 @@
 {{- if .Values.scout.enabled }}
   {{- $probes = append $probes (dict "name" "scout" "service" "homerun2-scout" "port" 80 "path" "/health" "hostname" (ternary .Values.scout.hostname "" .Values.httpRoute.enabled)) }}
 {{- end }}
+{{- /* light-catcher and wled-mock answer on /healthz, not /health — checked
+       against light-catcher v1.0.0 and wled-mock v1.0.0. Getting this wrong
+       fails the smoke test on a perfectly healthy component. */}}
+{{- if .Values.lightCatcher.enabled }}
+  {{- $probes = append $probes (dict "name" "light-catcher" "service" "homerun2-light-catcher" "port" 80 "path" "/healthz" "hostname" (ternary .Values.lightCatcher.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
+{{- if .Values.wledMock.enabled }}
+  {{- $probes = append $probes (dict "name" "wled-mock" "service" "homerun2-wled-mock" "port" 80 "path" "/healthz" "hostname" (ternary .Values.wledMock.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
 {{- $probes = concat $probes .Values.smokeTest.extraProbes }}
 {{- $stValues := dict
       "name"                 (printf "%s-smoke-test" $appName)

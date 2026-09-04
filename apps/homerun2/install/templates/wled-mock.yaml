@@ -21,6 +21,15 @@ spec:
     kustomize:
       namespace: {{ $ns | quote }}
       patches:
+        # Like scout, wled-mock's base ships its own Namespace. Left in place
+        # this Application would OWN homerun2 and `prune: true` would delete
+        # it — with the whole stack in it — as soon as wledMock is disabled.
+        # The parent chart creates the namespace via CreateNamespace=true.
+        - target:
+            kind: Namespace
+            name: {{ $ns }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Namespace" "name" $ns) | indent 12 }}
         - target:
             kind: Deployment
             name: {{ $name }}
