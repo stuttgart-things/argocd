@@ -174,6 +174,20 @@
       },
       "required": ["enabled"]
     },
+    "notificationCatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Redis Streams consumer that fans messages out to MS Teams / generic webhooks — the other half of the Alertmanager/Grafana chain. No Service and no route. Needs the notify ConfigMap out-of-band and a Secret carrying the webhook URL.",
+      "properties": {
+        "enabled":         { "type": "boolean" },
+        "version":         { "type": "string", "minLength": 1 },
+        "redisStream":     { "type": "string", "minLength": 1 },
+        "dryRun":          { "type": "boolean" },
+        "notifyConfigMap": { "type": "string", "minLength": 1 },
+        "teamsWebhookUrl": { "type": "string", "description": "Empty deletes the Secret the base ships, so an out-of-band/ESO-managed one of the same name takes over. Inline literals only via ArgoCD Vault Plugin / SOPS." }
+      },
+      "required": ["enabled"]
+    },
     "gitPitcher": {
       "type": "object",
       "additionalProperties": false,

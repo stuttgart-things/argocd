@@ -219,6 +219,33 @@ ledCatcher:
   # rendering in the kustomize base).
   inlineHttpRoute: false
 
+# notification-catcher (Redis Streams consumer → MS Teams / generic webhooks).
+# The other half of the Alertmanager/Grafana chain: omni-pitcher takes the
+# alert, this fans it out. No Service and no route — it only consumes.
+notificationCatcher:
+  enabled: false
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
+  version: v3.0.0
+  # Stream to consume. `messages` is where omni-pitcher's default_stream puts
+  # everything; a cluster that routes alerts onto their own stream (the flux
+  # side sends /pitch/grafana to `alerts`) sets that here instead.
+  redisStream: messages
+  # true = log what would be sent and send nothing. Worth leaving on until the
+  # notify config below is known-good, because the first wrong filter posts to
+  # a real Teams channel.
+  dryRun: false
+  # ConfigMap holding config.yaml — which stream entries go to which webhook,
+  # with filters. NOT created by this chart: it is cluster-specific, the same
+  # way k8sPitcherProfileConfigMap is. Provision it out-of-band; see the README
+  # for the shape.
+  notifyConfigMap: homerun2-notification-catcher-notify
+  # Webhook URL. Empty (the default) deletes the Secret the base ships, so an
+  # out-of-band or ESO-managed `homerun2-notification-catcher-secrets` takes
+  # over — which is the right way round for a credential. Setting it here
+  # inlines a literal, so only do that from an ArgoCD Vault Plugin / SOPS
+  # overlay.
+  teamsWebhookUrl: ""                       # pragma: allowlist secret
+
 # git-pitcher (watches Git repos → Redis Streams).
 gitPitcher:
   enabled: false
