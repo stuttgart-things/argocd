@@ -56,17 +56,16 @@ when the entry is used for a single cluster and you want a readable name.
 
 ## Pinning
 
-`version` is a commit SHA and carries **no** `# renovate:` comment on purpose. The
-repository publishes SHAs and no semver tags at all, and renovate cannot order SHAs — an
-annotation would look like tracking while tracking nothing. Add one once release-please cuts
-real tags ([schmetterpause#39](https://github.com/stuttgart-things/schmetterpause/issues/39)).
+`version` pins the published kustomize artefact — and with it the application, because CI
+gives artefact and image the same tag and bakes the image reference into the Deployment.
 
-The first tag will be **`v0.1.0`**, not `v1.0.0`, and the `0.x` is deliberate upstream: the
-patch surface this chart drives — gateway name, hostname in three places, both
-`secretStoreRef`s, the two listener names — is the interface between the two repositories
-and is still moving. Under `1.0.0` every rename in it would be a major bump and the signal
-would go dead; under `0.x` it is a minor. **So a minor bump of this package can require a
-change here** — do not auto-merge it on the assumption that only majors break.
+Upstream is **pre-1.0**, and that changes what a bump means here. The patch surface this
+chart drives — gateway name, hostname in three places, both `secretStoreRef`s, the two
+listener names — *is* the interface between the two repositories, and it is still moving.
+Under `0.x` a rename in it is a **minor** bump, not a major. `renovate.json` therefore keeps
+`schmetterpause` and `schmetterpause-kustomize` out of the shared `stuttgart-things images`
+group and off auto-merge, so such a bump arrives as its own reviewable PR rather than inside
+a batch title. Fold them back in once upstream reaches 1.0.0.
 
 ## The database is not prunable, on purpose
 

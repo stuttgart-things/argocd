@@ -60,6 +60,21 @@
       "addLabels": [
         "platform-promotion"
       ]
+    },
+    {
+      "description": "schmetterpause is pre-1.0, and its patch surface IS the interface apps/schmetterpause/install drives: gateway name, hostname in three places, both secretStoreRefs, the two listener names. Under 0.x a rename in that surface is a MINOR bump, not a major - so a minor here can require a chart change and must not ride along on the patch auto-merge rule, nor disappear into the shared 'stuttgart-things images' group where a reviewer sees only a batch title. Fold these back in once upstream reaches 1.0.0.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/stuttgart-things/schmetterpause",
+        "ghcr.io/stuttgart-things/schmetterpause-kustomize"
+      ],
+      "groupName": "schmetterpause",
+      "automerge": false,
+      "addLabels": [
+        "interface-surface"
+      ]
     }
   ]
 }
