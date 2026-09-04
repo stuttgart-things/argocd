@@ -75,6 +75,9 @@ spec:
     server: {{ .Values.destination.server | quote }}
     {{- end }}
     namespace: {{ $ns | quote }}
+{{- if .Values.scout.inlineHttpRoute }}
+  {{- include "homerun2.inlineRouteIgnoreDifferences" $name | nindent 2 }}
+{{- end }}
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
 {{- end }}

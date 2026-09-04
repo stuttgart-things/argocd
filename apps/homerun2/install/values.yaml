@@ -26,6 +26,9 @@ syncPolicy:
   syncOptions:
     - CreateNamespace=true
     - ServerSideApply=true
+    # Honour the chart's ignoreDifferences during sync and selfHeal, so the
+    # controller never tries to rewrite fields the API server owns.
+    - RespectIgnoreDifferences=true
   retry:
     limit: 5
     backoff:

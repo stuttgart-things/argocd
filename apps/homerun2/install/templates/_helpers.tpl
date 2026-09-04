@@ -138,3 +138,34 @@ Usage: include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" 
 -}}
 {{ toYaml $patch }}
 {{- end -}}
+
+{{/*
+homerun2.inlineRouteIgnoreDifferences -- server-defaulted fields on an HTTPRoute
+that the kustomize OCI base does not declare.
+
+A base whose route omits `group`/`kind` on parentRefs/backendRefs (and `weight`
+on a backendRef) gets them defaulted by the API server, so the Application is
+permanently OutOfSync while server-side-applying cleanly every time. Whether it
+bites depends on the base: omni-pitcher v2.0.0 spells all of them out and stays
+Synced; core-catcher v1.0.0 spells none of them out and does not.
+
+The standalone httproute sub-chart solves the same problem the other way, by
+rendering `weight` explicitly (see stuttgart-things/argocd#114). That is not
+available here — the route lives inside the OCI artifact — and enumerating the
+rest would mean tracking Gateway API defaulting rules per version in a JSON
+patch, so these are ignored instead of asserted.
+
+Usage: include "homerun2.inlineRouteIgnoreDifferences" "homerun2-core-catcher"
+*/}}
+{{- define "homerun2.inlineRouteIgnoreDifferences" -}}
+ignoreDifferences:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: {{ . | quote }}
+    jqPathExpressions:
+      - .spec.parentRefs[].group
+      - .spec.parentRefs[].kind
+      - .spec.rules[].backendRefs[].group
+      - .spec.rules[].backendRefs[].kind
+      - .spec.rules[].backendRefs[].weight
+{{- end -}}
