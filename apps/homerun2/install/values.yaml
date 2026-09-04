@@ -87,7 +87,8 @@ redisStack:
 # omni-pitcher (HTTP gateway → Redis Streams).
 omniPitcher:
   enabled: true
-  version: v1.6.2
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-omni-pitcher
+  version: v2.0.0
   hostname: omni-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the omni-pitcher kustomize OCI (parentRef +
@@ -99,8 +100,10 @@ omniPitcher:
 # core-catcher (Redis Streams consumer + web dashboard).
 coreCatcher:
   enabled: true
-  version: v0.8.0
-  kustomizeVersion: v0.7.1               # may differ from image tag (e.g. -web suffix on older versions)
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-core-catcher
+  version: v1.0.0
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-core-catcher-kustomize
+  kustomizeVersion: v1.0.0               # may differ from image tag (e.g. -web suffix on older versions)
   hostname: core-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the core-catcher kustomize OCI (parentRef +
@@ -121,7 +124,8 @@ coreCatcher:
 # scout (web dashboard / monitoring).
 scout:
   enabled: true
-  version: v0.7.0
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-scout
+  version: v0.8.2
   hostname: scout.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the scout kustomize OCI (parentRef +
@@ -136,7 +140,8 @@ scout:
 # namespace from the rest of the stack; override `namespace` if needed.
 k8sPitcher:
   enabled: false
-  version: v0.4.0
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
+  version: v1.0.0
   namespace: homerun2
   # When true, keep the K8sPitcherProfile ConfigMap shipped inside the
   # k8s-pitcher kustomize OCI instead of deleting it and remounting an
@@ -149,7 +154,8 @@ k8sPitcher:
 # light-catcher (Redis Streams consumer → WLED HTTP).
 lightCatcher:
   enabled: false
-  version: v0.3.0
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-light-catcher
+  version: v1.0.0
   hostname: light-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the light-catcher kustomize OCI (parentRef +
@@ -167,13 +173,15 @@ lightCatcher:
 # pin below that 404s on resolve.
 wledMock:
   enabled: false
-  version: v0.7.1
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-wled-mock
+  version: v1.0.0
   hostname: wled-mock.example.com
 
 # demo-pitcher (web UI for manually pitching messages to Redis Streams).
 demoPitcher:
   enabled: false
-  version: v1.4.0
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-demo-pitcher
+  version: v2.0.0
   hostname: demo-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the demo-pitcher kustomize OCI (parentRef +
@@ -196,7 +204,8 @@ demoPitcher:
 # led-catcher (Redis Streams consumer → LED display).
 ledCatcher:
   enabled: false
-  version: v0.1.1
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-led-catcher
+  version: v0.2.2
   hostname: led-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the led-catcher kustomize OCI (parentRef +
@@ -210,7 +219,8 @@ ledCatcher:
 # git-pitcher (watches Git repos → Redis Streams).
 gitPitcher:
   enabled: false
-  version: v0.5.0
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-git-pitcher
+  version: v1.0.0
   hostname: git-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the git-pitcher kustomize OCI (parentRef +
