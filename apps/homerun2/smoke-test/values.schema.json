@@ -32,10 +32,10 @@
       "additionalProperties": false,
       "properties": {
         "backoffLimit":            { "type": "integer", "minimum": 0 },
-        "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+        "ttlSecondsAfterFinished": { "type": ["integer", "null"], "minimum": 0, "description": "Null = no TTL, the finished Job stays as the record. A number makes the test recurring: the Job is GC'd, ArgoCD recreates it, the test re-runs." },
         "activeDeadlineSeconds":   { "type": "integer", "minimum": 1 }
       },
-      "required": ["backoffLimit", "ttlSecondsAfterFinished", "activeDeadlineSeconds"]
+      "required": ["backoffLimit", "activeDeadlineSeconds"]
     },
     "omniPitcher": {
       "type": "object",

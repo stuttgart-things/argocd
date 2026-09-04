@@ -254,9 +254,13 @@ secrets:
 # the bearer token, and — with `external.enabled` — repeats all three
 # through the public HTTPRoute with TLS verified against the trust bundle.
 #
-# The Job is an ArgoCD PostSync hook (`hook.enabled`), so it re-runs on
-# every sync of that Application: the `helm test` idea without Helm. A
-# failed assertion fails the sync, which is the signal you want.
+# The Job is rendered as a REGULAR resource of its own Application, not as
+# a PostSync hook: an Application whose desired state is only hooks has
+# nothing to apply, so ArgoCD reports it Synced without running a sync
+# operation and the hook never fires (observed on homerun2-test1). As a
+# regular resource it runs on creation and ArgoCD's Job health check turns
+# a failed assertion into a Degraded Application — the signal we want.
+# Re-run it by deleting the Job; automated sync recreates it.
 #
 # Requires the omni-pitcher auth-token Secret to exist in
 # `destination.namespace` — i.e. either `authToken` inline or
@@ -271,11 +275,13 @@ smokeTest:
     runAsUser: 100
     runAsGroup: 101
   hook:
-    enabled: true
+    enabled: false
     deletePolicy: BeforeHookCreation
   job:
     backoffLimit: 2
-    ttlSecondsAfterFinished: 86400
+    # Empty = no TTL. A number makes the test recurring: the Job is
+    # garbage-collected, ArgoCD sees the drift and recreates it.
+    ttlSecondsAfterFinished: null
     activeDeadlineSeconds: 900
   healthCheck:
     attempts: 60

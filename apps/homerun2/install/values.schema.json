@@ -239,7 +239,7 @@
           "additionalProperties": false,
           "properties": {
             "backoffLimit":            { "type": "integer", "minimum": 0 },
-            "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+            "ttlSecondsAfterFinished": { "type": ["integer", "null"], "minimum": 0 },
             "activeDeadlineSeconds":   { "type": "integer", "minimum": 1 }
           }
         },
