@@ -72,6 +72,8 @@ Each enabled non-redis-stack component renders one Argo CD `Application` whose s
 6. **(k8s-pitcher only) trust-bundle volume + profile ConfigMap reference + webhook port + delete the KCL profile CM** — the calling side provides its own `K8sPitcherProfile` ConfigMap (cluster-specific config)
 7. **(git-pitcher only) Namespace delete** — the base creates its own `homerun2` Namespace; we strip it because the parent stack manages the namespace via the install chart's destination
 
+Every `<component>.version` default now carries a `# renovate:` comment, so the catalog defaults track upstream releases instead of ageing silently. The chart uses one `version` for both the image tag and the kustomize OCI tag, which holds because both artifacts ship from the same Release workflow — `coreCatcher` is the exception and takes a separate `kustomizeVersion`.
+
 `coreCatcher` is the only component that takes a separate `kustomizeVersion` from its image `version`. Earlier core-catcher kustomize tags used a `-web` suffix to enable web mode; recent tags accept `CATCHER_MODE: web` via env (which the chart sets unconditionally), so usually `kustomizeVersion == version`.
 
 ## Consumer usage
