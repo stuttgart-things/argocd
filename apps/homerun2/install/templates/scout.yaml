@@ -26,6 +26,16 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "networking.k8s.io/v1" "kind" "Ingress" "name" $name) | indent 12 }}
+        # scout is the only base that ships its own Namespace. Left in place
+        # this Application would OWN homerun2, and `prune: true` would delete
+        # the namespace — with the whole stack inside it — the moment scout is
+        # disabled. The parent chart creates the namespace via
+        # CreateNamespace=true on the destination instead.
+        - target:
+            kind: Namespace
+            name: {{ $ns }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Namespace" "name" $ns) | indent 12 }}
 {{- if .Values.scout.inlineHttpRoute }}
         # Option B from stuttgart-things/argocd#116 — kustomize OCI ships the
         # HTTPRoute alongside Service so they land atomically. Patch parentRef
@@ -50,6 +60,23 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.scout.version) | indent 12 }}
+{{- /* The base ships homerun2-scout-token with a literal `changeme`, and
+       scout's /analytics/* endpoints are the only thing that Secret guards.
+       Patch it from .Values.authToken, or delete it so an ESO-managed Secret
+       of the same name takes over — never ship the placeholder. */}}
+{{- if .Values.authToken }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.authTokenPatch" (dict "secretName" (printf "%s-token" $name) "token" .Values.authToken) | indent 12 }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-token" $name)) | indent 12 }}
+{{- end }}
 {{- if .Values.redisPassword }}
         - target:
             kind: Secret

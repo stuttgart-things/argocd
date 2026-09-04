@@ -52,7 +52,7 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `redisStack` | Redis Stack with Sentinel — the bus everything pitches/catches over (delegates to `apps/redis-stack/install`) | no | no |
 | `omniPitcher` | HTTP `/pitch` API gateway | yes | yes |
 | `coreCatcher` | Redis Streams consumer + web dashboard | yes | no |
-| `scout` | Web dashboard / monitoring | yes | no |
+| `scout` | RediSearch analytics API — severity/system/alert aggregates + Prometheus `/metrics` for Grafana | yes | yes |
 | `k8sPitcher` | Watches K8s API (informers/collectors) → pitches to omni | no | yes |
 | `lightCatcher` | Redis Streams consumer → WLED HTTP | yes | no |
 | `wledMock` | Mock WLED device + dashboard (dev) | yes | no |
@@ -70,7 +70,9 @@ Each enabled non-redis-stack component renders one Argo CD `Application` whose s
 4. **(omni + k8s only) Auth-token Secret patch** — patches the per-component `*-token` Secret's `auth-token` key with `.Values.authToken`
 5. **(most) Ingress + KCL HTTPRoute deletes** — the bases ship a default Ingress and/or HTTPRoute; we always strip them and ship our own through the httpRoute sub-Application
 6. **(k8s-pitcher only) trust-bundle volume + profile ConfigMap reference + webhook port + delete the KCL profile CM** — the calling side provides its own `K8sPitcherProfile` ConfigMap (cluster-specific config)
-7. **(git-pitcher only) Namespace delete** — the base creates its own `homerun2` Namespace; we strip it because the parent stack manages the namespace via the install chart's destination
+7. **(scout only) Namespace delete** — scout's base ships its own `homerun2` Namespace; we strip it, because otherwise the scout Application owns the namespace and `prune: true` would take the whole stack down with it when scout is disabled. The parent stack manages the namespace via `CreateNamespace=true` on the destination. (git-pitcher's base used to ship one too; as of v1.0.0 it no longer does.)
+
+8. **(scout only) Auth-token Secret** — same treatment as omni-pitcher: patched from `authToken`, or deleted so an ESO-managed Secret takes over. The base ships a literal `changeme`, and that Secret is the only thing guarding `/analytics/*`
 
 Every `<component>.version` default now carries a `# renovate:` comment, so the catalog defaults track upstream releases instead of ageing silently. The chart uses one `version` for both the image tag and the kustomize OCI tag, which holds because both artifacts ship from the same Release workflow — `coreCatcher` is the exception and takes a separate `kustomizeVersion`.
 
