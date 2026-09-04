@@ -45,6 +45,15 @@ commit SHA and bakes that reference into the Deployment, so `version` pins both.
 The Vault entry name is not patched either: the ClusterSecretStore carries the KV mount and
 the base asks for the entry `schmetterpause` under it.
 
+## Application names
+
+`applicationName` defaults to empty, which derives `schmetterpause-<sha1(destination)[:8]>`.
+Both Applications live in the `argocd` namespace of **one** management cluster, so a fixed
+name would make two clusters' deployments of this app collide on the same object. The
+catalog verifier fails a chart whose names do not vary with the destination (argocd#41) —
+it caught exactly that in the first version of this chart. Set `applicationName` explicitly
+when the entry is used for a single cluster and you want a readable name.
+
 ## Pinning
 
 `version` is a commit SHA and carries **no** `# renovate:` comment on purpose. The

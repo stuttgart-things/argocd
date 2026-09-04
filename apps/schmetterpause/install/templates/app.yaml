@@ -1,4 +1,4 @@
-{{- $name := .Values.applicationName }}
+{{- $name := include "schmetterpause.appName" . }}
 {{- $ns := .Values.destination.namespace }}
 ---
 apiVersion: argoproj.io/v1alpha1

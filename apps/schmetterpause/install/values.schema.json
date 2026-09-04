@@ -14,7 +14,7 @@
       },
       "required": ["repoURL", "targetRevision"]
     },
-    "applicationName": { "type": "string", "minLength": 1 },
+    "applicationName": { "type": "string", "description": "Empty = derive from the destination (schmetterpause-<sha1[:8]>), so two clusters cannot collide in the management cluster's argocd namespace." },
     "project":         { "type": "string", "minLength": 1 },
     "destination": {
       "type": "object",

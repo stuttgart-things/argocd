@@ -1,5 +1,5 @@
 {{- if .Values.database.enabled }}
-{{- $name := .Values.applicationName }}
+{{- $name := include "schmetterpause.appName" . }}
 {{- $dbValues := dict
       "namespace"             .Values.destination.namespace
       "name"                  .Values.database.name

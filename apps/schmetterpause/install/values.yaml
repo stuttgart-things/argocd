@@ -5,8 +5,13 @@ catalog:
   repoURL: https://github.com/stuttgart-things/argocd.git
   targetRevision: HEAD
 
-# Base name for the rendered Applications.
-applicationName: schmetterpause
+# Base name for the rendered Applications. Empty means derive it from the
+# destination as `schmetterpause-<sha1(destination)[:8]>`, because both
+# Applications land in the `argocd` namespace of ONE management cluster: a fixed
+# name would make two clusters' deployments of this app collide on the same
+# object. Set it to something readable when this catalog entry is used for a
+# single cluster — that is what the homerun2-test1 consumer does.
+applicationName: ""
 
 # AppProject both rendered Applications belong to.
 project: default
