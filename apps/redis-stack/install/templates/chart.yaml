@@ -177,5 +177,17 @@ spec:
     server: {{ .Values.destination.server | quote }}
     {{- end }}
     namespace: {{ .Values.destination.namespace | quote }}
+  # The API server stamps apiVersion/kind/status onto every
+  # volumeClaimTemplate, and the Helm-rendered StatefulSet declares none of
+  # them, so the Application sits OutOfSync forever while server-side-applying
+  # cleanly on every sync. Nothing here can assert those fields — they are
+  # status and server-owned type metadata — so they are ignored.
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jqPathExpressions:
+        - .spec.volumeClaimTemplates[].apiVersion
+        - .spec.volumeClaimTemplates[].kind
+        - .spec.volumeClaimTemplates[].status
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
