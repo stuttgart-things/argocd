@@ -95,5 +95,18 @@ spec:
     server: {{ .Values.destination.server | quote }}
     {{- end }}
     namespace: {{ $ns | quote }}
+  # The redirect route declares no `matches` — it redirects everything on the
+  # hostname — and the API server defaults one in (PathPrefix /). The rendered
+  # manifest cannot carry it without asserting a match the base deliberately
+  # leaves open, so the Application would sit OutOfSync forever while
+  # server-side-applying cleanly. Observed on homerun2-test1: 7 of 8 resources
+  # Synced, this one not. The main route declares its own matches and needs no
+  # such exception.
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: schmetterpause-redirect
+      jqPathExpressions:
+        - .spec.rules[].matches
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
