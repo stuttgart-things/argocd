@@ -46,11 +46,21 @@ syncPolicy:
 # and no image patch is needed here.
 #
 # Deliberately NOT carrying a `# renovate:` comment yet. The repository
-# publishes commit SHAs and no semver tags at all (28 tags, all SHAs), and
-# renovate cannot order SHAs — an annotation would look like tracking while
-# tracking nothing. Add one once release-please cuts real tags
-# (stuttgart-things/schmetterpause#39); until then this pin is updated by hand
-# and that is the honest state.
+# publishes commit SHAs and no semver tags at all, and renovate cannot order
+# SHAs — an annotation would look like tracking while tracking nothing. Add one
+# once release-please cuts real tags (stuttgart-things/schmetterpause#39).
+#
+# When that happens the first tag is v0.1.0, NOT v1.0.0, and the 0.x is
+# deliberate upstream: the patch surface this chart drives — gateway name,
+# hostname in three places, both secretStoreRefs, the two listener names — is
+# the interface between us, and it is still moving. Under 1.0.0 every rename in
+# it would be a major bump and the signal would go dead; under 0.x it is a
+# minor.
+#
+# So when the annotation goes in: a MINOR bump of this package can require a
+# change here. Do not let it auto-merge on the assumption that only majors
+# break — the repo-wide rule that auto-merges patch updates is fine, minor is
+# not.
 version: 59ec952
 
 # FQDN the app is served on. Patched into both HTTPRoutes and into
