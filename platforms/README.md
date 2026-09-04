@@ -51,7 +51,7 @@ component at `'false'` rather than omitting it.
 | `network-platform/cert-manager-cluster-ca` | `appset-cert-manager-cluster-ca` | `…/fqdn` *(auto)*, `…/wildcard-issuer-name` **(user)** |
 | `network-platform/cert-manager-vault-pki` | `appset-cert-manager-vault-pki` | `…/vault-server`, `…/vault-pki-path`, `…/vault-token-secret` **(user)** |
 | `network-platform/trust-manager-install` | `appset-trust-manager-install` | — |
-| `network-platform/trust-manager-bundle` | `appset-trust-manager-bundle` | — |
+| `network-platform/trust-manager-bundle` | `appset-trust-manager-bundle` | — (auto-adds the Vault PKI CA when `…/cert-manager-vault-pki` is `'true'` **or** `…/wildcard-issuer-name` starts with `vault-pki`; that Secret must exist on the target) |
 
 ### `storage-platform`
 | Label | AppSet | Needs annotations |

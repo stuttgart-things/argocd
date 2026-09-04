@@ -35,14 +35,38 @@ spec:
         path: infra/trust-manager/bundle
         helm:
           valuesObject:
-            # When the cluster has `network-platform/cert-manager-vault-pki=true`
-            # the chart appends an extra source pointing at the Vault PKI CA
-            # Secret (produced by either the cert-manager-vault-pki AppSet's
-            # chart or the create-vault-issuer workflow step). Templated as
-            # a quoted string so the manifest stays valid YAML for kustomize
-            # build; ArgoCD's goTemplate substitutes the value at App-create
-            # time before the chart renders.
-            includeVaultPkiCa: '{{ if eq (index .metadata.labels "network-platform/cert-manager-vault-pki") "true" }}true{{ else }}false{{ end }}'
+            # Append a source pointing at the Vault PKI CA Secret
+            # (`vault-pki-ca` in cert-manager) when this cluster's gateway
+            # certificate is signed by Vault — otherwise the cluster ends up
+            # with a trust bundle that cannot verify its own gateway.
+            #
+            # TWO ways a cluster gets a Vault issuer, and the label only knows
+            # about the first:
+            #   1. `network-platform/cert-manager-vault-pki=true` — this AppSet
+            #      family deploys the `vault-pki` ClusterIssuer itself.
+            #   2. the ClusterStack XR's `vaultIssuer` branch creates
+            #      `vault-pki-k8s` (tokenless, Kubernetes auth) and the cluster
+            #      carries `wildcard-issuer-name: vault-pki*` while the label
+            #      above stays 'false' — deliberately, because the AppSet's
+            #      issuer would want a static token Secret on the target.
+            # Case 2 produced the Secret all the same, so gate on either.
+            #
+            # PRECONDITION: `vault-pki-ca` must exist in the trust namespace on
+            # the target. A Bundle source pointing at a missing Secret makes
+            # trust-manager stop syncing the WHOLE bundle, so do not set the
+            # annotation on a cluster that has no Vault CA.
+            #
+            # Templated as a quoted string so the manifest stays valid YAML for
+            # kustomize build; ArgoCD's goTemplate substitutes the value at
+            # App-create time before the chart renders. `index` (not `hasKey`)
+            # because `.metadata.annotations` is map[string]string. The two
+            # coercions are load-bearing: `default (dict)` survives a cluster
+            # with no annotations at all, and `toString` survives `index`
+            # returning an untyped nil for an absent key — without it
+            # `hasPrefix` aborts the template with "invalid value; expected
+            # string" and the AppSet then generates NOTHING, for every
+            # cluster. Both cases verified against Go template + sprig.
+            includeVaultPkiCa: '{{ if or (eq (toString (index .metadata.labels "network-platform/cert-manager-vault-pki")) "true") (hasPrefix "vault-pki" (toString (index (default (dict) .metadata.annotations) "clusterbook.stuttgart-things.com/wildcard-issuer-name"))) }}true{{ else }}false{{ end }}'
             bundles:
               - name: cluster-trust-bundle
                 spec:
