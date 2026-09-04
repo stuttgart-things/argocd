@@ -217,7 +217,7 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `k8sPitcher.namespace` | `homerun2` | Optional override — k8s-pitcher often runs in a different namespace |
 | `httpRoute.enabled` / `gateway.{name,namespace}` | `true` / `cilium-gateway` / `default` | Render Gateway API HTTPRoutes for every enabled component that exposes one |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the redis-stack + httpRoute Applications fetch manifests from |
-| `smokeTest.enabled` / `external.*` / `events` | `false` / verify TLS via `cluster-trust-bundle`, dial the gateway Service / one fixture event | Opt-in PostSync-hook Job asserting `/health`, an unauthenticated `POST /pitch` → 401, and an authenticated pitch — in-cluster and through the HTTPRoute. Needs the auth-token Secret (inline `authToken` or `secrets.enabled`). See [`smoke-test/`](./smoke-test/) |
+| `smokeTest.enabled` / `external.*` / `extraProbes` / `events` | `false` / verify TLS via `cluster-trust-bundle`, dial the gateway Service / one fixture event | Opt-in Job asserting `/health`, an unauthenticated `POST /pitch` → 401, and an authenticated pitch — in-cluster and through the HTTPRoute — plus a `/health` probe per enabled core-catcher/scout. Needs the auth-token Secret (inline `authToken` or `secrets.enabled`). See [`smoke-test/`](./smoke-test/) |
 | `syncPolicy` | automated + retry | Applied to all rendered Applications |
 
 ## Testing

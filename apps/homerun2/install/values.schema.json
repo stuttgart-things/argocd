@@ -272,6 +272,22 @@
             "insecure":         { "type": "boolean" }
           }
         },
+        "extraProbes": {
+          "type": "array",
+          "description": "Extra components to liveness-probe. core-catcher and scout are added automatically when enabled; this list covers anything else.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name":     { "type": "string", "minLength": 1 },
+              "service":  { "type": "string", "minLength": 1 },
+              "port":     { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "path":     { "type": "string" },
+              "hostname": { "type": "string" }
+            },
+            "required": ["name", "service", "port"]
+          }
+        },
         "events": {
           "type": "array",
           "minItems": 1,

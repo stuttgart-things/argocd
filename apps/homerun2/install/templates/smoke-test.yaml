@@ -17,6 +17,21 @@
       "connectTo"    $connectTo
       "insecure"     .Values.smokeTest.external.insecure
 }}
+{{- /* Liveness probes for the other enabled components. Only core-catcher
+       and scout are derived automatically — both serve /health on port 80 in
+       every published kustomize base. Anything else goes through
+       smokeTest.extraProbes, so the chart never invents an endpoint a
+       component may not have. `hostname` is only set when the component's own
+       HTTPRoute exists, i.e. it is not silently probed through a route that
+       was never rendered. */}}
+{{- $probes := list }}
+{{- if .Values.coreCatcher.enabled }}
+  {{- $probes = append $probes (dict "name" "core-catcher" "service" "homerun2-core-catcher" "port" 80 "path" "/health" "hostname" (ternary .Values.coreCatcher.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
+{{- if .Values.scout.enabled }}
+  {{- $probes = append $probes (dict "name" "scout" "service" "homerun2-scout" "port" 80 "path" "/health" "hostname" (ternary .Values.scout.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
+{{- $probes = concat $probes .Values.smokeTest.extraProbes }}
 {{- $stValues := dict
       "name"                 (printf "%s-smoke-test" $appName)
       "namespace"            .Values.destination.namespace
@@ -31,6 +46,7 @@
       "unauthenticated"      .Values.smokeTest.unauthenticated
       "external"             $ext
       "events"               .Values.smokeTest.events
+      "extraProbes"          $probes
 }}
 ---
 apiVersion: argoproj.io/v1alpha1

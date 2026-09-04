@@ -306,6 +306,11 @@ smokeTest:
     # means plain DNS resolution of the public hostname.
     connectTo: ""
     insecure: false
+  # core-catcher and scout are probed automatically when enabled (both serve
+  # /health on port 80). Use this list for anything else — one entry per
+  # component, `{name, service, port, path?, hostname?}`; `hostname` adds the
+  # same probe through the public HTTPRoute.
+  extraProbes: []
   events:
     - title: Smoke Test
       message: omni-pitcher smoke test — authenticated pitch via in-cluster Service
