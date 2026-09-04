@@ -59,12 +59,18 @@ version: 59ec952
 hostname: schmetterpause.cluster.example.com
 
 # Gateway the HTTPRoutes attach to. The base names a Gateway called `gateway`
-# in `default`; `sectionName` is NOT configurable because the two routes must
-# keep the listeners they were rendered for: the main route on `https`, the
-# redirect on `http`.
+# in `default`.
+#
+# The listener names are values because the patches replace `parentRefs`
+# wholesale and would otherwise bake them in: a Gateway whose listeners are
+# named differently would leave both routes attached to EVERY listener, and the
+# redirect would then redirect HTTPS to HTTPS — a loop that turns nothing red.
+# The upstream base parametrises the same two names.
 gateway:
   name: gateway
   namespace: default
+  sectionNameHTTPS: https
+  sectionNameHTTP: http
 
 # ClusterSecretStore the two ExternalSecrets read from. The base points at
 # `vault-cluster`.

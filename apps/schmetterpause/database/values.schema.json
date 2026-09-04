@@ -10,6 +10,7 @@
     "instances":  { "type": "integer", "minimum": 1 },
     "imageName":  { "type": "string", "minLength": 1 },
     "enableSuperuserAccess": { "type": "boolean" },
+    "protect": { "type": "boolean", "description": "Annotate the Cluster with Prune=false,Delete=false. The PVC is owned by the Cluster, so deleting it destroys the data." },
     "storage": {
       "type": "object",
       "additionalProperties": false,

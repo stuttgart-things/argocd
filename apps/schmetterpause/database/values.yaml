@@ -33,6 +33,11 @@ bootstrap:
   localeCollate: C
   localeCType: C
 
+# Mark the Cluster Prune=false + Delete=false. Leave this on unless you have a
+# specific reason: the PVC hangs off the Cluster by ownerReference, so an
+# accidental prune or a deleted Application takes the data with it.
+protect: true
+
 # The app connects as the owner role; nothing needs superuser, so it stays off.
 enableSuperuserAccess: false
 

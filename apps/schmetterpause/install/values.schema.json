@@ -38,8 +38,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "name":      { "type": "string", "minLength": 1 },
-        "namespace": { "type": "string", "minLength": 1 }
+        "name":             { "type": "string", "minLength": 1 },
+        "namespace":        { "type": "string", "minLength": 1 },
+        "sectionNameHTTPS": { "type": "string", "minLength": 1, "description": "Listener the main route attaches to." },
+        "sectionNameHTTP":  { "type": "string", "minLength": 1, "description": "Listener the redirect route attaches to. Getting this wrong loops HTTPS onto itself without failing anything." }
       },
       "required": ["name", "namespace"]
     },
