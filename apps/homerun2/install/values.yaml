@@ -246,3 +246,64 @@ secrets:
   clusterSecretStoreName: vault-homerun2-pr
   vaultSecretName: preview-env
   refreshInterval: 1h
+
+# Optional smoke-test sub-Application (apps/homerun2/smoke-test in this
+# catalog). Off by default. When enabled, renders a Job that probes the
+# deployed omni-pitcher: waits for /health on the in-cluster Service,
+# asserts an unauthenticated POST /pitch is rejected, posts a fixture with
+# the bearer token, and — with `external.enabled` — repeats all three
+# through the public HTTPRoute with TLS verified against the trust bundle.
+#
+# The Job is an ArgoCD PostSync hook (`hook.enabled`), so it re-runs on
+# every sync of that Application: the `helm test` idea without Helm. A
+# failed assertion fails the sync, which is the signal you want.
+#
+# Requires the omni-pitcher auth-token Secret to exist in
+# `destination.namespace` — i.e. either `authToken` inline or
+# `secrets.enabled`.
+smokeTest:
+  enabled: false
+  # renovate: datasource=docker depName=curlimages/curl
+  image: curlimages/curl:8.21.0
+  # runAsUser must stay numeric — see apps/homerun2/smoke-test/values.yaml.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 100
+    runAsGroup: 101
+  hook:
+    enabled: true
+    deletePolicy: BeforeHookCreation
+  job:
+    backoffLimit: 2
+    ttlSecondsAfterFinished: 86400
+    activeDeadlineSeconds: 900
+  healthCheck:
+    attempts: 60
+    intervalSeconds: 5
+  unauthenticated:
+    enabled: true
+    expectStatus: 401
+  external:
+    # Second pass through the gateway. The hostname is NOT configured here —
+    # it is taken from `omniPitcher.hostname`, so the test can never drift
+    # from the route the chart actually publishes.
+    enabled: true
+    caConfigMap: cluster-trust-bundle
+    caKey: trust-bundle.pem
+    # A Cilium L2-announced LoadBalancer VIP is not reachable from Pods on
+    # the same cluster, so the Job dials the gateway's own Service
+    # (`cilium-gateway-<gateway>.<ns>.svc.cluster.local`, derived from
+    # httpRoute.gateway) while keeping the public hostname for SNI, Host and
+    # certificate validation. Everything but the VIP itself is exercised.
+    connectToGateway: true
+    # Explicit override; wins over connectToGateway. Empty + no derivation
+    # means plain DNS resolution of the public hostname.
+    connectTo: ""
+    insecure: false
+  events:
+    - title: Smoke Test
+      message: omni-pitcher smoke test — authenticated pitch via in-cluster Service
+      severity: info
+      author: smoke-test
+      system: smoke-test
+      tags: smoke,internal

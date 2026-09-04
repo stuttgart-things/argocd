@@ -1,0 +1,106 @@
+---
+# Name of the rendered Job. Fixed (not suffixed) on purpose: as a PostSync
+# hook with deletePolicy BeforeHookCreation the previous run stays visible —
+# and readable via `kubectl logs job/<name>` — until the next sync replaces it.
+name: homerun2-smoke-test
+
+# Namespace the Job runs in. Must be the namespace omni-pitcher runs in:
+# the Service is addressed by its short DNS name and the auth-token Secret
+# is read from here.
+namespace: homerun2
+
+# curlimages/curl ships sh + curl in a tiny rootless container. No jq —
+# every assertion below is a status-code comparison, so none is needed.
+image: curlimages/curl:8.21.0
+
+# Pod security context. runAsUser MUST be numeric: curlimages/curl declares
+# `USER curl_user` (uid 100, gid 101), and with only `runAsNonRoot: true` the
+# kubelet cannot prove a non-numeric user is non-root — the container never
+# starts, with `CreateContainerConfigError` and no logs to explain it.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+
+# ArgoCD hook wiring. With `enabled: true` the Job carries
+# `argocd.argoproj.io/hook: PostSync`, so it runs after the Application's
+# resources are healthy and re-runs on every sync — the `helm test` idea,
+# expressed the way ArgoCD does it. Set false to render a plain Job
+# (created once, then inert until deleted).
+#
+# deletePolicy BeforeHookCreation keeps the finished Job (and its logs)
+# around until the next run. HookSucceeded would delete it the moment it
+# passes, which throws away the evidence that it passed.
+hook:
+  enabled: true
+  deletePolicy: BeforeHookCreation
+
+job:
+  # Never, not OnFailure: a failed assertion should end the pod and surface
+  # as a failed sync, not silently retry inside the same pod.
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  activeDeadlineSeconds: 900
+
+# The in-cluster Service under test. Addressed as http://<service>:<port>
+# from inside `namespace`.
+omniPitcher:
+  service: homerun2-omni-pitcher
+  port: 80
+
+# Secret + key holding the bearer token for POST /pitch.
+authTokenSecretName: homerun2-omni-pitcher-token
+authTokenSecretKey: auth-token
+
+# How long to wait for /health before failing. omni-pitcher boots in
+# 5-15s but crash-loops until redis-stack accepts connections, so on a
+# cold stack this can legitimately take a couple of minutes.
+# 60 × 5s = 5 minutes.
+healthCheck:
+  attempts: 60
+  intervalSeconds: 5
+
+# Negative probe: POST /pitch with no Authorization header must be
+# rejected. This is the assertion that catches an omni-pitcher whose
+# auth-token Secret never materialised — the pod is Running and /health is
+# 200, but /pitch is wide open.
+unauthenticated:
+  enabled: true
+  expectStatus: 401
+
+# Second pass through the public HTTPRoute: gateway routing + TLS +
+# hostname, end to end. Off by default because it needs a hostname that
+# only the caller knows; apps/homerun2/install fills it in from
+# `omniPitcher.hostname`.
+external:
+  enabled: false
+  hostname: ""
+  # trust-manager Bundle ConfigMap used to verify the gateway certificate.
+  # Empty string disables the mount (then the system CA store is used).
+  caConfigMap: cluster-trust-bundle
+  caKey: trust-bundle.pem
+  # Dial this host instead of resolving `hostname`, while keeping the real
+  # hostname for SNI, Host and certificate validation (curl --connect-to).
+  # A Cilium L2-announced LoadBalancer VIP is NOT reachable from Pods on the
+  # same cluster, so a Job that curls the public FQDN hangs until its retry
+  # budget expires — even though the route works perfectly from outside.
+  # Point this at the gateway's own Service instead, e.g.
+  # `cilium-gateway-<gateway>.<ns>.svc.cluster.local`. Empty = plain DNS.
+  connectTo: ""
+  # Last resort for clusters with no usable trust bundle. Leaving this
+  # false is the point of the external pass — `-k` would prove routing
+  # while hiding a broken certificate chain.
+  insecure: false
+
+# Events posted to /pitch during the authenticated probe. Rendered into the
+# script one `post_event` call per entry, so no JSON parsing happens in sh.
+#
+# Values must not contain single quotes — each object is passed to curl as a
+# single-quoted shell argument.
+events:
+  - title: Smoke Test
+    message: omni-pitcher smoke test — authenticated pitch via in-cluster Service
+    severity: info
+    author: smoke-test
+    system: smoke-test
+    tags: smoke,internal

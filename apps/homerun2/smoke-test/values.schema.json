@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2-smoke-test sub-chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name", "namespace", "image", "podSecurityContext", "hook", "job",
+    "omniPitcher", "authTokenSecretName", "authTokenSecretKey",
+    "healthCheck", "unauthenticated", "external", "events"
+  ],
+  "properties": {
+    "name":      { "type": "string", "minLength": 1 },
+    "namespace": { "type": "string", "minLength": 1 },
+    "image":     { "type": "string", "minLength": 1 },
+    "podSecurityContext": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Pod-level securityContext. runAsUser must be numeric — curlimages/curl's USER is the name `curl_user`, which the kubelet cannot verify against runAsNonRoot (the container then never starts, with CreateContainerConfigError and no logs)."
+    },
+    "hook": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Render the Job as an ArgoCD hook. PostSync + BeforeHookCreation means it re-runs on every sync and the previous run's logs survive until the next one.",
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "deletePolicy": { "type": "string", "enum": ["BeforeHookCreation", "HookSucceeded", "HookFailed"] }
+      },
+      "required": ["enabled", "deletePolicy"]
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backoffLimit":            { "type": "integer", "minimum": 0 },
+        "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+        "activeDeadlineSeconds":   { "type": "integer", "minimum": 1 }
+      },
+      "required": ["backoffLimit", "ttlSecondsAfterFinished", "activeDeadlineSeconds"]
+    },
+    "omniPitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": { "type": "string", "minLength": 1 },
+        "port":    { "type": "integer", "minimum": 1, "maximum": 65535 }
+      },
+      "required": ["service", "port"]
+    },
+    "authTokenSecretName": { "type": "string", "minLength": 1 },
+    "authTokenSecretKey":  { "type": "string", "minLength": 1 },
+    "healthCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attempts":        { "type": "integer", "minimum": 1 },
+        "intervalSeconds": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["attempts", "intervalSeconds"]
+    },
+    "unauthenticated": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Negative probe: POST /pitch with no Authorization header must be rejected. Catches a stack whose auth-token Secret never materialised — /health is 200 while /pitch is wide open.",
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "expectStatus": { "type": "integer", "minimum": 100, "maximum": 599 }
+      },
+      "required": ["enabled", "expectStatus"]
+    },
+    "external": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Second pass through the public HTTPRoute — gateway, hostname match and TLS chain.",
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "hostname":    { "type": "string", "description": "FQDN on the HTTPRoute. Must be non-empty when enabled." },
+        "caConfigMap": { "type": "string", "description": "trust-manager Bundle ConfigMap mounted at /etc/ssl/bundle and passed as --cacert. Empty disables the mount." },
+        "caKey":       { "type": "string" },
+        "connectTo":   { "type": "string", "description": "Host to dial instead of `hostname` (curl --connect-to), keeping the original hostname for SNI, Host and certificate validation. Needed because a Cilium L2-announced LoadBalancer VIP is not reachable from Pods on the same cluster." },
+        "insecure":    { "type": "boolean" }
+      },
+      "required": ["enabled", "hostname", "insecure"]
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Posted one `post_event` call per entry, so no JSON parsing happens in sh. Values must not contain single quotes.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "title":    { "type": "string", "minLength": 1 },
+          "message":  { "type": "string", "minLength": 1 },
+          "severity": { "type": "string" },
+          "author":   { "type": "string" },
+          "system":   { "type": "string" },
+          "tags":     { "type": "string" }
+        },
+        "required": ["title", "message"]
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}

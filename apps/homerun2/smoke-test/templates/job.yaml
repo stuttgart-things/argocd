@@ -1,0 +1,150 @@
+{{- $ext := .Values.external }}
+{{- $mountCA := and $ext.enabled $ext.caConfigMap (not $ext.insecure) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+  {{- if .Values.hook.enabled }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: {{ .Values.hook.deletePolicy | quote }}
+  {{- end }}
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  activeDeadlineSeconds: {{ .Values.job.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.name | quote }}
+        app.kubernetes.io/component: smoke-test
+        app.kubernetes.io/part-of: homerun2
+    spec:
+      restartPolicy: Never
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: smoke
+          image: {{ .Values.image | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.authTokenSecretName | quote }}
+                  key: {{ .Values.authTokenSecretKey | quote }}
+            - name: INTERNAL_URL
+              value: {{ printf "http://%s:%d" .Values.omniPitcher.service (int .Values.omniPitcher.port) | quote }}
+            - name: EXTERNAL_URL
+              value: {{ if $ext.enabled }}{{ printf "https://%s" $ext.hostname | quote }}{{ else }}""{{ end }}
+            - name: HEALTH_ATTEMPTS
+              value: {{ .Values.healthCheck.attempts | quote }}
+            - name: HEALTH_INTERVAL
+              value: {{ .Values.healthCheck.intervalSeconds | quote }}
+            - name: EXPECT_UNAUTH
+              value: {{ .Values.unauthenticated.expectStatus | quote }}
+            - name: CHECK_UNAUTH
+              value: {{ .Values.unauthenticated.enabled | quote }}
+            # curl --connect-to: dial this host instead, but keep the real
+            # hostname for SNI, the Host header and certificate validation.
+            # Needed because a Cilium L2-announced LoadBalancer VIP is not
+            # reachable from Pods on the same cluster — the external pass
+            # would otherwise hang until the retry budget runs out.
+            - name: CONNECT_TO_OPTS
+              value: {{ if and $ext.enabled $ext.connectTo }}{{ printf "--connect-to %s:443:%s:443" $ext.hostname $ext.connectTo | quote }}{{ else }}""{{ end }}
+            - name: CURL_TLS_OPTS
+              value: {{ if and $ext.enabled $ext.insecure }}"-k"{{ else if $mountCA }}{{ printf "--cacert /etc/ssl/bundle/%s" $ext.caKey | quote }}{{ else }}""{{ end }}
+          {{- if $mountCA }}
+          volumeMounts:
+            - name: ca-bundle
+              mountPath: /etc/ssl/bundle
+              readOnly: true
+          {{- end }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              fail() { echo "FAIL: $*"; exit 1; }
+
+              # $1 method, $2 url, $3... extra curl args. Echoes the status code.
+              # `|| true` so a connection failure does not trip `set -e` before
+              # the caller can report it: curl still prints 000 on stdout, and
+              # the caller's comparison turns that into a named FAIL.
+              code() {
+                m=$1; u=$2; shift 2
+                curl -s -m 15 -o /dev/null -w '%{http_code}' -X "$m" "$u" "$@" || true
+              }
+
+              probe_health() {
+                base=$1; label=$2; shift 2
+                echo "[$label] waiting for $base/health ..."
+                i=1
+                while [ "$i" -le "$HEALTH_ATTEMPTS" ]; do
+                  if curl -sf -m 15 -o /dev/null "$@" "$base/health"; then
+                    echo "[$label] /health 200 after $i attempt(s)"
+                    return 0
+                  fi
+                  i=$((i + 1))
+                  sleep "$HEALTH_INTERVAL"
+                done
+                fail "[$label] /health never returned 200 after $HEALTH_ATTEMPTS attempts"
+              }
+
+              probe_unauthenticated() {
+                base=$1; label=$2; shift 2
+                [ "$CHECK_UNAUTH" = "true" ] || return 0
+                c=$(code POST "$base/pitch" \
+                      -H 'Content-Type: application/json' \
+                      -d '{"title":"smoke-test-unauthenticated","message":"this pitch carries no token and must be rejected","severity":"info","author":"smoke-test"}' \
+                      "$@")
+                [ "$c" = "$EXPECT_UNAUTH" ] || fail "[$label] unauthenticated POST /pitch returned $c, expected $EXPECT_UNAUTH — /pitch is NOT protected"
+                echo "[$label] unauthenticated POST /pitch -> $c (rejected, as expected)"
+              }
+
+              post_event() {
+                base=$1; label=$2; body=$3; shift 3
+                c=$(code POST "$base/pitch" \
+                      -H "Authorization: Bearer $AUTH_TOKEN" \
+                      -H 'Content-Type: application/json' \
+                      -d "$body" "$@")
+                case "$c" in
+                  200|201|202) echo "[$label] authenticated POST /pitch -> $c" ;;
+                  *) fail "[$label] authenticated POST /pitch returned $c" ;;
+                esac
+              }
+
+              echo "=== in-cluster Service: $INTERNAL_URL ==="
+              probe_health "$INTERNAL_URL" internal
+              probe_unauthenticated "$INTERNAL_URL" internal
+              {{- range .Values.events }}
+              post_event "$INTERNAL_URL" internal '{{ toJson . }}'
+              {{- end }}
+
+              if [ -n "$EXTERNAL_URL" ]; then
+                echo "=== HTTPRoute + gateway: $EXTERNAL_URL (tls: ${CURL_TLS_OPTS:-system CA store}) ${CONNECT_TO_OPTS} ==="
+                # Unquoted on purpose — CURL_TLS_OPTS is either empty or a
+                # flag pair that must word-split into two arguments.
+                probe_health "$EXTERNAL_URL" external $CURL_TLS_OPTS $CONNECT_TO_OPTS
+                probe_unauthenticated "$EXTERNAL_URL" external $CURL_TLS_OPTS $CONNECT_TO_OPTS
+                post_event "$EXTERNAL_URL" external \
+                  '{"title":"Smoke Test","message":"omni-pitcher smoke test — authenticated pitch via the public HTTPRoute","severity":"info","author":"smoke-test","system":"smoke-test","tags":"smoke,external"}' \
+                  $CURL_TLS_OPTS $CONNECT_TO_OPTS
+              else
+                echo "=== external pass disabled (external.enabled=false) ==="
+              fi
+
+              echo "smoke test PASSED"
+      {{- if $mountCA }}
+      volumes:
+        - name: ca-bundle
+          configMap:
+            name: {{ $ext.caConfigMap | quote }}
+      {{- end }}

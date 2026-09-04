@@ -1,0 +1,5 @@
+apiVersion: v2
+name: homerun2-smoke-test
+description: One-shot Job that smoke-tests a deployed omni-pitcher — waits for /health on the in-cluster Service, asserts an unauthenticated POST /pitch is rejected, posts a fixture of events with the bearer token, and (optionally) repeats health + auth-positive + auth-negative through the public HTTPRoute with TLS verified against the trust-manager bundle. Rendered as an ArgoCD PostSync hook so it behaves like `helm test` without Helm — re-run it by syncing the Application.
+type: application
+version: 0.1.0

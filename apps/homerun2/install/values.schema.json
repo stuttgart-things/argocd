@@ -213,6 +213,84 @@
         "refreshInterval":        { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
       },
       "required": ["enabled"]
+    },
+    "smokeTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional sub-Application that runs a smoke test against the deployed omni-pitcher: /health on the in-cluster Service, an unauthenticated POST /pitch that must be rejected, an authenticated fixture post, and optionally the same three through the public HTTPRoute. Rendered as an ArgoCD PostSync hook Job, so a failed assertion fails the sync. Requires the omni-pitcher auth-token Secret to exist (inline `authToken` or `secrets.enabled`).",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image":   { "type": "string", "minLength": 1 },
+        "podSecurityContext": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Pod-level securityContext. runAsUser must be numeric — curlimages/curl's USER is the name `curl_user`, which the kubelet cannot verify against runAsNonRoot."
+        },
+        "hook": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled":      { "type": "boolean" },
+            "deletePolicy": { "type": "string", "enum": ["BeforeHookCreation", "HookSucceeded", "HookFailed"] }
+          }
+        },
+        "job": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "backoffLimit":            { "type": "integer", "minimum": 0 },
+            "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+            "activeDeadlineSeconds":   { "type": "integer", "minimum": 1 }
+          }
+        },
+        "healthCheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "attempts":        { "type": "integer", "minimum": 1 },
+            "intervalSeconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "unauthenticated": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled":      { "type": "boolean" },
+            "expectStatus": { "type": "integer", "minimum": 100, "maximum": 599 }
+          }
+        },
+        "external": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Second pass through the public HTTPRoute. The hostname comes from omniPitcher.hostname, not from here.",
+          "properties": {
+            "enabled":          { "type": "boolean" },
+            "caConfigMap":      { "type": "string" },
+            "caKey":            { "type": "string" },
+            "connectToGateway": { "type": "boolean", "description": "Derive curl --connect-to from httpRoute.gateway (cilium-gateway-<name>.<ns>.svc.cluster.local), because a Cilium L2-announced LoadBalancer VIP is not reachable from Pods on the same cluster." },
+            "connectTo":        { "type": "string", "description": "Explicit --connect-to host; wins over connectToGateway." },
+            "insecure":         { "type": "boolean" }
+          }
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "title":    { "type": "string", "minLength": 1 },
+              "message":  { "type": "string", "minLength": 1 },
+              "severity": { "type": "string" },
+              "author":   { "type": "string" },
+              "system":   { "type": "string" },
+              "tags":     { "type": "string" }
+            },
+            "required": ["title", "message"]
+          }
+        }
+      },
+      "required": ["enabled"]
     }
   }
 }

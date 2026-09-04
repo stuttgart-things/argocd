@@ -24,8 +24,10 @@ apps/homerun2/
 │       ├── demo-pitcher.yaml                  Application "...-demo-pitcher"       (sync-wave 0)
 │       ├── led-catcher.yaml                   Application "...-led-catcher"        (sync-wave 0)
 │       ├── git-pitcher.yaml                   Application "...-git-pitcher"        (sync-wave 0)
-│       └── httproute.yaml                     Application "...-httproute"          (sync-wave 10, builds routes from enabled components)
+│       ├── httproute.yaml                     Application "...-httproute"          (sync-wave 10, builds routes from enabled components)
+│       └── smoke-test.yaml                    Application "...-smoke-test"         (sync-wave 20, opt-in via smokeTest.enabled)
 ├── httproute/                                 multi-HTTPRoute sub-chart (driven by a values list)
+├── smoke-test/                                PostSync-hook Job that probes a deployed omni-pitcher (health, unauthenticated 401, authenticated pitch — in-cluster and through the HTTPRoute); see its README
 ├── preview-quota/                             Kyverno `ClusterPolicy` auto-generating `ResourceQuota` + `LimitRange` in every `homerun2-pr-*` namespace (PR-preview safety net; requires Kyverno installed — see `infra/kyverno/install`)
 ├── preview-secrets/                           Kyverno `ClusterPolicy` auto-generating `ExternalSecret`s in every `homerun2-pr-*` namespace (pulls per-component secrets from Vault via ESO; requires Kyverno + ESO + `ClusterSecretStore`)
 ├── preview-seed-data/                         Kyverno `ClusterPolicy` generating a one-shot `Job` in every `homerun2-pr-*` namespace that posts a curated event fixture to omni-pitcher's /pitch endpoint (reviewer-visible non-empty stream from the moment the preview is Ready; requires Kyverno + the `homerun2-omni-pitcher-token` Secret)
@@ -215,11 +217,13 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `k8sPitcher.namespace` | `homerun2` | Optional override — k8s-pitcher often runs in a different namespace |
 | `httpRoute.enabled` / `gateway.{name,namespace}` | `true` / `cilium-gateway` / `default` | Render Gateway API HTTPRoutes for every enabled component that exposes one |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the redis-stack + httpRoute Applications fetch manifests from |
+| `smokeTest.enabled` / `external.*` / `events` | `false` / verify TLS via `cluster-trust-bundle`, dial the gateway Service / one fixture event | Opt-in PostSync-hook Job asserting `/health`, an unauthenticated `POST /pitch` → 401, and an authenticated pitch — in-cluster and through the HTTPRoute. Needs the auth-token Secret (inline `authToken` or `secrets.enabled`). See [`smoke-test/`](./smoke-test/) |
 | `syncPolicy` | automated + retry | Applied to all rendered Applications |
 
 ## Testing
 
-Pitch a test event to omni-pitcher:
+Automated: set `smokeTest.enabled: true` and the stack ships its own
+PostSync-hook Job — see [`smoke-test/`](./smoke-test/). By hand:
 
 ```bash
 curl -X POST https://omni.<DOMAIN>/pitch \
