@@ -1,0 +1,203 @@
+---
+version: 3
+
+tasks:
+  default:
+    desc: Show available tmux session tasks
+    silent: true
+    cmds:
+      - task --list
+
+  # ============================================================================
+  # Create new session or attach to existing one
+  # ============================================================================
+
+  tmux:
+    desc: Create or attach to a tmux session (smart)
+    aliases: [t]
+    silent: true
+    vars:
+      EXISTING:
+        sh: "tmux ls 2>/dev/null | cut -d: -f1 || true"
+      ACTION:
+        sh: |
+          if [[ -z "{{ .EXISTING }}" ]]; then
+            echo "create"
+          else
+            gum choose --header "tmux sessions:" "attach" "create" "kill" "list"
+          fi
+    cmds:
+      - task: tmux-{{ .ACTION }}
+
+  # ============================================================================
+  # Start a new session
+  # ============================================================================
+
+  tmux-create:
+    desc: Create a new tmux session
+    aliases: [tc]
+    silent: true
+    vars:
+      PRESET:
+        sh: |
+          gum choose --header "Session preset:" \
+            "custom" \
+            "claude-code" \
+            "k8s-ops" \
+            "homelab"
+      SESSION_NAME:
+        sh: |
+          DEFAULT="{{ .PRESET }}"
+          [[ "$DEFAULT" == "custom" ]] && DEFAULT="dev"
+          gum input --prompt "Session name: " --value "$DEFAULT" --placeholder "my-session"
+      WORKDIR:
+        sh: |
+          DEFAULT="$(pwd)"
+          gum input --prompt "Working directory: " --value "$DEFAULT"
+    cmds:
+      - |
+        if tmux has-session -t "{{ .SESSION_NAME }}" 2>/dev/null; then
+          gum style --foreground 212 "Session '{{ .SESSION_NAME }}' already exists — attaching."
+          tmux attach -t "{{ .SESSION_NAME }}"
+          exit 0
+        fi
+
+        case "{{ .PRESET }}" in
+          claude-code)
+            tmux new-session -d -s "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "claude"
+            tmux send-keys -t "{{ .SESSION_NAME }}:claude" "claude" Enter
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "shell"
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "git"
+            tmux select-window -t "{{ .SESSION_NAME }}:claude"
+            ;;
+          k8s-ops)
+            tmux new-session -d -s "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "k9s"
+            tmux send-keys -t "{{ .SESSION_NAME }}:k9s" "k9s" Enter
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "kubectl"
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "flux"
+            tmux send-keys -t "{{ .SESSION_NAME }}:flux" "flux get kustomizations -A" Enter
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "argo"
+            tmux select-window -t "{{ .SESSION_NAME }}:k9s"
+            ;;
+          homelab)
+            tmux new-session -d -s "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "main"
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "proxmox"
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "vault"
+            tmux new-window  -t "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}" -n "logs"
+            tmux select-window -t "{{ .SESSION_NAME }}:main"
+            ;;
+          *)
+            tmux new-session -d -s "{{ .SESSION_NAME }}" -c "{{ .WORKDIR }}"
+            ;;
+        esac
+
+        gum style --foreground 84 "✓ Session '{{ .SESSION_NAME }}' created — attaching."
+        tmux attach -t "{{ .SESSION_NAME }}"
+
+  # ============================================================================
+  # Attach to an existing session
+  # ============================================================================
+
+  tmux-attach:
+    desc: Attach to an existing tmux session (fuzzy pick)
+    aliases: [ta]
+    silent: true
+    vars:
+      SESSIONS:
+        sh: "tmux ls 2>/dev/null | awk -F: '{print $1}' || true"
+      TARGET:
+        sh: |
+          if [[ -z "{{ .SESSIONS }}" ]]; then
+            echo ""
+          else
+            echo "{{ .SESSIONS }}" | gum filter --header "Pick session to attach:" --placeholder "type to filter…"
+          fi
+    cmds:
+      - |
+        if [[ -z "{{ .TARGET }}" ]]; then
+          gum style --foreground 196 "No tmux sessions running."
+          exit 1
+        fi
+        tmux attach -t "{{ .TARGET }}"
+
+  # ============================================================================
+  # Kill session(s)
+  # ============================================================================
+
+  tmux-kill:
+    desc: Kill a tmux session (multi-select)
+    aliases: [tk]
+    silent: true
+    vars:
+      SESSIONS:
+        sh: "tmux ls 2>/dev/null | awk -F: '{print $1}' || true"
+      TARGETS:
+        sh: |
+          if [[ -z "{{ .SESSIONS }}" ]]; then
+            echo ""
+          else
+            echo "{{ .SESSIONS }}" | gum choose --no-limit --header "Sessions to kill:"
+          fi
+    cmds:
+      - |
+        if [[ -z "{{ .TARGETS }}" ]]; then
+          gum style --foreground 196 "Nothing selected."
+          exit 0
+        fi
+
+        if ! gum confirm "Really kill: {{ .TARGETS }}?"; then
+          gum style --foreground 214 "Aborted."
+          exit 0
+        fi
+
+        for s in {{ .TARGETS }}; do
+          tmux kill-session -t "$s" && \
+            gum style --foreground 84 "✓ killed $s"
+        done
+
+  # ============================================================================
+  # Overview
+  # ============================================================================
+
+  tmux-list:
+    desc: List all tmux sessions
+    aliases: [tl]
+    silent: true
+    cmds:
+      - |
+        if ! tmux ls 2>/dev/null; then
+          gum style --foreground 214 "No tmux sessions running."
+        fi
+
+  # ============================================================================
+  # Quick-jump into project session (one session per repo)
+  # ============================================================================
+
+  tmux-project:
+    desc: Jump to a project-named tmux session (one per repo)
+    aliases: [tp]
+    silent: true
+    vars:
+      PROJECTS_ROOT:
+        sh: echo "${PROJECTS_ROOT:-$HOME/code/stuttgart-things}"
+      PROJECT:
+        sh: |
+          ls -1 "{{ .PROJECTS_ROOT }}" 2>/dev/null \
+            | gum filter --header "Pick project:" --placeholder "filter projects…"
+      SESSION_NAME:
+        sh: echo "{{ .PROJECT }}" | tr '.' '-'
+    cmds:
+      - |
+        if [[ -z "{{ .PROJECT }}" ]]; then
+          exit 0
+        fi
+
+        WORKDIR="{{ .PROJECTS_ROOT }}/{{ .PROJECT }}"
+
+        if tmux has-session -t "{{ .SESSION_NAME }}" 2>/dev/null; then
+          gum style --foreground 84 "Attaching to existing '{{ .SESSION_NAME }}'."
+        else
+          gum style --foreground 84 "Creating '{{ .SESSION_NAME }}' in $WORKDIR."
+          tmux new-session -d -s "{{ .SESSION_NAME }}" -c "$WORKDIR"
+        fi
+        tmux attach -t "{{ .SESSION_NAME }}"
