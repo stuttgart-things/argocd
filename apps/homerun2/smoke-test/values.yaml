@@ -11,7 +11,7 @@ namespace: homerun2
 
 # curlimages/curl ships sh + curl in a tiny rootless container. No jq —
 # every assertion below is a status-code comparison, so none is needed.
-image: curlimages/curl:8.21.0
+image: curlimages/curl:8.22.0
 
 # Pod security context. runAsUser MUST be numeric: curlimages/curl declares
 # `USER curl_user` (uid 100, gid 101), and with only `runAsNonRoot: true` the

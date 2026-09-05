@@ -318,7 +318,7 @@ secrets:
 smokeTest:
   enabled: false
   # renovate: datasource=docker depName=curlimages/curl
-  image: curlimages/curl:8.21.0
+  image: curlimages/curl:8.22.0
   # runAsUser must stay numeric — see apps/homerun2/smoke-test/values.yaml.
   podSecurityContext:
     runAsNonRoot: true
