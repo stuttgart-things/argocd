@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: homerun2-k8s-pitcher-profile
+description: ConfigMap carrying k8s-pitcher's K8sPitcherProfile — loaded as a sub-Application by apps/homerun2/install when `k8sPitcher.profileContent` is set.
+type: application
+version: 0.1.0

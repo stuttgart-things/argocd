@@ -283,6 +283,10 @@
         },
         "inlineProfile": {
           "type": "boolean"
+        },
+        "profileContent": {
+          "type": "string",
+          "description": "K8sPitcherProfile document as a YAML string. Empty keeps the out-of-band contract; set it and the chart materializes k8sPitcherProfileConfigMap itself."
         }
       },
       "required": [
