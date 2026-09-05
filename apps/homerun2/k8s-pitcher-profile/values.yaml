@@ -1,0 +1,21 @@
+---
+# Name of the ConfigMap to materialize. Must match
+# `k8sPitcherProfileConfigMap` in apps/homerun2/install, which is what the
+# k8s-pitcher Deployment patch mounts at /etc/k8s-pitcher.
+name: homerun2-k8s-pitcher-profile
+
+# The full K8sPitcherProfile document as a YAML string. Schema lives in
+# stuttgart-things/homerun2-k8s-pitcher `internal/profile/types.go`; worked
+# examples are in that repo's `profiles/`.
+#
+# The default below is deliberately inert: it pitches nowhere and watches
+# nothing, so a chart rendered without a real profile cannot start flooding a
+# cluster's message stream. Override it.
+content: |
+  apiVersion: homerun2.sthings.io/v1alpha1
+  kind: K8sPitcherProfile
+  metadata:
+    name: placeholder
+  spec:
+    collectors: []
+    informers: []

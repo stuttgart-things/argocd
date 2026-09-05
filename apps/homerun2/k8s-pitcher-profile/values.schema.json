@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2-k8s-pitcher-profile chart",
+  "type": "object",
+  "_comment": "additionalProperties left open so the catalog verifier (call-argocd-verify-catalog) can inject its common probe values like `destination` without tripping the schema. The chart only consumes `name` and `content`; anything else is ignored.",
+  "additionalProperties": true,
+  "required": ["name", "content"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ConfigMap name. Must match k8sPitcherProfileConfigMap in apps/homerun2/install, which the Deployment patch mounts at /etc/k8s-pitcher."
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Full K8sPitcherProfile document as a YAML string."
+    }
+  }
+}

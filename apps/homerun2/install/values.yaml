@@ -39,8 +39,11 @@ syncPolicy:
 # trust-manager bundle used by k8s-pitcher (mounted at /etc/ssl/custom/trust-bundle.pem).
 trustBundleConfigMap: cluster-trust-bundle
 
-# K8sPitcherProfile ConfigMap name. The ConfigMap itself is provisioned out-of-band
-# (cluster-specific config); the chart only references it from the k8s-pitcher Deployment.
+# K8sPitcherProfile ConfigMap name — what the k8s-pitcher Deployment patch
+# mounts at /etc/k8s-pitcher. By default the ConfigMap itself is provisioned
+# out-of-band (cluster-specific config) and the chart only references it; set
+# `k8sPitcher.profileContent` to have the chart materialize it under this name
+# instead.
 k8sPitcherProfileConfigMap: homerun2-k8s-pitcher-profile
 # Out-of-band ConfigMap holding git-pitcher's watch-profile.yaml, used only
 # when gitPitcher.inlineWatchConfig is false. Provision it yourself; the key
@@ -158,6 +161,20 @@ k8sPitcher:
   # OCI carries a namespace-scoped profile (built from
   # tests/kcl-deploy-profile-preview.yaml in the SUT repo).
   inlineProfile: false
+  # The K8sPitcherProfile document, as a YAML string. Empty (the default)
+  # keeps the historical contract: `k8sPitcherProfileConfigMap` names a
+  # ConfigMap somebody provisioned out-of-band and the chart only references
+  # it. Set it, and templates/k8s-pitcher-profile.yaml materializes that
+  # ConfigMap for you via a sub-Application at sync-wave -10 — the same shape
+  # apps/machinery/install uses for machinery's config.json.
+  #
+  # Ignored when inlineProfile is true (that branch never remounts).
+  #
+  # Worth scoping deliberately: the profile shipped in the kustomize base
+  # watches Pods and Events across ALL namespaces every 15-30s, and every one
+  # of those becomes a message in the stream that core-, light- and
+  # led-catcher read.
+  profileContent: ""
 
 # light-catcher (Redis Streams consumer → WLED HTTP).
 lightCatcher:

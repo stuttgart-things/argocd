@@ -1,0 +1,47 @@
+{{- /* Materializes the K8sPitcherProfile ConfigMap that templates/k8s-pitcher.yaml
+       mounts at /etc/k8s-pitcher. Only rendered when `k8sPitcher.profileContent`
+       is set; leaving it empty keeps the historical contract, where
+       `k8sPitcherProfileConfigMap` names a ConfigMap somebody provisioned
+       out-of-band and the chart merely references it.
+
+       Skipped entirely when `k8sPitcher.inlineProfile` is true — that branch
+       keeps the profile the kustomize OCI ships and never remounts, so a
+       ConfigMap here would be dead weight (and PR previews rely on it). */}}
+{{- if and .Values.k8sPitcher.enabled (not .Values.k8sPitcher.inlineProfile) .Values.k8sPitcher.profileContent }}
+{{- $appName := include "homerun2.appName" . }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-k8s-pitcher-profile" $appName | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Ahead of the k8s-pitcher Application (wave 0): the container mounts this
+    # ConfigMap as a volume, and a Pod scheduled before it exists sits in
+    # ContainerCreating until Argo gets round to applying it on a later pass.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/homerun2/k8s-pitcher-profile
+    helm:
+      releaseName: {{ printf "%s-k8s-pitcher-profile" $appName | quote }}
+      valuesObject:
+        name: {{ .Values.k8sPitcherProfileConfigMap | quote }}
+        content: {{ .Values.k8sPitcher.profileContent | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    # k8s-pitcher often runs in its own namespace; the ConfigMap has to follow
+    # it, not the rest of the stack.
+    namespace: {{ .Values.k8sPitcher.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
