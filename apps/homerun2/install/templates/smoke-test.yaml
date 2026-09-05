@@ -55,6 +55,13 @@
 {{- if .Values.ledCatcher.enabled }}
   {{- $probes = append $probes (dict "name" "led-catcher" "service" "homerun2-led-catcher" "port" 80 "path" "/healthz" "hostname" (ternary .Values.ledCatcher.hostname "" .Values.httpRoute.enabled)) }}
 {{- end }}
+{{- /* git-pitcher serves /health on port 80 — checked against v1.0.0. Its
+       POST /pitch is bearer-protected like omni-pitcher's, but the smoke test
+       only probes health here: pitching through it would need a real repo
+       event, which is not something a test can arrange. */}}
+{{- if .Values.gitPitcher.enabled }}
+  {{- $probes = append $probes (dict "name" "git-pitcher" "service" "homerun2-git-pitcher" "port" 80 "path" "/health" "hostname" (ternary .Values.gitPitcher.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
 {{- $probes = concat $probes .Values.smokeTest.extraProbes }}
 {{- $stValues := dict
       "name"                 (printf "%s-smoke-test" $appName)

@@ -63,6 +63,76 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" list) | indent 12 }}
+        {{- /* The kustomize base sets AUTH_TOKEN as a PLAIN env value literal
+               `changeme`, not a secretKeyRef like every other component's
+               token. That literal guards POST /pitch, which this chart
+               publishes through the gateway — left alone it is a
+               world-writable entry point into the message bus, and no Secret
+               delete patch can reach it because there is no Secret.
+               `value: null` is load-bearing: strategic merge merges env
+               entries by name, so without it the container ends up with both
+               `value` and `valueFrom` and the API server rejects the
+               Deployment outright. */}}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: {{ $name }}
+                      env:
+                        - name: AUTH_TOKEN
+                        {{- if .Values.authToken }}
+                          value: {{ .Values.authToken | quote }}
+                        {{- else }}
+                          value: null
+                          valueFrom:
+                            secretKeyRef:
+                              name: {{ printf "%s-token" $name | quote }}
+                              key: auth-token
+                        {{- end }}
+        {{- /* The base ships homerun2-git-pitcher-github holding the literal
+               `changeme`. A GitHub PAT is never something this chart inlines
+               from values, so the placeholder is always deleted and the
+               Secret comes from ESO (secrets.enabled adds the row) or
+               out-of-band. Note the token is NOT optional: git-pitcher's
+               config loader fails startup on an empty GITHUB_TOKEN, so a
+               missing Vault field is a CrashLoopBackOff, not degraded
+               polling. */}}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-github" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-github" $name)) | indent 12 }}
+{{- if not .Values.gitPitcher.inlineWatchConfig }}
+        {{- /* Which repos are watched is cluster-specific, the same way
+               k8sPitcherProfileConfigMap is. With inlineWatchConfig false the
+               base's ConfigMap is dropped and the volume points at an
+               out-of-band one; this chart does not create it. */}}
+        - target:
+            kind: ConfigMap
+            name: {{ printf "%s-watch-config" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "ConfigMap" "name" (printf "%s-watch-config" $name)) | indent 12 }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ toYaml (dict
+     "apiVersion" "apps/v1"
+     "kind" "Deployment"
+     "metadata" (dict "name" $name)
+     "spec" (dict "template" (dict "spec" (dict
+       "volumes" (list (dict "name" "watch-config" "configMap" (dict "name" .Values.gitPitcherWatchConfigMap)))
+     )))
+   ) | indent 12 }}
+{{- end }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}
