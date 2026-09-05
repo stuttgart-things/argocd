@@ -100,7 +100,7 @@ spec:
             # default of v1.4.0 predates demo-pitcher's kustomize OCI
             # publishing, so it 404s on the ghcr.io lookup. v1.8.1 is the
             # current latest release with both image + kustomize OCI.
-            # omniPitcherUrl flips the Deployment env to PITCH_TARGET=http +
+            # omniPitcherUrl flips the Deployment env to PITCH_TARGET=omni-pitcher +
             # OMNI_PITCHER_URL=<in-cluster service> so the UI's "Pitch"
             # button POSTs to the co-tenanted omni-pitcher (instead of the
             # compiled-in localhost:4000 fallback the UI otherwise surfaces).
