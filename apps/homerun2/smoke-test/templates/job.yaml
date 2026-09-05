@@ -6,10 +6,19 @@ kind: Job
 metadata:
   name: {{ .Values.name | quote }}
   namespace: {{ .Values.namespace | quote }}
-  {{- if .Values.hook.enabled }}
   annotations:
+  {{- if .Values.hook.enabled }}
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/hook-delete-policy: {{ .Values.hook.deletePolicy | quote }}
+  {{- else }}
+    # As a regular resource (the default since argocd#343 — a hook-only
+    # Application never syncs at all) the Job is applied, and a Job's
+    # spec.template is immutable. Every change to the probe list therefore
+    # wedges the sync: "field is immutable", retried forever, and no test
+    # runs until somebody deletes the Job by hand. Force+Replace makes
+    # ArgoCD delete and recreate it instead, which is also what re-runs the
+    # test on a sync that actually changed something.
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
   {{- end }}
 spec:
   backoffLimit: {{ .Values.job.backoffLimit }}

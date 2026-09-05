@@ -346,9 +346,10 @@ smokeTest:
     # means plain DNS resolution of the public hostname.
     connectTo: ""
     insecure: false
-  # core-catcher, scout, light-catcher and wled-mock are probed automatically
-  # when enabled — the first two on /health, the latter two on /healthz. Use
-  # this list for anything else — one entry per component,
+  # core-catcher, scout, light-catcher, wled-mock, demo-pitcher and
+  # led-catcher are probed automatically when enabled — /health for
+  # core-catcher, scout and demo-pitcher, /healthz for the rest. Use this
+  # list for anything else — one entry per component,
   # `{name, service, port, path?, hostname?}`; `hostname` adds the same probe
   # through the public HTTPRoute.
   extraProbes: []
