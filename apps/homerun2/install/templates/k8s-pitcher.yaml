@@ -10,24 +10,44 @@
 {{- if not .Values.k8sPitcher.inlineProfile }}
 {{- $volumes = append $volumes (dict "name" "profile" "configMap" (dict "name" .Values.k8sPitcherProfileConfigMap)) }}
 {{- end }}
+{{- $podTemplate := dict "spec" (dict
+      "volumes" $volumes
+      "containers" (list (dict
+        "name" $name
+        "env"  (list (dict "name" "SSL_CERT_DIR" "value" "/etc/ssl/custom"))
+        "ports" (list (dict "name" "webhook" "containerPort" 8080 "protocol" "TCP"))
+        "volumeMounts" (list (dict
+          "name"      "trust-bundle"
+          "mountPath" "/etc/ssl/custom/trust-bundle.pem"
+          "subPath"   "trust-bundle.pem"
+          "readOnly"  true
+        ))
+      ))
+    )
+}}
+{{- /* k8s-pitcher parses the profile once at startup (`--profile` flag), and
+       kubelet updates a mounted ConfigMap in place. Changing profileContent
+       therefore reaches the container's filesystem but not its behaviour --
+       the running process keeps the profile it booted with, and the change
+       looks applied while nothing happened. Stamping the content hash onto
+       the pod template makes the Deployment roll instead.
+
+       Only possible when the chart knows the content. With profileContent
+       empty the ConfigMap is provisioned out-of-band, its content is not in
+       this render, and a restart after editing it stays manual. Same for
+       inlineProfile, where the profile ships inside the kustomize OCI and is
+       already pinned by the image tag a version bump rolls anyway. */}}
+{{- if and (not .Values.k8sPitcher.inlineProfile) .Values.k8sPitcher.profileContent }}
+{{- $_ := set $podTemplate "metadata" (dict "annotations" (dict
+      "homerun2.stuttgart-things.com/profile-checksum" (.Values.k8sPitcher.profileContent | sha256sum)
+    ))
+}}
+{{- end }}
 {{- $trustPatch := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"
       "metadata" (dict "name" $name)
-      "spec" (dict "template" (dict "spec" (dict
-        "volumes" $volumes
-        "containers" (list (dict
-          "name" $name
-          "env"  (list (dict "name" "SSL_CERT_DIR" "value" "/etc/ssl/custom"))
-          "ports" (list (dict "name" "webhook" "containerPort" 8080 "protocol" "TCP"))
-          "volumeMounts" (list (dict
-            "name"      "trust-bundle"
-            "mountPath" "/etc/ssl/custom/trust-bundle.pem"
-            "subPath"   "trust-bundle.pem"
-            "readOnly"  true
-          ))
-        ))
-      )))
+      "spec" (dict "template" $podTemplate)
 }}
 ---
 apiVersion: argoproj.io/v1alpha1
