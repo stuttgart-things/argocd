@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: reloader-install
+description: App-of-apps chart packaging the upstream Stakater Reloader Helm chart (stakater/reloader)
+type: application
+version: 0.1.0
+appVersion: "2.2.16"

@@ -1,0 +1,53 @@
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $defaultName := printf "reloader-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+Only the knobs a cluster actually varies get a first-class value; everything
+else goes through extraValues. The upstream chart nests all of these under a
+single `reloader:` key.
+*/}}
+{{- $computed := dict
+      "watchGlobally"  .Values.watchGlobally
+      "reloadStrategy" .Values.reloadStrategy
+      "autoReloadAll"  .Values.autoReloadAll
+      "logLevel"       .Values.logLevel
+      "enableHA"       .Values.enableHA
+      "deployment"     (dict
+        "replicas"  (int .Values.replicas)
+        "resources" (.Values.resources | default dict)
+      )
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # Nothing depends on Reloader at apply time — it reacts to changes, and a
+    # workload created before it is watched just as well afterwards. -10 only
+    # to keep it with the other infra components rather than interleaved with
+    # application waves.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://stakater.github.io/stakater-charts
+    chart: reloader
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: reloader
+      valuesObject:
+        reloader:
+          {{- toYaml $merged | nindent 10 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

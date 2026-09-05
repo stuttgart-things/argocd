@@ -1,0 +1,84 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+#
+# The controller has to run on the WORKLOAD cluster, not on the management
+# cluster: it watches the ConfigMaps/Secrets and patches the Deployments that
+# live next to it. Pointing this at the ArgoCD cluster deploys a Reloader that
+# watches the wrong things and never fires.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: reloader
+
+# Upstream Stakater Reloader Helm chart (https://stakater.github.io/stakater-charts).
+# Matches the version stuttgart-things/flux runs in infra/reloader, so both
+# fleets stay on one controller version.
+# renovate: datasource=helm depName=reloader registryUrl=https://stakater.github.io/stakater-charts
+chartVersion: 2.2.16
+
+# Watch ConfigMaps/Secrets in every namespace. Workloads still have to opt in
+# (see `autoReloadAll` below), so this widens what Reloader can see, not what
+# it acts on.
+watchGlobally: true
+
+# How a reload is triggered:
+#   annotations — stamps an annotation on the pod template
+#   env-vars    — injects a hash into an env var
+#   default     — upstream's own choice
+#
+# `annotations` on purpose, and the same value stuttgart-things/flux uses. The
+# env-var strategy mutates the container spec, which is a field ArgoCD renders
+# from Git and will fight over.
+#
+# Either way Reloader writes into the live Deployment. Once a workload is
+# actually annotated, the Application that owns it needs an `ignoreDifferences`
+# entry for whatever Reloader stamps, or selfHeal reverts the patch and the two
+# take turns restarting the Pod. Verify the exact field on the first annotated
+# workload before rolling this out further — no workload here is annotated yet,
+# so nothing writes anything today.
+reloadStrategy: annotations
+
+# false = every workload opts in explicitly via
+# `reloader.stakater.com/auto: "true"`.
+#
+# Deliberate. With `true` plus watchGlobally, one bad value written by a broken
+# ESO refresh or a Vault hiccup rolls every Deployment on the cluster at once.
+# Credentials are worth that trade; arbitrary ConfigMaps are not.
+autoReloadAll: false
+
+# Log level: trace, debug, info, warning, error, fatal, panic.
+logLevel: info
+
+# Controller replicas. 1 is right unless `enableHA` is on — without leader
+# election a second replica duplicates every reload.
+replicas: 1
+
+# Leader election, so >1 replica is safe.
+enableHA: false
+
+# Resource requests/limits for the controller container. Empty = upstream
+# default (unset). Set both on clusters with a ResourceQuota or LimitRange
+# that rejects unbounded pods.
+resources: {}
+
+# Deep-merged on top of the computed `reloader:` values passed to the upstream
+# chart. Use for anything not exposed above (ignoreNamespaces,
+# namespaceSelector, resourceLabelSelector, ignoreSecrets, ignoreConfigMaps,
+# serviceMonitor, nodeSelector, tolerations, image overrides, …).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

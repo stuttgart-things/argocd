@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "reloader install app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Argo destination for the rendered Application. Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. Template prefers `name` when both are set. Must resolve to the WORKLOAD cluster: Reloader patches the Deployments that live beside it.",
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["namespace"],
+      "anyOf": [
+        { "required": ["server"] },
+        { "required": ["name"] }
+      ]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "watchGlobally": { "type": "boolean" },
+    "reloadStrategy": {
+      "type": "string",
+      "enum": ["annotations", "env-vars", "default"],
+      "description": "How a reload is triggered. `annotations` avoids mutating the container spec, which ArgoCD renders from Git and would fight over."
+    },
+    "autoReloadAll": {
+      "type": "boolean",
+      "description": "true reloads every workload without an opt-in annotation. Leave false: combined with watchGlobally it turns one bad Secret write into a cluster-wide restart."
+    },
+    "logLevel": {
+      "type": "string",
+      "enum": ["trace", "debug", "info", "warning", "error", "fatal", "panic"]
+    },
+    "replicas": { "type": "integer", "minimum": 1 },
+    "enableHA": {
+      "type": "boolean",
+      "description": "Leader election. Required before raising replicas above 1, otherwise each replica reloads independently."
+    },
+    "resources": {
+      "type": "object",
+      "description": "Resource requests/limits for the controller container. Empty = upstream default (unset)."
+    },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed `reloader:` values passed to the upstream chart."
+    },
+    "syncPolicy": { "type": "object" }
+  }
+}
