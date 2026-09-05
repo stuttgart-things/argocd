@@ -47,6 +47,14 @@
 {{- if .Values.demoPitcher.enabled }}
   {{- $probes = append $probes (dict "name" "demo-pitcher" "service" "homerun2-demo-pitcher" "port" 80 "path" "/health" "hostname" (ternary .Values.demoPitcher.hostname "" .Values.httpRoute.enabled)) }}
 {{- end }}
+{{- /* led-catcher answers on /healthz like the other catchers — checked
+       against led-catcher v0.2.2, whose HEALTH_PORT is the same 8080 the
+       Service fronts. It needs no mock counterpart: unlike light-catcher,
+       which speaks WLED HTTP to wled-mock, led-catcher renders its own
+       embedded HTMX simulator when LED_MODE=web (the base default). */}}
+{{- if .Values.ledCatcher.enabled }}
+  {{- $probes = append $probes (dict "name" "led-catcher" "service" "homerun2-led-catcher" "port" 80 "path" "/healthz" "hostname" (ternary .Values.ledCatcher.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
 {{- $probes = concat $probes .Values.smokeTest.extraProbes }}
 {{- $stValues := dict
       "name"                 (printf "%s-smoke-test" $appName)
