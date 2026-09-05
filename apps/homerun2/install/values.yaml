@@ -42,6 +42,11 @@ trustBundleConfigMap: cluster-trust-bundle
 # K8sPitcherProfile ConfigMap name. The ConfigMap itself is provisioned out-of-band
 # (cluster-specific config); the chart only references it from the k8s-pitcher Deployment.
 k8sPitcherProfileConfigMap: homerun2-k8s-pitcher-profile
+# Out-of-band ConfigMap holding git-pitcher's watch-profile.yaml, used only
+# when gitPitcher.inlineWatchConfig is false. Provision it yourself; the key
+# must be `watch-profile.yaml` (the base's WATCH_CONFIG points at
+# /config/watch-profile.yaml).
+gitPitcherWatchConfigMap: homerun2-git-pitcher-watch-config
 
 # Shared credentials. Each component's kustomize base ships its own per-component
 # Secret (e.g. `homerun2-omni-pitcher-redis`, `homerun2-omni-pitcher-token`) which
@@ -260,6 +265,11 @@ gitPitcher:
   # stuttgart-things/homerun2-git-pitcher#27 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
+  # true = keep the watch profile shipped inside the kustomize OCI (which
+  # repos are polled, at which interval, for which events). false = delete it
+  # and mount gitPitcherWatchConfigMap instead — cluster-specific, and NOT
+  # created by this chart, the same way k8sPitcherProfileConfigMap is not.
+  inlineWatchConfig: true
 
 # Gateway API HTTPRoutes for every enabled component that exposes one.
 httpRoute:

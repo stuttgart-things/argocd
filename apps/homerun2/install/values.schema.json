@@ -3,274 +3,579 @@
   "title": "homerun2 app-of-apps chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["project", "destination"],
+  "required": [
+    "project",
+    "destination"
+  ],
   "properties": {
-    "applicationName": { "type": "string", "minLength": 1 },
+    "applicationName": {
+      "type": "string",
+      "minLength": 1
+    },
     "catalog": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "repoURL": { "type": "string", "format": "uri" },
-        "targetRevision": { "type": "string", "minLength": 1 }
+        "repoURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "targetRevision": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["repoURL", "targetRevision"]
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ]
     },
-    "project": { "type": "string", "minLength": 1 },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
     "destination": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Argo destination for all rendered child Applications. Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. If both are set (e.g. when overriding the default `server` with a `name`), the template prefers `name`; this is intentional so consumers can switch to a name without having to null out the chart's default server.",
+      "description": "Argo destination for all rendered child Applications. Provide `server` (cluster URL) or `name` (registered cluster name) \u2014 at least one required. If both are set (e.g. when overriding the default `server` with a `name`), the template prefers `name`; this is intentional so consumers can switch to a name without having to null out the chart's default server.",
       "properties": {
-        "server":    { "type": "string", "format": "uri" },
-        "name":      { "type": "string", "minLength": 1 },
-        "namespace": { "type": "string", "minLength": 1 }
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["namespace"],
+      "required": [
+        "namespace"
+      ],
       "anyOf": [
-        { "required": ["server"] },
-        { "required": ["name"] }
+        {
+          "required": [
+            "server"
+          ]
+        },
+        {
+          "required": [
+            "name"
+          ]
+        }
       ]
     },
-    "syncPolicy": { "type": "object", "additionalProperties": true },
-    "trustBundleConfigMap":      { "type": "string", "minLength": 1 },
-    "k8sPitcherProfileConfigMap": { "type": "string", "minLength": 1 },
-    "redisPassword": { "type": "string" },
-    "authToken":     { "type": "string" },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "trustBundleConfigMap": {
+      "type": "string",
+      "minLength": 1
+    },
+    "k8sPitcherProfileConfigMap": {
+      "type": "string",
+      "minLength": 1
+    },
+    "redisPassword": {
+      "type": "string"
+    },
+    "authToken": {
+      "type": "string"
+    },
     "redisStack": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":      { "type": "boolean" },
-        "chartVersion": { "type": "string", "minLength": 1 },
-        "serviceType":  { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "enabled": {
+          "type": "boolean"
+        },
+        "chartVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serviceType": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
         "auth": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "existingSecret":            { "type": "string" },
-            "existingSecretPasswordKey": { "type": "string", "minLength": 1 }
+            "existingSecret": {
+              "type": "string"
+            },
+            "existingSecretPasswordKey": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "persistence": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled":      { "type": "boolean" },
-            "storageClass": { "type": "string", "minLength": 1 },
-            "size":         { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "storageClass": {
+              "type": "string",
+              "minLength": 1
+            },
+            "size": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$"
+            }
           },
-          "required": ["enabled"]
+          "required": [
+            "enabled"
+          ]
         },
         "image": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "registry":   { "type": "string", "minLength": 1 },
-            "repository": { "type": "string", "minLength": 1 },
-            "tag":        { "type": "string", "minLength": 1 }
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "required": ["registry", "repository", "tag"]
+          "required": [
+            "registry",
+            "repository",
+            "tag"
+          ]
         },
         "sentinel": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "registry":   { "type": "string", "minLength": 1 },
-            "repository": { "type": "string", "minLength": 1 },
-            "tag":        { "type": "string", "minLength": 1 }
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "required": ["registry", "repository", "tag"]
+          "required": [
+            "registry",
+            "repository",
+            "tag"
+          ]
         }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "omniPitcher": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":          { "type": "boolean" },
-        "version":          { "type": "string", "minLength": 1 },
-        "hostname":         { "type": "string", "minLength": 1 },
-        "inlineHttpRoute":  { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "coreCatcher": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":          { "type": "boolean" },
-        "version":          { "type": "string", "minLength": 1 },
-        "kustomizeVersion": { "type": "string", "minLength": 1 },
-        "hostname":         { "type": "string", "minLength": 1 },
-        "inlineHttpRoute":  { "type": "boolean" },
-        "redisStream":      { "type": "string" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kustomizeVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        },
+        "redisStream": {
+          "type": "string"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "scout": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":          { "type": "boolean" },
-        "version":          { "type": "string", "minLength": 1 },
-        "hostname":         { "type": "string", "minLength": 1 },
-        "inlineHttpRoute":  { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "k8sPitcher": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":       { "type": "boolean" },
-        "version":       { "type": "string", "minLength": 1 },
-        "namespace":     { "type": "string", "minLength": 1 },
-        "inlineProfile": { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineProfile": {
+          "type": "boolean"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "lightCatcher": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":         { "type": "boolean" },
-        "version":         { "type": "string", "minLength": 1 },
-        "hostname":        { "type": "string", "minLength": 1 },
-        "inlineHttpRoute": { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "wledMock": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":  { "type": "boolean" },
-        "version":  { "type": "string", "minLength": 1 },
-        "hostname": { "type": "string", "minLength": 1 }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "demoPitcher": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":          { "type": "boolean" },
-        "version":          { "type": "string", "minLength": 1 },
-        "hostname":         { "type": "string", "minLength": 1 },
-        "inlineHttpRoute":  { "type": "boolean" },
-        "omniPitcherUrl":   { "type": "string" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        },
+        "omniPitcherUrl": {
+          "type": "string"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "ledCatcher": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":         { "type": "boolean" },
-        "version":         { "type": "string", "minLength": 1 },
-        "hostname":        { "type": "string", "minLength": 1 },
-        "inlineHttpRoute": { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "notificationCatcher": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Redis Streams consumer that fans messages out to MS Teams / generic webhooks — the other half of the Alertmanager/Grafana chain. No Service and no route. Needs the notify ConfigMap out-of-band and a Secret carrying the webhook URL.",
+      "description": "Redis Streams consumer that fans messages out to MS Teams / generic webhooks \u2014 the other half of the Alertmanager/Grafana chain. No Service and no route. Needs the notify ConfigMap out-of-band and a Secret carrying the webhook URL.",
       "properties": {
-        "enabled":         { "type": "boolean" },
-        "version":         { "type": "string", "minLength": 1 },
-        "redisStream":     { "type": "string", "minLength": 1 },
-        "dryRun":          { "type": "boolean" },
-        "notifyConfigMap": { "type": "string", "minLength": 1 },
-        "teamsWebhookUrl": { "type": "string", "description": "Empty deletes the Secret the base ships, so an out-of-band/ESO-managed one of the same name takes over. Inline literals only via ArgoCD Vault Plugin / SOPS." }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redisStream": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "notifyConfigMap": {
+          "type": "string",
+          "minLength": 1
+        },
+        "teamsWebhookUrl": {
+          "type": "string",
+          "description": "Empty deletes the Secret the base ships, so an out-of-band/ESO-managed one of the same name takes over. Inline literals only via ArgoCD Vault Plugin / SOPS."
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "gitPitcher": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":         { "type": "boolean" },
-        "version":         { "type": "string", "minLength": 1 },
-        "hostname":        { "type": "string", "minLength": 1 },
-        "inlineHttpRoute": { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        },
+        "inlineWatchConfig": {
+          "type": "boolean",
+          "description": "Keep the watch profile shipped in the kustomize OCI. False deletes it and mounts gitPitcherWatchConfigMap instead."
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "httpRoute": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
+        "enabled": {
+          "type": "boolean"
+        },
         "gateway": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "name":      { "type": "string", "minLength": 1 },
-            "namespace": { "type": "string", "minLength": 1 }
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "required": ["name", "namespace"]
+          "required": [
+            "name",
+            "namespace"
+          ]
         }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "secrets": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional sub-Application that materialises the Secrets the workloads consume (omni-pitcher auth-token + redis password, redis-stack auth) from a ClusterSecretStore + Vault path. When `enabled: false` (default), nothing is rendered — the cluster relies on inline `redisPassword`/`authToken` literals or out-of-band-managed Secrets.",
+      "description": "Optional sub-Application that materialises the Secrets the workloads consume (omni-pitcher auth-token + redis password, redis-stack auth) from a ClusterSecretStore + Vault path. When `enabled: false` (default), nothing is rendered \u2014 the cluster relies on inline `redisPassword`/`authToken` literals or out-of-band-managed Secrets.",
       "properties": {
-        "enabled":                { "type": "boolean" },
-        "clusterSecretStoreName": { "type": "string", "minLength": 1 },
-        "vaultSecretName":        { "type": "string", "minLength": 1 },
-        "refreshInterval":        { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "clusterSecretStoreName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vaultSecretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "smokeTest": {
       "type": "object",
       "additionalProperties": false,
       "description": "Optional sub-Application that runs a smoke test against the deployed omni-pitcher: /health on the in-cluster Service, an unauthenticated POST /pitch that must be rejected, an authenticated fixture post, and optionally the same three through the public HTTPRoute. Rendered as an ArgoCD PostSync hook Job, so a failed assertion fails the sync. Requires the omni-pitcher auth-token Secret to exist (inline `authToken` or `secrets.enabled`).",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "image":   { "type": "string", "minLength": 1 },
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
         "podSecurityContext": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Pod-level securityContext. runAsUser must be numeric — curlimages/curl's USER is the name `curl_user`, which the kubelet cannot verify against runAsNonRoot."
+          "description": "Pod-level securityContext. runAsUser must be numeric \u2014 curlimages/curl's USER is the name `curl_user`, which the kubelet cannot verify against runAsNonRoot."
         },
         "hook": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled":      { "type": "boolean" },
-            "deletePolicy": { "type": "string", "enum": ["BeforeHookCreation", "HookSucceeded", "HookFailed"] }
+            "enabled": {
+              "type": "boolean"
+            },
+            "deletePolicy": {
+              "type": "string",
+              "enum": [
+                "BeforeHookCreation",
+                "HookSucceeded",
+                "HookFailed"
+              ]
+            }
           }
         },
         "job": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "backoffLimit":            { "type": "integer", "minimum": 0 },
-            "ttlSecondsAfterFinished": { "type": ["integer", "null"], "minimum": 0 },
-            "activeDeadlineSeconds":   { "type": "integer", "minimum": 1 }
+            "backoffLimit": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "ttlSecondsAfterFinished": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "activeDeadlineSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         },
         "healthCheck": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "attempts":        { "type": "integer", "minimum": 1 },
-            "intervalSeconds": { "type": "integer", "minimum": 1 }
+            "attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "intervalSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         },
         "unauthenticated": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled":      { "type": "boolean" },
-            "expectStatus": { "type": "integer", "minimum": 100, "maximum": 599 }
+            "enabled": {
+              "type": "boolean"
+            },
+            "expectStatus": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            }
           }
         },
         "external": {
@@ -278,12 +583,26 @@
           "additionalProperties": false,
           "description": "Second pass through the public HTTPRoute. The hostname comes from omniPitcher.hostname, not from here.",
           "properties": {
-            "enabled":          { "type": "boolean" },
-            "caConfigMap":      { "type": "string" },
-            "caKey":            { "type": "string" },
-            "connectToGateway": { "type": "boolean", "description": "Derive curl --connect-to from httpRoute.gateway (cilium-gateway-<name>.<ns>.svc.cluster.local), because a Cilium L2-announced LoadBalancer VIP is not reachable from Pods on the same cluster." },
-            "connectTo":        { "type": "string", "description": "Explicit --connect-to host; wins over connectToGateway." },
-            "insecure":         { "type": "boolean" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "caConfigMap": {
+              "type": "string"
+            },
+            "caKey": {
+              "type": "string"
+            },
+            "connectToGateway": {
+              "type": "boolean",
+              "description": "Derive curl --connect-to from httpRoute.gateway (cilium-gateway-<name>.<ns>.svc.cluster.local), because a Cilium L2-announced LoadBalancer VIP is not reachable from Pods on the same cluster."
+            },
+            "connectTo": {
+              "type": "string",
+              "description": "Explicit --connect-to host; wins over connectToGateway."
+            },
+            "insecure": {
+              "type": "boolean"
+            }
           }
         },
         "extraProbes": {
@@ -293,13 +612,31 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "name":     { "type": "string", "minLength": 1 },
-              "service":  { "type": "string", "minLength": 1 },
-              "port":     { "type": "integer", "minimum": 1, "maximum": 65535 },
-              "path":     { "type": "string" },
-              "hostname": { "type": "string" }
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "service": {
+                "type": "string",
+                "minLength": 1
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "path": {
+                "type": "string"
+              },
+              "hostname": {
+                "type": "string"
+              }
             },
-            "required": ["name", "service", "port"]
+            "required": [
+              "name",
+              "service",
+              "port"
+            ]
           }
         },
         "events": {
@@ -309,18 +646,42 @@
             "type": "object",
             "additionalProperties": true,
             "properties": {
-              "title":    { "type": "string", "minLength": 1 },
-              "message":  { "type": "string", "minLength": 1 },
-              "severity": { "type": "string" },
-              "author":   { "type": "string" },
-              "system":   { "type": "string" },
-              "tags":     { "type": "string" }
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "severity": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "system": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "string"
+              }
             },
-            "required": ["title", "message"]
+            "required": [
+              "title",
+              "message"
+            ]
           }
         }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
+    },
+    "gitPitcherWatchConfigMap": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Out-of-band ConfigMap holding git-pitcher's watch-profile.yaml; used only when gitPitcher.inlineWatchConfig is false. Not created by this chart."
     }
   }
 }
