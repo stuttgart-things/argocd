@@ -40,6 +40,13 @@
 {{- if .Values.wledMock.enabled }}
   {{- $probes = append $probes (dict "name" "wled-mock" "service" "homerun2-wled-mock" "port" 80 "path" "/healthz" "hostname" (ternary .Values.wledMock.hostname "" .Values.httpRoute.enabled)) }}
 {{- end }}
+{{- /* demo-pitcher serves the UI and /health on port 80 — checked against
+       demo-pitcher v2.0.0. It is a UI, so /health is all the smoke test
+       asserts; whether its pitches arrive is what core-catcher's and scout's
+       own probes already cover downstream. */}}
+{{- if .Values.demoPitcher.enabled }}
+  {{- $probes = append $probes (dict "name" "demo-pitcher" "service" "homerun2-demo-pitcher" "port" 80 "path" "/health" "hostname" (ternary .Values.demoPitcher.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
 {{- $probes = concat $probes .Values.smokeTest.extraProbes }}
 {{- $stValues := dict
       "name"                 (printf "%s-smoke-test" $appName)
