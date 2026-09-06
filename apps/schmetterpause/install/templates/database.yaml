@@ -8,6 +8,7 @@
       "storage"               .Values.database.storage
       "bootstrap"             .Values.database.bootstrap
       "enableSuperuserAccess" .Values.database.enableSuperuserAccess
+      "protect"               .Values.database.protect
 }}
 ---
 apiVersion: argoproj.io/v1alpha1

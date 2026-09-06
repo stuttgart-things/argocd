@@ -128,6 +128,17 @@ spec:
             database:
               enabled: true
               instances: 1
+              # OFF here, and only here. The Cluster is normally annotated
+              # Prune=false + Delete=false, because the PVC hangs off it and
+              # the permanent instance must survive a bad render. A preview is
+              # the opposite case: it is meant to die with its pull request.
+              #
+              # With the guard on, tearing a preview down leaves the Postgres
+              # pod, its three Services and a 1Gi volume running in a namespace
+              # nothing points at any more — observed on pr-187, 86 minutes
+              # after the pull request was merged and the application was long
+              # gone.
+              protect: false
               storage:
                 # A preview is thrown away in days and holds a fixture, so it
                 # gets an eighth of what the permanent instance has. The

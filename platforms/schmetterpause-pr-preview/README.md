@@ -101,7 +101,13 @@ label exists rather than previews being automatic.
 Closing the pull request drops the generator entry. The
 `resources-finalizer.argocd.argoproj.io` on the parent is what makes that a
 cascading delete rather than an orphaning — without it the pods, the Cluster
-and its PVC stay behind. A cleanup workflow in the app repository deletes both
+and its PVC stay behind.
+
+**The database's own guard has to be off for that to work.** The chart
+annotates the CNPG `Cluster` `Prune=false,Delete=false` by default, which is
+right for the permanent instance and wrong here: with it on, the cascade stops
+at the Cluster and leaves a Postgres pod, three Services and a 1Gi volume
+behind. This set passes `database.protect: false`. A cleanup workflow in the app repository deletes both
 GHCR packages on the same event.
 
 **The namespace itself is not swept.** Argo removes what it manages; an empty
