@@ -13,17 +13,25 @@
 # that were weighed before building it.
 #
 # Prereqs not declared here:
-#   - Secret `schmetterpause-pat` in the argocd namespace on the management
-#     cluster (GitHub PAT with repo:status + public_repo):
-#       kubectl -n argocd create secret generic schmetterpause-pat \
-#         --from-literal=token=<ghp_xxx>
-#   - The target cluster registered as an Argo cluster with label
-#     schmetterpause-pr-preview: "true", and an AppProject of the same name as
-#     the cluster whose destinations allow schmetterpause-pr-* namespaces.
-#   - ClusterSecretStore `vault-schmetterpause` on that cluster. Already there
-#     for the permanent instance, and it authenticates as the cluster's ESO
-#     service account rather than per namespace — so a preview namespace needs
-#     no Vault work of its own.
+#   - The target cluster registered as an Argo cluster with the label
+#     schmetterpause-pr-preview: "true". One label per preview platform is the
+#     convention here: homerun2-pr-preview, machinery-pr-preview and the two
+#     machinery-catalog ones each select their own.
+#
+# What it does NOT need, because the platform already has it:
+#   - No PAT of its own. Every preview ApplicationSet in this catalog reads
+#     `homerun2-omni-pitcher-pat`, including the three machinery ones, which
+#     watch entirely different repositories. It is the shared PR-reader token
+#     under a name it outgrew; a token that can list pull requests on a public
+#     repository can list them on all of them.
+#   - No AppProject work. `cluster-projects` renders proj-<cluster> for every
+#     cluster labelled auto-project, and that chart always grants
+#     `name: <cluster>, namespace: '*'` — so schmetterpause-pr-* is allowed
+#     without an extraDestination.
+#   - No Vault work per preview. ClusterSecretStore `vault-schmetterpause`
+#     authenticates as the cluster's ESO service account rather than per
+#     namespace, so an ExternalSecret in a preview namespace resolves like any
+#     other.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -45,7 +53,12 @@ spec:
                 owner: stuttgart-things
                 repo: schmetterpause
                 tokenRef:
-                  secretName: schmetterpause-pat
+                  # The catalog's shared PR-reader token — the same secret the
+                  # homerun2 and machinery preview sets read. Not a new one:
+                  # a second PAT for the same job is a second thing to rotate,
+                  # and the one that gets forgotten is the one nobody else
+                  # depends on.
+                  secretName: homerun2-omni-pitcher-pat
                   key: token
                 # The `preview` label is the opt-in. CI builds an artefact for
                 # every pull request — that is what makes the Trivy scan see
