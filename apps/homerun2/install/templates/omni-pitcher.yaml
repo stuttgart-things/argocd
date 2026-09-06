@@ -31,6 +31,50 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.omniPitcher.version) | indent 12 }}
+{{- if .Values.omniPitcher.routesContent }}
+        # Config-driven stream routing (homerun2-omni-pitcher#105). ROUTES_CONFIG
+        # names a file, so it needs the ConfigMap from
+        # templates/omni-pitcher-routes.yaml mounted alongside it.
+        #
+        # Patched here rather than left to the kustomize OCI: that artifact is
+        # rendered at release time from the repo's own KCL profile, where
+        # routesConfig is empty, so the base ships no volume to fill.
+        #
+        # A strategic merge on the pod template: volumes and volumeMounts merge
+        # by name, so `tmp` from the base survives and `routes` is added.
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+            spec:
+              template:
+                metadata:
+                  annotations:
+                    # omni-pitcher loads the routing file once at startup and
+                    # exits if it is invalid; kubelet updates a mounted
+                    # ConfigMap in place. Without this the change reaches the
+                    # filesystem and not the process, and looks applied while
+                    # nothing happened.
+                    homerun2.sthings.io/routes-hash: {{ .Values.omniPitcher.routesContent | sha256sum | trunc 16 | quote }}
+                spec:
+                  volumes:
+                    - name: routes
+                      configMap:
+                        name: {{ .Values.omniPitcherRoutesConfigMap | quote }}
+                  containers:
+                    - name: {{ $name }}
+                      env:
+                        - name: ROUTES_CONFIG
+                          value: {{ printf "%s/routes.yaml" .Values.omniPitcher.routesPath | quote }}
+                      volumeMounts:
+                        - name: routes
+                          mountPath: {{ .Values.omniPitcher.routesPath | quote }}
+                          readOnly: true
+{{- end }}
 {{- if .Values.omniPitcher.inlineHttpRoute }}
         # Option B from stuttgart-things/argocd#116 — kustomize OCI ships the
         # HTTPRoute alongside Service so they land atomically. Patch parentRef

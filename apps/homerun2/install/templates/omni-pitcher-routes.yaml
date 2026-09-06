@@ -1,0 +1,43 @@
+{{- /* Materializes the ConfigMap that templates/omni-pitcher.yaml mounts as
+       the routing file. Only rendered when `omniPitcher.routesContent` is set;
+       leaving it empty keeps the single-stream path, where REDIS_STREAM takes
+       every message and no ConfigMap, volume or env var appears at all.
+
+       Routing itself is stuttgart-things/homerun2-omni-pitcher#105; it needed
+       #179 before a kustomize deployment could reach it. */}}
+{{- if and .Values.omniPitcher.enabled .Values.omniPitcher.routesContent }}
+{{- $appName := include "homerun2.appName" . }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-omni-pitcher-routes" $appName | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Ahead of the omni-pitcher Application (wave 0): the container mounts this
+    # ConfigMap as a volume, and a Pod scheduled before it exists sits in
+    # ContainerCreating until Argo gets round to applying it on a later pass.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/homerun2/omni-pitcher-routes
+    helm:
+      releaseName: {{ printf "%s-omni-pitcher-routes" $appName | quote }}
+      valuesObject:
+        name: {{ .Values.omniPitcherRoutesConfigMap | quote }}
+        content: {{ .Values.omniPitcher.routesContent | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
