@@ -106,3 +106,12 @@ database:
     localeCollate: C
     localeCType: C
   enableSuperuserAccess: false
+  # Prune=false + Delete=false on the Cluster object. On by default, and it has
+  # to be: the PVC holds an ownerReference on the Cluster, so a prune or a
+  # cascading Application delete takes the data with it.
+  #
+  # Switch it off ONLY where the database is meant to die with its Application
+  # — a per-PR preview is the case it exists for. With it on, tearing a preview
+  # down leaves the Postgres pod, its Services and its volume running in a
+  # namespace nothing points at any more.
+  protect: true
