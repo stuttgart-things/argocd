@@ -68,6 +68,16 @@ label exists rather than previews being automatic.
 
 ## What it does not need
 
+- **No PAT of its own.** Every preview ApplicationSet in this catalog reads
+  `homerun2-omni-pitcher-pat` — including the three `machinery-*` sets, which
+  watch entirely different repositories. It is the shared PR-reader token under
+  a name it outgrew. A second PAT for the same job is a second thing to rotate,
+  and the one that gets forgotten is the one nobody else depends on.
+- **No AppProject work.** `cluster-projects` in the platform-sthings overlay
+  renders `proj-<cluster>` for every cluster labelled `auto-project: "true"`,
+  and `config/cluster-project/chart` always grants
+  `name: <cluster>, namespace: '*'`. So `schmetterpause-pr-*` is permitted
+  without an `extraDestination`.
 - **No Vault work per preview.** `vault-schmetterpause` is a
   `ClusterSecretStore` authenticating as the cluster's ESO service account, so
   an `ExternalSecret` in a preview namespace resolves like any other.
@@ -96,8 +106,16 @@ same would work here if the shells become a nuisance.
 
 - **No ResourceQuota or LimitRange.** Worth adding before this is used by more
   than a couple of open pull requests at a time.
-- **The AppProject.** The template uses the cluster-named project, whose
-  destinations must permit `schmetterpause-pr-*` namespaces. Verify before the
-  first preview: an AppProject that refuses the namespace fails the child
-  Application, not the parent, so the error is one level down from where it
-  looks like it should be.
+
+## Turning it on
+
+The bootstrap Application belongs beside the other preview platforms in
+`stuttgart-things/stuttgart-things`:
+
+```
+clusters/labul/vsphere/platform-sthings/argocd/schmetterpause-pr-preview-platform.yaml
+```
+
+`application.yaml` in this directory is the same object for a `kubectl apply`
+where that is quicker — it is deliberately not listed in `kustomization.yaml`,
+so the rendered set never contains its own bootstrap.
