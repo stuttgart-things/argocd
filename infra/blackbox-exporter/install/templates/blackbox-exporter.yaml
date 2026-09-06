@@ -1,0 +1,38 @@
+{{- $defaultName := printf "blackbox-exporter-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $computed := dict
+      "config" .Values.config
+      "serviceMonitor" (dict
+        "enabled" (gt (len .Values.targets) 0)
+        "targets" .Values.targets
+      )
+      "prometheusRule" (dict
+        "enabled" .Values.alerts.enabled
+        "rules"   .Values.alerts.rules
+      )
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-blackbox-exporter
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: blackbox-exporter
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

@@ -1,0 +1,114 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where it deploys. A blackbox exporter is only useful where it can reach the
+# URLs it is asked to probe AND be scraped by a Prometheus — in practice, next
+# to that Prometheus.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: monitoring
+
+# Base name for the rendered Application. Empty derives
+# `blackbox-exporter-<sha1(destination.server)[:8]>`, because Applications land
+# in the `argocd` namespace of ONE management cluster and a fixed name would
+# make two clusters' deployments collide on the same object.
+applicationName: ""
+
+# Upstream prometheus-community/prometheus-blackbox-exporter chart version.
+# renovate: datasource=helm depName=prometheus-blackbox-exporter registryUrl=https://prometheus-community.github.io/helm-charts
+chartVersion: 11.18.0
+
+# Prober modules. Both are the upstream `http_2xx` with `preferred_ip_protocol:
+# ip4` — without which a dual-stack node resolves AAAA first and the probe fails
+# for a reason that has nothing to do with the target.
+#
+# `http_2xx_untrusted_ca` exists for hosts whose certificate is issued by an
+# internal CA the exporter image does not trust. It still exports
+# `probe_ssl_earliest_cert_expiry`, because the peer certificate is presented
+# and parsed either way — so the expiry alert keeps working while validity does
+# not. Making validity real needs the CA bundle mounted (trust-manager runs on
+# the platform cluster and publishes one); until then, choosing this module is
+# a deliberate, visible trade rather than a silent `-k`.
+config:
+  modules:
+    http_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        follow_redirects: true
+        preferred_ip_protocol: ip4
+    http_2xx_untrusted_ca:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        follow_redirects: true
+        preferred_ip_protocol: ip4
+        tls_config:
+          insecure_skip_verify: true
+
+# What to probe. Each entry becomes one ServiceMonitor that scrapes the
+# exporter's /probe with this target's parameters — so a target is added here,
+# not in the Prometheus configuration.
+#
+# Empty by default: an exporter with no targets is inert rather than wrong, and
+# every target belongs to an environment rather than to the catalog.
+#
+#   - name: example              # appears as the job in Prometheus / Alertmanager
+#     url: https://example.com/  # what blackbox fetches
+#     module: http_2xx           # optional, defaults to http_2xx
+#     interval: 60s              # optional
+targets: []
+
+# Alerts over whatever is in `targets`. Generic on purpose: they are written
+# against `probe_*` metrics rather than against one service, so adding a target
+# above also gets it watched.
+#
+# `severity` is load-bearing where kube-prometheus-stack routes
+# `severity =~ "warning|critical"` onward and drops everything else.
+alerts:
+  enabled: true
+  rules:
+    - alert: BlackboxProbeFailed
+      expr: probe_success == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "{{ $labels.instance }} does not answer"
+        description: >-
+          The blackbox probe for {{ $labels.instance }} has been failing for 5
+          minutes. This covers the whole path a user takes — DNS, the gateway,
+          the certificate and the application — so it says people cannot use it,
+          not which part broke.
+    - alert: BlackboxCertificateExpiringSoon
+      expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+      for: 1h
+      labels:
+        severity: warning
+      annotations:
+        summary: "The certificate for {{ $labels.instance }} expires in under 14 days"
+        description: >-
+          Renewal is somebody's job somewhere; this is the alert that says
+          nobody did it. Fourteen days is enough to notice over a holiday.
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
