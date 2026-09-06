@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.name | quote }}
+data:
+  routes.yaml: |
+{{ .Values.content | indent 4 }}

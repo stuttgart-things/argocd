@@ -44,6 +44,11 @@ trustBundleConfigMap: cluster-trust-bundle
 # out-of-band (cluster-specific config) and the chart only references it; set
 # `k8sPitcher.profileContent` to have the chart materialize it under this name
 # instead.
+# Name of the ConfigMap holding omni-pitcher's routing file. Only used when
+# omniPitcher.routesContent is set, in which case the chart both creates it and
+# mounts it, so the two cannot drift apart.
+omniPitcherRoutesConfigMap: homerun2-omni-pitcher-routes
+
 k8sPitcherProfileConfigMap: homerun2-k8s-pitcher-profile
 # Out-of-band ConfigMap holding git-pitcher's watch-profile.yaml, used only
 # when gitPitcher.inlineWatchConfig is false. Provision it yourself; the key
@@ -107,6 +112,30 @@ omniPitcher:
   # omni-pitcher. Flip to true on consumers (AppSet valuesObject) once they
   # consume an OCI tag built after stuttgart-things/homerun2-omni-pitcher#125.
   inlineHttpRoute: false
+
+  # Config-driven stream routing (homerun2-omni-pitcher#105): an allowlist of
+  # streams, a default, and ordered rules matching on system, author, tags or
+  # title. Empty — the default — keeps the single-stream path, where
+  # REDIS_STREAM takes every message and no ConfigMap, volume or env var is
+  # rendered at all.
+  #
+  # Set it, and the chart materializes the routing file as a ConfigMap and
+  # mounts it. Worth setting as soon as a second consumer wants a stream of its
+  # own: without a rule a producer's messages land on the default stream, the
+  # pitch still succeeds, and a catcher watching the other stream shows nothing
+  # while both sides look healthy.
+  #
+  #   routesContent: |
+  #     streams: [messages, tabletennis]
+  #     default_stream: messages
+  #     routes:
+  #       - match: { system: tabletennis }
+  #         stream: tabletennis
+  routesContent: ""
+
+  # Where the routing file is mounted. ROUTES_CONFIG points at
+  # <routesPath>/routes.yaml.
+  routesPath: /config/routing
 
 # core-catcher (Redis Streams consumer + web dashboard).
 coreCatcher:

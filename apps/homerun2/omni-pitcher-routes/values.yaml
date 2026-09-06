@@ -1,0 +1,18 @@
+---
+# Name of the ConfigMap to materialize. Must match
+# `omniPitcherRoutesConfigMap` in apps/homerun2/install, which is what the
+# omni-pitcher Deployment patch mounts.
+name: homerun2-omni-pitcher-routes
+
+# The routing file as a YAML string. Shape and semantics live in
+# stuttgart-things/homerun2-omni-pitcher `internal/routing/config.go`:
+# an allowlist of streams, a default, and ordered rules whose matchers are
+# ANDed and evaluated first-match-wins.
+#
+# The default below is deliberately inert: one stream, no rules, so every
+# message goes where it went before routing existed. Override it.
+content: |
+  streams:
+    - messages
+  default_stream: messages
+  routes: []

@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: homerun2-omni-pitcher-routes
+description: ConfigMap carrying omni-pitcher's stream routing rules — loaded as a sub-Application by apps/homerun2/install when `omniPitcher.routesContent` is set.
+type: application
+version: 0.1.0

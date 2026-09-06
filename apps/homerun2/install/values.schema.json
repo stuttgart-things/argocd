@@ -207,6 +207,14 @@
         },
         "inlineHttpRoute": {
           "type": "boolean"
+        },
+        "routesContent": {
+          "type": "string",
+          "description": "omni-pitcher stream routing file as a YAML string: streams allowlist, default_stream, ordered routes. Empty keeps the single-stream path."
+        },
+        "routesPath": {
+          "type": "string",
+          "description": "Mount path for the routing file; ROUTES_CONFIG points at <routesPath>/routes.yaml."
         }
       },
       "required": [
@@ -686,6 +694,10 @@
       "type": "string",
       "minLength": 1,
       "description": "Out-of-band ConfigMap holding git-pitcher's watch-profile.yaml; used only when gitPitcher.inlineWatchConfig is false. Not created by this chart."
+    },
+    "omniPitcherRoutesConfigMap": {
+      "type": "string",
+      "description": "Name of the ConfigMap holding omni-pitcher's routing file. Only used when omniPitcher.routesContent is set."
     }
   }
 }
