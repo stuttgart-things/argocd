@@ -1,0 +1,140 @@
+---
+# Per-PR preview environments for stuttgart-things/schmetterpause.
+#
+# Fans out across (clusters labelled schmetterpause-pr-preview: "true") ×
+# (open PRs on schmetterpause carrying the `preview` label). One parent
+# Application per cell, rendering apps/schmetterpause/install with the PR's
+# artefact, its own namespace, its own hostname and its own database.
+#
+# Why this app gets previews at all: Schmetterpause is a browser app whose
+# premise is a colleague opening it on their phone in a break. "Does this look
+# right on your phone?" is a question a preview URL answers and a diff does
+# not. See stuttgart-things/schmetterpause#82, which also records the triggers
+# that were weighed before building it.
+#
+# Prereqs not declared here:
+#   - Secret `schmetterpause-pat` in the argocd namespace on the management
+#     cluster (GitHub PAT with repo:status + public_repo):
+#       kubectl -n argocd create secret generic schmetterpause-pat \
+#         --from-literal=token=<ghp_xxx>
+#   - The target cluster registered as an Argo cluster with label
+#     schmetterpause-pr-preview: "true", and an AppProject of the same name as
+#     the cluster whose destinations allow schmetterpause-pr-* namespaces.
+#   - ClusterSecretStore `vault-schmetterpause` on that cluster. Already there
+#     for the permanent instance, and it authenticates as the cluster's ESO
+#     service account rather than per namespace — so a preview namespace needs
+#     no Vault work of its own.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: schmetterpause-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  schmetterpause-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: schmetterpause
+                tokenRef:
+                  secretName: schmetterpause-pat
+                  key: token
+                # The `preview` label is the opt-in. CI builds an artefact for
+                # every pull request — that is what makes the Trivy scan see
+                # one — but a Renovate bump does not need a Postgres and a
+                # hostname, so the environment waits for somebody to ask.
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'schmetterpause-pr-{{ .number }}'
+      labels:
+        schmetterpause.stuttgart-things.com/pr: '{{ .number }}'
+      # Without this finalizer Argo deletes the Application the moment the
+      # generator drops the entry and orphans everything it managed — the
+      # child Applications, the pods, and the CNPG Cluster with its PVC. With
+      # it, prune runs over every managed resource first.
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      # The parent renders Applications, so it must land in argocd on the
+      # management cluster. The workload cluster has no argoproj.io CRDs, and
+      # pointing the parent at it fails with "failed to discover server
+      # resources for group version argoproj.io/v1alpha1".
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/schmetterpause/install
+        helm:
+          releaseName: 'schmetterpause-pr-{{ .number }}'
+          valuesObject:
+            # NOT the parent's name. The chart uses applicationName verbatim
+            # for the app Application and `<name>-db` for the database, so a
+            # child called `schmetterpause-pr-5` would be the same object as
+            # its parent, overwrite the parent's spec, and leave the sync
+            # waiting on the deletion of itself.
+            applicationName: 'schmetterpause-pr-{{ .number }}-app'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'schmetterpause-pr-{{ .number }}'
+
+            # The per-PR artefact. CI tags the image and the kustomize base
+            # with pr-<number>-<full head sha>, which is exactly what
+            # .head_sha carries — and the artefact under that tag is the only
+            # one that contains the seed Job, so a preview fills itself with a
+            # demo field instead of coming up as an empty ranking.
+            version: 'pr-{{ .number }}-{{ .head_sha }}'
+
+            # Covered by the gateway's wildcard certificate
+            # (*.homerun2-test1.sthings-vsphere.labul.sva.de) and by wildcard
+            # DNS, so a new PR needs neither a record nor a certificate.
+            hostname: 'schmetterpause-pr-{{ .number }}.homerun2-test1.sthings-vsphere.labul.sva.de'
+
+            gateway:
+              name: homerun2-test1-gateway
+              namespace: default
+
+            secretStore:
+              kind: ClusterSecretStore
+              name: vault-schmetterpause
+
+            database:
+              enabled: true
+              instances: 1
+              storage:
+                # A preview is thrown away in days and holds a fixture, so it
+                # gets an eighth of what the permanent instance has. The
+                # number matters: this is one PVC per open labelled pull
+                # request, which is the cost #82 called the expensive half.
+                size: 1Gi
+                # Explicit, always: this cluster has TWO default
+                # StorageClasses (local-path and openebs-hostpath), and an
+                # unclassed PVC gets an undefined one of them.
+                storageClass: openebs-hostpath
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
