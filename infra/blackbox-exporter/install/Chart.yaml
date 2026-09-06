@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: blackbox-exporter-install
+description: App-of-apps entry for prometheus-community/prometheus-blackbox-exporter. Probes URLs from outside the cluster they run in and turns each target into a ServiceMonitor the Prometheus Operator scrapes, plus generic alerts on reachability and certificate expiry.
+type: application
+version: 0.1.0
+appVersion: "11.18.0"
