@@ -54,7 +54,7 @@ syncPolicy:
 # off auto-merge for exactly that reason; do not fold them back in.
 #
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-version: v0.1.0
+version: v0.3.0
 
 # FQDN the app is served on. Patched into both HTTPRoutes and into
 # SP_PUBLIC_BASE_URL, which the app uses to build absolute links — the base
