@@ -52,9 +52,15 @@ metadata:
     schmetterpause-pr-preview: "true"
 ```
 
-In `stuttgart-things/stuttgart-things` cluster overlays this goes in the
-`ClusterbookCluster` `spec.labels` block, which Clusterbook propagates to the
-Argo cluster Secret.
+In `stuttgart-things/stuttgart-things` this goes in the `ClusterbookCluster`
+`spec.labels` block, which Clusterbook propagates to the Argo cluster Secret —
+for homerun2-test1 that is
+`clusters/labul/vsphere/platform-sthings/argocd/homerun2-test1/cluster.yaml`.
+
+**Watch out for how this fails.** With no cluster carrying the label the
+ApplicationSet reports `generated 0 applications` — which is exactly what it
+reports when no pull request carries `preview`. Nothing is red either way. The
+`ParametersGenerated` condition distinguishes them.
 
 **`preview` on the pull request**, so a change chooses to have an environment.
 CI publishes an artefact for *every* pull request — that is what lets the Trivy
@@ -109,8 +115,8 @@ same would work here if the shells become a nuisance.
 
 ## Turning it on
 
-The bootstrap Application belongs beside the other preview platforms in
-`stuttgart-things/stuttgart-things`:
+Done, and running since 2026-09-06. The bootstrap Application sits beside the
+other preview platforms in `stuttgart-things/stuttgart-things`:
 
 ```
 clusters/labul/vsphere/platform-sthings/argocd/schmetterpause-pr-preview-platform.yaml
@@ -119,3 +125,8 @@ clusters/labul/vsphere/platform-sthings/argocd/schmetterpause-pr-preview-platfor
 `application.yaml` in this directory is the same object for a `kubectl apply`
 where that is quicker — it is deliberately not listed in `kustomization.yaml`,
 so the rendered set never contains its own bootstrap.
+
+The first cell, end to end, took about ten minutes from the label: CI published
+`pr-187-7589b21f…` for both packages, the ApplicationSet picked it up on its
+next poll, and the seed job reported `players=6 confirmed=10 pending=1
+disputed=1` before the page answered 200 under the wildcard certificate.
