@@ -9,6 +9,18 @@ on:
   push:
     branches:
       - main
+  # Manual trigger, for re-running a release that did not produce the tag it
+  # should have -- the pinned-majors comment below describes exactly such a
+  # silent failure, and without this the only way back was an empty push.
+  #
+  # It does NOT force a tag: semantic-release still decides from the commits
+  # since the last tag, and `chore(deps)`-only history (a run of Renovate
+  # chart bumps) releases nothing. Those bumps therefore sit on main in no
+  # tag, unpromotable, until a feat/fix lands and carries them along. If that
+  # wait ever becomes the problem rather than the safeguard, the fix is a
+  # commit-analyzer `releaseRules` entry making `chore(deps)` a patch -- not
+  # this trigger.
+  workflow_dispatch:
 
 permissions:
   contents: write       # create tags + releases
