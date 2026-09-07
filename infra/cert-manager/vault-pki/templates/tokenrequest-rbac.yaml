@@ -1,0 +1,71 @@
+{{- $auth := .Values.vault.auth }}
+{{- $method := $auth.method | default "token" }}
+{{- if and (eq $method "kubernetes") .Values.rbac.create }}
+{{- $k8s := $auth.kubernetes }}
+{{- /* The ServiceAccount whose token is minted — same default as the
+       ClusterIssuer's serviceAccountRef, so the two cannot drift. */}}
+{{- $loginSA := $k8s.role }}
+{{- if and $k8s.serviceAccountRef $k8s.serviceAccountRef.name }}
+  {{- $loginSA = $k8s.serviceAccountRef.name }}
+{{- end }}
+---
+# cert-manager mints the Vault login token through the TokenRequest API, which
+# needs `create` on serviceaccounts/token.
+#
+# THE cert-manager CHART USED TO SHIP THIS AND NO LONGER DOES. v1.18.x rendered
+# Role/cert-manager-tokenrequest; v1.21.x renders no serviceaccounts/token rule
+# at all, and there is no values flag to bring it back.
+#
+# Without it the failure is invisible in the obvious place: the ClusterIssuer
+# still reports Ready=True, because cert-manager verifies only the Vault LOGIN,
+# never the ability to sign. Certificates simply never appear, and the only
+# signal anywhere is the cert-manager log. So it ships here, next to the issuer
+# that needs it — mirroring stuttgart-things/flux, component
+# infra/cert-manager/components/vault-issuer, which does the same for clusters
+# that get their issuer from Flux rather than from this chart.
+#
+# Set rbac.create=false where something else already owns this Role — two
+# owners for one identity is not a conflict either side resolves.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cert-manager-tokenrequest
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: [{{ $loginSA | quote }}]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cert-manager-tokenrequest
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cert-manager-tokenrequest
+subjects:
+  # BIND THE CONTROLLER, NOT THE LOGIN ServiceAccount.
+  #
+  # The actor that CALLS TokenRequest is the cert-manager controller
+  # (system:serviceaccount:<ns>:cert-manager). The login SA is the one whose
+  # token gets minted — that is `resourceNames` above, not a subject here.
+  #
+  # The two are equal only while serviceAccountRef defaults to the role name
+  # and that role is called `cert-manager`. A dedicated login SA — e.g. the
+  # `certmanager` SA that vault-base-setup's Terraform creates and binds the
+  # Vault role to — makes them differ, and binding the login SA here leaves the
+  # controller forbidden from `create serviceaccounts/token`, so the issuer
+  # never mints a token at all.
+  - kind: ServiceAccount
+    name: {{ .Values.rbac.tokenRequesterServiceAccount | quote }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

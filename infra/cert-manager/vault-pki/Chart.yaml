@@ -3,5 +3,5 @@ apiVersion: v2
 name: cert-manager-vault-pki
 description: cert-manager Vault PKI ClusterIssuer (token or kubernetes auth) rendered from values
 type: application
-version: 0.2.0
+version: 0.3.0
 appVersion: "1.18.2"

@@ -41,9 +41,27 @@ vault:
       role: ""
       serviceAccountRef:
         # ServiceAccount cert-manager presents when logging in. Defaults to the
-        # role name. It must be listed in the Vault role's
-        # bound_service_account_names, and the cert-manager controller needs
-        # permission to create tokens for it — the chart-shipped
-        # cert-manager-tokenrequest Role is scoped to the "cert-manager"
-        # ServiceAccount only, so any other one needs its own grant.
+        # role name. It must exist in this namespace and be listed in the Vault
+        # role's bound_service_account_names — both are created Vault-side, by
+        # vault-base-setup's `k8s_auths`, not by this chart.
+        #
+        # The cert-manager controller also needs permission to mint tokens for
+        # it. That grant is the cert-manager-tokenrequest Role below, which
+        # follows this name automatically.
         name: ""
+
+# RBAC that lets the cert-manager CONTROLLER mint the login token. Rendered only
+# when vault.auth.method is "kubernetes"; token auth needs none of it.
+rbac:
+  # Ship the cert-manager-tokenrequest Role/RoleBinding.
+  #
+  # Set false only where something ELSE already owns that Role in this
+  # namespace — notably a cluster whose issuer comes from stuttgart-things/flux
+  # (component infra/cert-manager/components/vault-issuer), which ships the same
+  # pair. Two owners for one identity is not a conflict either side resolves.
+  create: true
+  # The ServiceAccount that CALLS TokenRequest — the cert-manager controller,
+  # NOT the ServiceAccount whose token is minted (that is
+  # vault.auth.kubernetes.serviceAccountRef.name). Change this only if the
+  # controller runs under a non-default ServiceAccount.
+  tokenRequesterServiceAccount: cert-manager
