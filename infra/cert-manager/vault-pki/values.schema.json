@@ -106,6 +106,24 @@
         }
       }
     },
+    "rbac": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "RBAC letting the cert-manager controller mint the Vault login token via the TokenRequest API. Rendered only when vault.auth.method is \"kubernetes\". The cert-manager chart shipped this Role up to v1.18.x and stopped in v1.21.x, with no values flag to restore it — and its absence is silent: the ClusterIssuer still reports Ready=True (cert-manager verifies the Vault login, never the ability to sign) while no certificate is ever issued.",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ship the cert-manager-tokenrequest Role/RoleBinding. Set false only where something else already owns that Role in this namespace — e.g. a cluster whose issuer comes from stuttgart-things/flux, which ships the same pair."
+        },
+        "tokenRequesterServiceAccount": {
+          "type": "string",
+          "minLength": 1,
+          "default": "cert-manager",
+          "description": "ServiceAccount that CALLS TokenRequest — the cert-manager controller, not the ServiceAccount whose token is minted (that is vault.auth.kubernetes.serviceAccountRef.name, which the Role's resourceNames follows)."
+        }
+      }
+    },
     "destination": {
       "type": "object",
       "additionalProperties": true,

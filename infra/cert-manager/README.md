@@ -9,7 +9,7 @@ infra/cert-manager/
 ├── install/       app-of-apps — renders Application "cert-manager" → jetstack/cert-manager
 ├── selfsigned/    plain Helm chart — renders the `selfsigned` ClusterIssuer
 ├── cluster-ca/    plain Helm chart — renders CA Certificate + CA ClusterIssuer + optional wildcard Certificate(s)
-├── vault-pki/     plain Helm chart — renders a Vault PKI ClusterIssuer (token auth)
+├── vault-pki/     plain Helm chart — renders a Vault PKI ClusterIssuer (token or kubernetes auth)
 └── README.md
 ```
 
@@ -22,6 +22,7 @@ Typical combinations:
 | Full CA chain (prod) | `install`, `selfsigned`, `cluster-ca` |
 | CA chain on top of an already-installed cert-manager | `selfsigned`, `cluster-ca` |
 | Additional CA chain on a cluster that already has one | `cluster-ca` with renamed `ca.name` + `ca.secretName` |
+| Vault-backed issuer, tokenless (preferred — Vault-side Kubernetes auth mount required) | `install`, `vault-pki` with `vault.auth.method: kubernetes` |
 | Vault-backed issuer (token Secret pre-provisioned) | `install`, `vault-pki` |
 
 ## install/
@@ -157,7 +158,13 @@ spec:
 
 ## vault-pki/
 
-Plain Helm chart that renders a single `vault`-type `ClusterIssuer` using token authentication. Requires a pre-provisioned `Secret` (default name `vault-pki-token`) in the cert-manager namespace carrying the Vault token under the configured key — provisioned out-of-band (e.g. by Terraform, like [`vault-cert-issuer`](https://github.com/stuttgart-things/stuttgart-things/tree/main/clusters/labul/vsphere/platform-sthings/vault-cert-issuer)).
+Plain Helm chart that renders a single `vault`-type `ClusterIssuer`, with either of two authentication methods selected by `vault.auth.method`.
+
+**`token`** (the default) uses a pre-provisioned `Secret` (default name `vault-pki-token`) in the cert-manager namespace carrying the Vault token under the configured key — provisioned out-of-band (e.g. by Terraform, like [`vault-cert-issuer`](https://github.com/stuttgart-things/stuttgart-things/tree/main/clusters/labul/vsphere/platform-sthings/vault-cert-issuer)). Nothing renews that token and Vault caps its TTL, so issuance starts failing once it expires — while the ClusterIssuer keeps reporting `Ready=True`.
+
+**`kubernetes`** removes the credential instead of lengthening it: cert-manager mints a short-lived ServiceAccount token per signing request through the TokenRequest API, and nothing long-lived is stored in the cluster. **Prefer it.** It needs a Kubernetes auth mount and role on the Vault side, plus the ServiceAccount it binds — all created Vault-side by [`vault-base-setup`](https://github.com/stuttgart-things/vault-base-setup)'s `k8s_auths`, not by this chart. The mount path, role and ServiceAccount name must match that configuration exactly; the module derives the mount from `<cluster_name>-<name>`.
+
+The chart does ship the `cert-manager-tokenrequest` Role/RoleBinding the method needs (`rbac.create`, kubernetes auth only). The cert-manager chart rendered that Role up to v1.18.x and stopped in v1.21.x with no values flag to restore it, and its absence is silent — the ClusterIssuer reports `Ready=True` because cert-manager verifies the Vault *login* and never the ability to sign, so certificates simply never appear and the only signal is the cert-manager log. Set `rbac.create: false` where something else already owns that Role, such as a cluster whose issuer comes from [stuttgart-things/flux](https://github.com/stuttgart-things/flux) (component `infra/cert-manager/components/vault-issuer`), which ships the same pair.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -196,8 +203,15 @@ spec:
 | `name` | `vault-pki` | ClusterIssuer name — referenced by `Certificate.spec.issuerRef.name` |
 | `vault.server` | placeholder | Vault server URL (`https://...`) |
 | `vault.path` | placeholder | Vault PKI sign path (`pki/sign/<role>`) |
-| `vault.auth.tokenSecretRef.name` | `vault-pki-token` | Secret in the cert-manager namespace holding the Vault token |
-| `vault.auth.tokenSecretRef.key` | `token` | Key inside the Secret holding the raw token |
+| `vault.auth.method` | `token` | `token` or `kubernetes`. Empty counts as `token`, so an ApplicationSet may pass a missing cluster annotation through unconditionally |
+| `vault.auth.tokenSecretRef.name` | `vault-pki-token` | **token auth** — Secret in the cert-manager namespace holding the Vault token |
+| `vault.auth.tokenSecretRef.key` | `token` | **token auth** — key inside the Secret holding the raw token |
+| `vault.auth.kubernetes.mountPath` | `""` | **kubernetes auth** — Vault auth mount *including* the `/v1/auth/` prefix, e.g. `/v1/auth/my-cluster-certmanager` |
+| `vault.auth.kubernetes.role` | `""` | **kubernetes auth** — Vault role name on that mount |
+| `vault.auth.kubernetes.serviceAccountRef.name` | role name | **kubernetes auth** — ServiceAccount cert-manager presents when logging in. Must exist and be in the Vault role's `bound_service_account_names` |
+| `vault.caBundleSecretRef.name` / `.key` | unset | Optional Secret carrying the Vault server's CA bundle, for verifying its TLS. Omit for an in-cluster `http://` address, where there is nothing to verify |
+| `rbac.create` | `true` | Ship the `cert-manager-tokenrequest` Role/RoleBinding (kubernetes auth only) |
+| `rbac.tokenRequesterServiceAccount` | `cert-manager` | ServiceAccount that *calls* TokenRequest — the controller, not the one whose token is minted |
 
 ## Fleet — one `ApplicationSet` per piece
 
