@@ -1,0 +1,24 @@
+{{- if .Values.defaultRuntimeConfig.enabled }}
+---
+# The DeploymentRuntimeConfig named `default` is special: Crossplane applies it
+# to every package runtime that does not reference one of its own — which is
+# exactly the providers it installs itself from a Configuration's `dependsOn`,
+# and every Function. Those CRs are created by the package manager and cannot be
+# declared here (a second CR for the same source collides in the package Lock —
+# see the note on provider-kubernetes in values.yaml), so this is the only
+# GitOps-reachable way to set anything on their Deployments.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: default
+spec:
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              env:
+                {{- toYaml .Values.defaultRuntimeConfig.env | nindent 16 }}
+{{- end }}
