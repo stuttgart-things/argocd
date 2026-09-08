@@ -57,3 +57,64 @@ awsFamily:
   enabled: false
   version: v1.1.0
   services: []
+
+# DeploymentRuntimeConfig `default` — settings for the package runtimes this
+# chart cannot declare.
+#
+# Crossplane applies the DeploymentRuntimeConfig named `default` to every
+# provider and function Deployment that does not name one of its own. That is
+# the only handle we have on the packages the package manager installs itself
+# from `dependsOn` — provider-kubernetes above all, which for the reason stated
+# further up must NOT be declared as a Provider here.
+#
+# WHY THIS IS ON: ENABLE_SERVER_SIDE_APPLY=false
+#
+# provider-kubernetes v1.2.1 defaults `--enable-server-side-apply` to TRUE
+# (cmd/provider/main.go:96) despite the feature being gated as beta. That
+# installs SSAResourceSyncer, whose GetDesiredState issues a **dry-run
+# server-side apply on every Observe** (syncer.go:114) — a workaround for
+# kubernetes/kubernetes#115563, where SSA defaulting otherwise makes observed
+# and desired state differ forever.
+#
+# The dry run writes to the object's spec, and some resources refuse that. A
+# completed Tekton PipelineRun is the case we hit:
+#
+#   observe failed: cannot get desired state: cannot dry run SSA: admission
+#   webhook "validation.webhook.pipeline.tekton.dev" denied the request:
+#   Once the PipelineRun is complete, no updates are allowed: spec
+#
+# `Observe` calls GetDesiredState unconditionally, with no reference to
+# `managementPolicies` (object.go:421) — so this cannot be avoided from the
+# Composition side. Not by dropping `Update`, not even by `["Observe"]` alone,
+# because Observe is itself the caller.
+#
+# The consequence is not cosmetic. Crossplane observes before it deletes, so a
+# failing Observe means the Delete path never runs: the Object's finalizer is
+# never released, the XR above it cannot finish deleting, and clearing the
+# finalizer by hand orphans the external resource permanently — nothing owns it
+# afterwards. On crossplane-mgmt this held `jonathan` in deletion for seven days
+# (2026-08-31 to 2026-09-07) and leaked a PipelineRun each time.
+#
+# With SSA off, PatchingResourceSyncer.GetDesiredState is just
+# `parseManifest(obj)` (syncer.go:49) — no API call, nothing for a webhook to
+# reject. That is how provider-kubernetes behaved before v1.x.
+#
+# THE COST, stated plainly: every Object on the cluster goes back to
+# client-side apply with the `last-applied-configuration` annotation. That is
+# the older mechanism, with the older weaknesses — the annotation is subject to
+# the 256 KB metadata limit, and field ownership is tracked by convention
+# rather than by the API server. Upstream made SSA the default deliberately.
+#
+# Measured on crossplane-mgmt, 2026-09-08: 44 Objects, 4 providers, 7 functions,
+# 11 Configurations and 13 XRs before and after. The only change was the two
+# wrapped PipelineRuns going Synced=False -> True. Nothing else moved.
+#
+# Set `enabled: false` to leave the cluster on the upstream default.
+#
+# The env applies to functions too, which never read it — an inert variable, at
+# the price of restarting their pods when this list changes.
+defaultRuntimeConfig:
+  enabled: true
+  env:
+    - name: ENABLE_SERVER_SIDE_APPLY
+      value: "false"
