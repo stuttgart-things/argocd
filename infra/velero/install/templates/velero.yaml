@@ -16,8 +16,20 @@
     "name" "trust-bundle"
     "mountPath" .Values.trustBundle.mountPath
     "readOnly" true)) }}
+{{- /*
+  configuration.extraEnvVars is a LIST of name/value, not a dict. The upstream
+  chart changed this field's shape in 10.0.0 (9.x took a map) and enforces it
+  in values.schema.json, so the dict form does not misbehave -- it fails the
+  install outright with
+
+    at '/configuration/extraEnvVars': got object, want array
+
+  whatever sslCertDir resolves to. chartVersion has been 12.1.0 since the
+  renovate bump, so this app could not have installed since; nobody noticed
+  because no cluster deploys it yet.
+*/}}
 {{- $_ := set $computed "configuration" (dict
-    "extraEnvVars" (dict "SSL_CERT_DIR" (.Values.sslCertDir | default ""))
+    "extraEnvVars" (list (dict "name" "SSL_CERT_DIR" "value" (.Values.sslCertDir | default "")))
     "backupStorageLocation" (list (dict
         "name" "default"
         "provider" "aws"
