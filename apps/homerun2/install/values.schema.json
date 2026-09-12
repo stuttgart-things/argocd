@@ -268,6 +268,38 @@
         },
         "inlineHttpRoute": {
           "type": "boolean"
+        },
+        "profile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Render the ScoutProfile CR through apps/homerun2/scout-profile."
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Must match SCOUT_PROFILE_NAME of the scout base (default)."
+            },
+            "spec": {
+              "type": "object",
+              "description": "ScoutProfile spec (homerun2-scout docs/scout-profile.md). alerting.pitcherToken is rejected: the token comes from homerun2-omni-pitcher-token.",
+              "properties": {
+                "alerting": {
+                  "type": "object",
+                  "not": {
+                    "required": [
+                      "pitcherToken"
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "required": [

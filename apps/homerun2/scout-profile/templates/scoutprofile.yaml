@@ -1,0 +1,6 @@
+apiVersion: homerun2.stuttgart-things.com/v1alpha1
+kind: ScoutProfile
+metadata:
+  name: {{ .Values.name | quote }}
+spec:
+{{ toYaml .Values.spec | indent 2 }}

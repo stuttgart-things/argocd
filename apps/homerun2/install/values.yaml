@@ -183,6 +183,23 @@ scout:
   # stuttgart-things/homerun2-scout#55 (which enables HTTPRoute rendering
   # in the kustomize base).
   inlineHttpRoute: false
+  # ScoutProfile CR (apps/homerun2/scout-profile, sync-wave 1). scout reads it
+  # at startup; without one it logs "could not load ScoutProfile" and runs on
+  # its environment defaults, which leave alerting off. `name` must match the
+  # base's SCOUT_PROFILE_NAME (`default`). With alerting.pitcherURL set, scout
+  # gets ALERT_PITCHER_TOKEN from homerun2-omni-pitcher-token - do not put a
+  # pitcherToken into spec (the schema rejects it).
+  profile:
+    enabled: false
+    name: default
+    spec:
+      retention:
+        enabled: true
+      # alerting:
+      #   pitcherURL: http://homerun2-omni-pitcher.homerun2.svc.cluster.local  # base URL; scout appends /pitch
+      #   errorThreshold: 20
+      #   criticalThreshold: 5
+      #   cooldown: 30m
 
 # k8s-pitcher (informers/collectors → omni-pitcher). Often deployed in a different
 # namespace from the rest of the stack; override `namespace` if needed.

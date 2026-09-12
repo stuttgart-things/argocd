@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: homerun2-scout-profile
+description: homerun2-scout's ScoutProfile custom resource — loaded as a sub-Application by apps/homerun2/install when `scout.profile.enabled` is set.
+type: application
+version: 0.1.0

@@ -1,0 +1,14 @@
+---
+# Name of the ScoutProfile. Must match SCOUT_PROFILE_NAME of the scout
+# Deployment, which the kustomize base sets to `default`.
+name: default
+
+# spec of the ScoutProfile (homerun2.stuttgart-things.com/v1alpha1). Schema:
+# stuttgart-things/homerun2-scout docs/scout-profile.md. scout reads it once
+# at startup; non-empty fields override its environment.
+#
+# Never put alerting.pitcherToken here: apps/homerun2/install hands scout the
+# token from a Secret (ALERT_PITCHER_TOKEN) instead.
+spec:
+  retention:
+    enabled: true

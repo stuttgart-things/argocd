@@ -18,6 +18,7 @@ apps/homerun2/
 │       ├── omni-pitcher.yaml                  Application "...-omni-pitcher"       (sync-wave 0)
 │       ├── core-catcher.yaml                  Application "...-core-catcher"       (sync-wave 0)
 │       ├── scout.yaml                         Application "...-scout"              (sync-wave 0)
+│       ├── scout-profile.yaml                 Application "...-scout-profile"      (sync-wave 1, only with scout.profile.enabled)
 │       ├── k8s-pitcher.yaml                   Application "...-k8s-pitcher"        (sync-wave 0)
 │       ├── light-catcher.yaml                 Application "...-light-catcher"      (sync-wave 0)
 │       ├── wled-mock.yaml                     Application "...-wled-mock"          (sync-wave 0)

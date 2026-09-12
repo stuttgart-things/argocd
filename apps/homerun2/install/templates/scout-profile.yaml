@@ -1,0 +1,46 @@
+{{- /* Materializes scout's ScoutProfile CR (alerting, retention, interval)
+       through apps/homerun2/scout-profile. Without it scout logs "could not
+       load ScoutProfile, using env defaults" and alerting stays off unless the
+       base's environment enables it.
+
+       Wave 1, after the scout Application: its kustomize base ships the
+       ScoutProfile CRD, and a CR applied before the CRD exists fails the dry
+       run - SkipDryRunOnMissingResource lets the first sync through. scout
+       reads the profile only at startup; templates/scout.yaml stamps the
+       spec's checksum on the pod template so a change rolls the Deployment. */}}
+{{- if and .Values.scout.enabled .Values.scout.profile.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $syncPolicy := deepCopy .Values.syncPolicy }}
+{{- $_ := set $syncPolicy "syncOptions" (append (default (list) $syncPolicy.syncOptions) "SkipDryRunOnMissingResource=true") }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-scout-profile" $appName | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/homerun2/scout-profile
+    helm:
+      releaseName: {{ printf "%s-scout-profile" $appName | quote }}
+      valuesObject:
+        name: {{ .Values.scout.profile.name | quote }}
+        spec:
+          {{- toYaml .Values.scout.profile.spec | nindent 10 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml $syncPolicy | nindent 4 }}
+{{- end }}
