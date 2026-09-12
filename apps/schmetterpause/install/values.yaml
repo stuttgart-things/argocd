@@ -94,7 +94,16 @@ database:
   enabled: true
   name: schmetterpause-db
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  # PostgreSQL 18, the major schmetterpause runs on everywhere else — Compose,
+  # its kcl default and Azure — so a dump moves between them (schmetterpause
+  # ADR-0016, #213). A dump only ever goes into the same or a newer major.
+  #
+  # For a consumer that does not set this, raising it is an offline in-place
+  # major upgrade of an existing Cluster by CloudNativePG (pg_upgrade --link):
+  # the database is down for the upgrade. A Cluster holding data worth keeping
+  # should pin imageName in its consumer file, as homerun2-test1 does, and
+  # take a backup before moving it.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18
   storage:
     size: 8Gi
     storageClass: ""
