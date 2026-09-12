@@ -62,6 +62,12 @@
 {{- if .Values.gitPitcher.enabled }}
   {{- $probes = append $probes (dict "name" "git-pitcher" "service" "homerun2-git-pitcher" "port" 80 "path" "/health" "hostname" (ternary .Values.gitPitcher.hostname "" .Values.httpRoute.enabled)) }}
 {{- end }}
+{{- /* config-viewer serves /healthz on port 80 — checked against v0.1.0.
+       /healthz never calls the Kubernetes API, so it passes without the
+       viewer's Role; whether that Role works shows on the viewer's own pages. */}}
+{{- if .Values.configViewer.enabled }}
+  {{- $probes = append $probes (dict "name" "config-viewer" "service" "homerun2-config-viewer" "port" 80 "path" "/healthz" "hostname" (ternary .Values.configViewer.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
 {{- $probes = concat $probes .Values.smokeTest.extraProbes }}
 {{- $stValues := dict
       "name"                 (printf "%s-smoke-test" $appName)
