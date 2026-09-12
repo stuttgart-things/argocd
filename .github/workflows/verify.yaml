@@ -68,6 +68,15 @@ jobs:
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-validate-json-schema.yaml@main
     secrets: inherit
 
+  renovate-comments:
+    # A '# renovate:' comment that is not directly above its pin is silently
+    # ignored by renovate (see hack/check-renovate-comments.py).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Renovate comments sit directly above their pins
+        run: python3 hack/check-renovate-comments.py
+
   verify-catalog:
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-argocd-verify-catalog.yaml@main
     with:
