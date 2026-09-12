@@ -46,7 +46,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.23.0
+        targetRevision: v0.25.4
         path: cicd/tekton/dashboard-httproute
         helm:
           valuesObject:
