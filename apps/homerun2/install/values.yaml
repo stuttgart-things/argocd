@@ -189,7 +189,7 @@ scout:
 k8sPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
-  version: v1.0.0
+  version: v1.0.2
   namespace: homerun2
   # When true, keep the K8sPitcherProfile ConfigMap shipped inside the
   # k8s-pitcher kustomize OCI instead of deleting it and remounting an
@@ -256,7 +256,7 @@ configViewer:
 demoPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-demo-pitcher
-  version: v2.0.0
+  version: v2.0.2
   hostname: demo-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the demo-pitcher kustomize OCI (parentRef +
@@ -280,7 +280,7 @@ demoPitcher:
 ledCatcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-led-catcher
-  version: v0.2.2
+  version: v0.7.1
   hostname: led-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the led-catcher kustomize OCI (parentRef +
@@ -323,7 +323,7 @@ notificationCatcher:
 gitPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-git-pitcher
-  version: v1.0.0
+  version: v1.0.2
   hostname: git-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the git-pitcher kustomize OCI (parentRef +
