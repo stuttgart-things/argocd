@@ -90,11 +90,37 @@ spec:
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-redis" $name)) | indent 12 }}
 {{- end }}
+{{- /* With alerting in the ScoutProfile, scout pitches meta-alerts to
+       omni-pitcher and needs its bearer token. It comes from omni-pitcher's own
+       Secret in the same namespace - never from the CR, which lives in git.
+       optional: scout still starts without it; the alerts are then answered
+       401 and logged. */}}
+{{- $scoutEnv := list }}
+{{- if and .Values.scout.profile.enabled (dig "alerting" "pitcherURL" "" .Values.scout.profile.spec) }}
+  {{- $scoutEnv = append $scoutEnv (dict "name" "ALERT_PITCHER_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" "homerun2-omni-pitcher-token" "key" "auth-token" "optional" true))) }}
+{{- end }}
         - target:
             kind: Deployment
             name: {{ $name }}
           patch: |
-{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" list) | indent 12 }}
+{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" $scoutEnv) | indent 12 }}
+{{- /* scout reads its ScoutProfile once at startup: stamp the spec's hash on
+       the pod template so a changed profile rolls the Deployment. */}}
+{{- if .Values.scout.profile.enabled }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+            spec:
+              template:
+                metadata:
+                  annotations:
+                    homerun2.stuttgart-things.com/profile-checksum: {{ .Values.scout.profile | toJson | sha256sum | quote }}
+{{- end }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}

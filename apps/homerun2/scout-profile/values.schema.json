@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2-scout-profile chart",
+  "type": "object",
+  "_comment": "additionalProperties left open so the catalog verifier (call-argocd-verify-catalog) can inject its common probe values like `destination` without tripping the schema. The chart only consumes `name` and `spec`.",
+  "additionalProperties": true,
+  "required": ["name", "spec"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ScoutProfile name; must match SCOUT_PROFILE_NAME of the scout Deployment (base default: default)."
+    },
+    "spec": {
+      "type": "object",
+      "description": "ScoutProfile spec, see homerun2-scout docs/scout-profile.md.",
+      "properties": {
+        "scoutInterval": { "type": "string" },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "ttl": { "type": "string" }
+          }
+        },
+        "alerting": {
+          "type": "object",
+          "not": { "required": ["pitcherToken"] },
+          "_comment": "pitcherToken is rejected: a token in a CR ends up in git. apps/homerun2/install passes it as ALERT_PITCHER_TOKEN from a Secret.",
+          "properties": {
+            "pitcherURL": { "type": "string", "description": "omni-pitcher base URL; scout posts to <pitcherURL>/pitch." },
+            "errorThreshold": { "type": "integer", "minimum": 0 },
+            "criticalThreshold": { "type": "integer", "minimum": 0 },
+            "cooldown": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
