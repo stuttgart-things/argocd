@@ -29,6 +29,17 @@
       "groupName": "stuttgart-things images"
     },
     {
+      "description": "homerun2: one PR per component (image and -kustomize together, as in stuttgart-things/flux#208) instead of the combined stuttgart-things images group, and no minimum release age. ghcr publishes these OCI tags without a release timestamp, so under minimumReleaseAge the update waited on the stability check forever and the catalog never got a homerun2 PR (stuttgart-things/homerun-library#127).",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/stuttgart-things/homerun2-**"
+      ],
+      "groupName": "homerun2 {{{replace '-kustomize$' '' (replace '^ghcr\\.io/stuttgart-things/homerun2-' '' depName)}}}",
+      "minimumReleaseAge": "0 days"
+    },
+    {
       "description": "Auto-merge patch and digest updates once CI passes — keeps low-risk bumps from piling up",
       "matchUpdateTypes": [
         "patch",
