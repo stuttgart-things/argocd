@@ -171,7 +171,9 @@ coreCatcher:
 scout:
   enabled: true
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-scout
-  version: v0.8.2
+  # v0.8.3 re-creates its RediSearch index until it exists instead of trying
+  # once at startup.
+  version: v0.8.3
   hostname: scout.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the scout kustomize OCI (parentRef +
@@ -295,7 +297,8 @@ ledCatcher:
 notificationCatcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-  version: v3.0.0
+  # v3.0.1 waits for Redis at startup (REDIS_STARTUP_TIMEOUT) instead of exiting.
+  version: v3.0.1
   # Stream to consume. `messages` is where omni-pitcher's default_stream puts
   # everything; a cluster that routes alerts onto their own stream (the flux
   # side sends /pitch/grafana to `alerts`) sets that here instead.
