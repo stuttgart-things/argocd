@@ -21,43 +21,64 @@ Every catalog entry is a self-contained Kustomize base producing one or more `Ap
 Version columns show what the child `Application` currently pins. `—` in the Version column means the sub-entry ships plain manifests (no upstream chart). Each row links to its per-entry README.
 
 <details>
-<summary><b><code>infra/</code> — platform infrastructure</b> (8 entries)</summary>
+<summary><b><code>infra/</code> — platform infrastructure</b> (13 entries)</summary>
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
-| [`cert-manager`](./infra/cert-manager/) | `install` / `selfsigned` / `cluster-ca` / `vault-pki` | `v1.19.2` + — + — + — | cert-manager chart, self-signed `ClusterIssuer`, CA chain (`cluster-ca` Certificate + ClusterIssuer + one or two wildcards), Vault PKI `ClusterIssuer` (token auth) |
-| [`cilium`](./infra/cilium/) | `chart` / `lb` / `gateway` | `1.18.5` + — + — | CNI with kube-proxy replacement, L2 LoadBalancer IP pool, Gateway API `Gateway` |
+| [`blackbox-exporter`](./infra/blackbox-exporter/) | `install` | `11.18.0` | prometheus-community blackbox-exporter — probes URLs/endpoints from inside the cluster. Deploy it next to the Prometheus that scrapes it |
+| [`cert-manager`](./infra/cert-manager/) | `install` / `selfsigned` / `cluster-ca` / `vault-pki` | `v1.21.1` + — + — + — | cert-manager chart, self-signed `ClusterIssuer`, CA chain (`cluster-ca` Certificate + ClusterIssuer + one or two wildcards), Vault PKI `ClusterIssuer` (token **or** kubernetes auth) |
+| [`cilium`](./infra/cilium/) | `install` / `lb` / `gateway` | `1.20.1` + — + — | CNI with kube-proxy replacement, L2 LoadBalancer IP pool, Gateway API `Gateway` |
 | [`cloudnative-pg`](./infra/cloudnative-pg/) | `install` / `cluster` | `0.29.0` + `0.8.1` | CloudNativePG operator + a PostgreSQL `Cluster` CR (official `cnpg/cluster` chart) |
-| [`external-secrets`](./infra/external-secrets/) | `install` / `cluster-secret-store-vault` | `2.4.1` + — | External Secrets Operator (ESO) + a templated `ClusterSecretStore` for Vault (k8s-auth, KV v2). Cluster overlays consume `cluster-secret-store-vault` per `(cluster, KV path)` pair |
-| [`kyverno`](./infra/kyverno/) | `install` | `3.8.0` | Kyverno admission controller (policy engine) — `ClusterPolicy` / `Policy` / `PolicyException` CRDs. Controller only; policies are cluster-specific |
-| [`longhorn`](./infra/longhorn/) | `install` | `1.11.2` | Longhorn distributed block storage; GitOps-friendly defaults (`preUpgradeChecker.jobEnabled: false`, `defaultClassReplicaCount: 1` for single-node-safe install) |
-| [`nfs-csi`](./infra/nfs-csi/) | `chart` / `storageclasses` | `v4.13.1` + — | kubernetes-csi NFS driver + opinionated `StorageClass` set |
-| [`openebs`](./infra/openebs/) | — (single) | `4.4.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
-| [`trust-manager`](./infra/trust-manager/) | `install` / `bundle` | `0.22.0` + — | trust-manager chart (app-of-apps), values-driven `Bundle`s — empty by default; consumers declare which Bundles their cluster needs |
+| [`external-secrets`](./infra/external-secrets/) | `install` / `cluster-secret-store-vault` | `2.10.0` + — | External Secrets Operator (ESO) + a templated `ClusterSecretStore` for Vault (k8s-auth, KV v2). Cluster overlays consume `cluster-secret-store-vault` per `(cluster, KV path)` pair |
+| [`kyverno`](./infra/kyverno/) | `install` | `3.9.0` | Kyverno admission controller (policy engine) — `ClusterPolicy` / `Policy` / `PolicyException` CRDs. Controller only; policies are cluster-specific |
+| [`longhorn`](./infra/longhorn/) | `install` | `1.12.1` | Longhorn distributed block storage; GitOps-friendly defaults (`preUpgradeChecker.jobEnabled: false`, `defaultClassReplicaCount: 1` for single-node-safe install) |
+| [`nfs-csi`](./infra/nfs-csi/) | `install` / `storageclasses` | `4.13.4` + — | kubernetes-csi NFS driver + opinionated `StorageClass` set |
+| [`openebs`](./infra/openebs/) | `install` | `4.6.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
+| [`prometheus`](./infra/prometheus/) | `install` / `httproute` | `29.27.2` + — | Standalone prometheus-community Prometheus (no Grafana, Alertmanager off by default) + Gateway API `HTTPRoute` for its UI |
+| [`reloader`](./infra/reloader/) | `install` | `2.2.17` | stakater Reloader — restarts workloads when a mounted ConfigMap/Secret changes. Belongs on the **workload** cluster, not the management cluster |
+| [`trust-manager`](./infra/trust-manager/) | `install` / `bundle` | `v0.24.0` + — | trust-manager chart (app-of-apps), values-driven `Bundle`s — empty by default; consumers declare which Bundles their cluster needs |
+| [`velero`](./infra/velero/) | `install` / `cloud-credentials` | `12.1.0` + — | Cluster backup/restore to S3-compatible object storage via `velero-plugin-for-aws` (works against MinIO and real AWS) |
 
 </details>
 
 <details>
-<summary><b><code>cicd/</code> — CI/CD tooling</b> (6 entries)</summary>
+<summary><b><code>cicd/</code> — CI/CD tooling</b> (7 entries)</summary>
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
-| [`argo-rollouts`](./cicd/argo-rollouts/) | `chart` / `httproute` | `2.40.9` + — | Argo Rollouts controller + dashboard, Gateway API `HTTPRoute` for the dashboard |
-| [`crossplane`](./cicd/crossplane/) | `install` / `functions` / `configs` | `2.2.0` + — + — | Crossplane core + 3 providers (helm / kubernetes / opentofu), 4 composition Functions, 6 stuttgart-things Configurations |
-| [`dapr`](./cicd/dapr/) | — (single) | `1.17.4` | Dapr control-plane (operator, placement, scheduler, sentry, sidecar injector); HA off, JSON logs |
-| [`kargo`](./cicd/kargo/) | `chart` / `certs` / `httproute` | `1.9.6` (OCI) + — + — | Akuity Kargo (multi-stage GitOps promotion orchestrator), cert-manager Certificate for the API hostname, Gateway API HTTPRoute |
-| [`kro`](./cicd/kro/) | — (single) | `0.9.1` | Kube Resource Orchestrator (OCI Helm, CRDs replaced on sync) |
+| [`argo-rollouts`](./cicd/argo-rollouts/) | `install` / `httproutes` | `2.43.1` + — | Argo Rollouts controller + dashboard, Gateway API `HTTPRoute` for the dashboard |
+| [`crossplane`](./cicd/crossplane/) | `install` / `functions` / `configs` / `providers` / `provider-configs` | `2.4.0` + — ×4 | Crossplane core, 5 composition Functions (auto-ready, go-templating, kcl, patch-and-transform, environment-configs), 3 providers (helm / opentofu / kubeconfig) with their ProviderConfigs, and 2 stuttgart-things Configurations (namespace, volume-claim) |
+| [`dapr`](./cicd/dapr/) | `install` | `1.18.3` | Dapr control-plane (operator, placement, scheduler, sentry, sidecar injector); HA off, JSON logs |
+| [`kargo`](./cicd/kargo/) | `install` / `certs` / `httproute` | `1.9.6` (OCI) + — + — | Akuity Kargo (multi-stage GitOps promotion orchestrator), cert-manager Certificate for the API hostname, Gateway API HTTPRoute |
+| [`kro`](./cicd/kro/) | `install` | `0.9.1` | Kube Resource Orchestrator (OCI Helm, CRDs replaced on sync) |
 | [`tekton`](./cicd/tekton/) | `operator` / `config` / `ci-namespace` / `dashboard-httproute` | — (vendored) + — + — + — | Tekton Operator + `TektonConfig` (pruner), shared `ci` namespace, dashboard `HTTPRoute` |
+| [`vcluster`](./cicd/vcluster/) | `install` | `0.37.0` | loft-sh vcluster — virtual clusters inside a host namespace, sized for CI use (resource requests, pinned `k8sVersion`). Same upstream chart as [`apps/vcluster`](./apps/vcluster/); this one carries the CI defaults |
 
 </details>
 
 <details>
-<summary><b><code>apps/</code> — user-facing applications</b> (2 entries)</summary>
+<summary><b><code>apps/</code> — user-facing applications</b> (16 entries)</summary>
+
+Entries whose upstream is a **kustomize OCI base** pin a tag rather than a chart version; where the base and the image are tagged separately, both are listed. Note that those ghcr tags are published **v-prefixed only** — a bare `1.2.3` is a 404, not an older release.
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
-| [`headlamp`](./apps/headlamp/) | `chart` / `rbac` | `0.40.0` + — | Headlamp Kubernetes dashboard + ClusterRoleBinding for SSO group |
-| [`minio`](./apps/minio/) | `chart` / `certs` / `httproute` | `16.0.10` (OCI) + — + — | MinIO object storage (stuttgart-things mirrored image), cert-manager Certificates for console + API, Gateway API HTTPRoutes |
+| [`backstage`](./apps/backstage/) | `install` / `config` / `httproute` / `secrets` | chart `2.6.3` + image `v1.5.1` | Spotify's developer portal over the upstream `oci://ghcr.io/backstage/charts` chart, with the stuttgart-things image, an `app-config` ConfigMap, Gateway API HTTPRoute and its Secrets |
+| [`claim-machinery-api`](./apps/claim-machinery-api/) | `install` / `auth-secret` / `httproute` | `v0.21.1` (kustomize) | REST API behind the Backstage `claimMachinery` plugin — renders Crossplane claim templates through KCL |
+| [`clusterbook`](./apps/clusterbook/) | `install` / `httproute` / `pdns` | `v1.28.2` (kustomize) | Clusterbook — GitOps IP address management for clusters; the service `clusterbook-operator` reserves IP/DNS from. Optional PowerDNS token Secret |
+| [`harbor`](./apps/harbor/) | `install` / `certs` / `httproute` | `27.0.3` (bitnami OCI) + — + — | Harbor container registry, cert-manager Certificates + Gateway API HTTPRoutes |
+| [`headlamp`](./apps/headlamp/) | `install` / `manifests` | `0.45.0` + — | Headlamp Kubernetes dashboard + the extra manifests (RBAC / SSO group binding) |
+| [`homerun2`](./apps/homerun2/) | `install` + 12 sub-charts (`httproute`, `secrets`, `kargo`, `scout-profile`, `k8s-pitcher-profile`, `omni-pitcher-routes`, `smoke-test`, `preview-*`) | redis `17.1.4` + per-service kustomize tags | The homerun2 message-bus stack: Redis Stack + 11 Go services that pitch (produce) and catch (consume) events — core/led/light/notification catchers, omni/git/k8s/demo pitchers, scout, config-viewer, wled-mock |
+| [`machinery`](./apps/machinery/) | `install` / `configmap` / `httproute` / `grpcroute` / `rbac` | base `v1.13.2` + image `v1.13.4` | Machinery — gRPC + HTMX service for watching Crossplane-managed resources. The one `apps/` entry a platform label reaches (`cicd-platform/machinery`) |
+| [`machinery-catalog-locator`](./apps/machinery-catalog-locator/) | `install` / `external-secrets` | `latest` ⚠️ floating | Catalog locator for the machinery catalog. Both base and image pin the mutable `latest` tag — pin a release before relying on it |
+| [`machinery-catalog-publisher`](./apps/machinery-catalog-publisher/) | `install` / `externalsecret` / `httproute` | base `v0.1.0` + image `v0.1.1` | Publishes machinery catalog entries |
+| [`minio`](./apps/minio/) | `install` / `certs` / `httproute` | `16.0.10` (OCI) + — + — | MinIO object storage (stuttgart-things mirrored image), cert-manager Certificates for console + API, Gateway API HTTPRoutes |
+| [`rancher`](./apps/rancher/) | `install` / `certs` / `httproute` | `2.15.1` + — + — | Rancher server from the `rancher-stable` Helm repo, optionally trusting a private CA |
+| [`redis-stack`](./apps/redis-stack/) | `install` | `17.1.4` | The stuttgart-things `redis` chart configured as Redis Stack (RedisJSON / Search / TimeSeries), standalone or with sentinel |
+| [`schmetterpause`](./apps/schmetterpause/) | `install` / `database` | `v0.3.0` (kustomize) | schmetterpause + its CloudNativePG database — the Argo CD replacement for the repo's hand-applied `task kcl:up` path (drift detection and prune, which hand-apply has neither of) |
+| [`vault`](./apps/vault/) | `install` / `certs` / `httproute` | chart `1.9.0` + autounseal `0.5.3` | HashiCorp Vault via the stuttgart-things Helm mirror, optional vault-autounseal sub-Application, cert-manager Certificates + HTTPRoute |
+| [`vcluster`](./apps/vcluster/) | `install` | `0.37.0` | loft-sh vcluster as a workload — one virtual cluster per Application. Same chart as [`cicd/vcluster`](./cicd/vcluster/), without the CI-sized defaults |
+| [`zitadel`](./apps/zitadel/) | `install` / `external-secrets` / `httproute` / `secrets` | chart `10.0.6` + image `v4.15.2` | ZITADEL identity provider, its ExternalSecrets/Secrets and Gateway API HTTPRoute |
 
 </details>
 
@@ -73,22 +94,31 @@ Catalog entries that configure Argo CD itself rather than installing workloads. 
 </details>
 
 <details>
-<summary><b><code>platforms/</code> — pre-bundled ApplicationSets per cluster role</b> (5 bundles)</summary>
+<summary><b><code>platforms/</code> — pre-bundled ApplicationSets per cluster role</b> (10 bundles)</summary>
 
 Each platform bundle is a kustomize directory of `ApplicationSet`s that live in the `argocd` namespace on the **management cluster** and fan out catalog entries to every cluster `Secret` matching a label gate. Alternative to the per-cluster aggregator-overlay pattern below: instead of every cluster repo composing its own `infra/cicd/apps` overlay, label the cluster Secret with `<bundle>-platform: "true"` and the right ApplicationSets fire automatically.
 
-Selector pattern shared by all bundles:
+Selector pattern shared by the five role bundles:
 - **Master gate** — `<bundle>-platform: "true"` on the cluster Secret enrols it in the bundle.
 - **Per-feature opt-out** — `<bundle>-platform/<feature>: "false"` skips a single component on a specific cluster (default = included).
 - **`preserveResourcesOnDeletion: true`** — flipping a cluster from included → opted-out deletes the parent `Application` but leaves the workload state in place (StorageClasses, CRDs, DaemonSets), so opt-out doesn't tear out live storage / CRDs.
 
+The five **preview** bundles below work differently: one single label, no umbrella, no opt-out — plus a `pullRequest` generator, so they render one environment per PR carrying the `preview` label.
+
+The canonical, annotated list of every label and annotation a cluster Secret can carry is [`platforms/cluster.reference.yaml`](./platforms/cluster.reference.yaml).
+
 | Bundle | Master gate | Components | Notes |
 |---|---|---|---|
-| [`platforms/cicd`](./platforms/cicd/) | `cicd-platform: "true"` | 10 appsets — openebs, dapr, kro, argo-rollouts, crossplane, kargo + httproute, tekton + config + dashboard-httproute | Has bootstrap `application.yaml` (mgmt-cluster apply once). The `*-httproute` appsets additionally require `clusterbook.stuttgart-things.com/allocation-ip` Exists — non-clusterbook clusters get the workload but no Gateway API route |
+| [`platforms/cicd`](./platforms/cicd/) | `cicd-platform: "true"` | 19 appsets — openebs, dapr, kro, argo-rollouts, crossplane (install / functions / configs / providers / provider-configs / platform-baseline), kargo + httproute, tekton + config + dashboard-httproute, machinery, and the three `cxp-*` XR sets (ansible / proxmoxvm / vspherevm) | Has bootstrap `application.yaml` (mgmt-cluster apply once). The `*-httproute` appsets and `machinery` additionally require `clusterbook.stuttgart-things.com/allocation-ip` Exists (and `NotIn [""]`, which excludes registration-only kind clusters) — other clusters get the workload but no Gateway API route. `platform-baseline` and the three `cxp-*` sets are git-file/directory generators keyed on the cluster's **`env`** label: without it the path segment renders empty and nothing is generated, silently |
 | [`platforms/network`](./platforms/network/) | `network-platform: "true"` + `clusterbook.stuttgart-things.com/allocation-ip` Exists | 9 appsets — cert-manager (install / selfsigned / cluster-ca), cilium (lb / gateway), trust-manager (install / bundle) by default; opt-in cilium gateway-secondary + cert-manager vault-pki | Clusterbook-aware. Reads the cluster's reserved IP + FQDN from `clusterbook-operator`-set annotations to wire LoadBalancer IPPool + wildcard cert + Gateway hostname. Optional second Gateway from `fqdn-secondary` annotation; optional Vault PKI `ClusterIssuer` from `vault-server`/`vault-pki-path`/`vault-token-secret` annotations |
-| [`platforms/kind`](./platforms/kind/) | `clusterbook.stuttgart-things.com/cluster-type: kind` (no master `kind-platform` label) | base: 4 appsets — cilium (install / lb), cert-manager (install / selfsigned). `expose-external/`: optional overlay adding cluster-CA + cilium gateway for kind clusters that publish their LB IPs via DNS | Tuned for kind networking (native routing on `eth0`/`net0`, tight L2-announcement leases). Per-feature opt-out via `kind-platform/<feature>: "false"` |
-| [`platforms/security`](./platforms/security/) | `security-platform: "true"` + per-component **opt-in** (e.g. `security-platform/external-secrets: "true"`, `security-platform/kyverno: "true"`) | 2 appsets — external-secrets-install, kyverno-install | Has bootstrap `application.yaml`. **Opt-in only** — labelling a cluster `security-platform: "true"` installs nothing on its own; each component needs an explicit `security-platform/<feature>: "true"`. Controllers only — ESO `ClusterSecretStore`s + Kyverno `ClusterPolicy`s are cluster-specific and stay in each cluster's overlay |
+| [`platforms/kind`](./platforms/kind/) | `kind-platform: "true"` | base: 4 appsets — cilium (install / lb), cert-manager (install / selfsigned). `expose-external/`: optional overlay adding cluster-CA + cilium gateway for kind clusters that publish their LB IPs via DNS | Tuned for kind networking (native routing on `eth0`/`net0`, tight L2-announcement leases). Per-feature opt-out via `kind-platform/<feature>: "false"`. The AppSets no longer gate on `clusterbook.stuttgart-things.com/cluster-type: kind`; the operator still sets that label from `spec.clusterType`, and `cilium-lb-kind` still consumes the `lb-range-*` annotations it comes with. Needs clusterbook-operator >= v0.15.0 |
+| [`platforms/security`](./platforms/security/) | `security-platform: "true"` | 2 appsets — external-secrets-install, kyverno-install | Has bootstrap `application.yaml`. **Opt-out like every other bundle** — the umbrella label is enough, a component is skipped only by an explicit `security-platform/<feature>: "false"`. (It was opt-in via a second `matchLabels` until that silently dropped clusters carrying only the umbrella.) Controllers only — ESO `ClusterSecretStore`s + Kyverno `ClusterPolicy`s are cluster-specific and stay in each cluster's overlay |
 | [`platforms/storage`](./platforms/storage/) | `storage-platform: "true"` | 4 appsets — openebs, longhorn, nfs-csi-install, nfs-csi-storageclasses | Has bootstrap `application.yaml`. openebs is the cluster default SC; longhorn ships alongside but not as default. NFS storage-class appset additionally requires `storage-platform.stuttgart-things.com/nfs-config` Exists; per-cluster `server`/`share`/etc. sourced from cluster-Secret annotations |
+| [`platforms/homerun2-pr-preview`](./platforms/homerun2-pr-preview/) | `homerun2-pr-preview: "true"` | 9 appsets — 8 per-service preview environments + `policies` | One environment per pull request labelled `preview`, across the homerun2 service repos. Shares the `homerun2-omni-pitcher-pat` PR-reader token with the other preview bundles |
+| [`platforms/machinery-pr-preview`](./platforms/machinery-pr-preview/) | `machinery-pr-preview: "true"` | 1 appset | Preview environment per `preview`-labelled PR in `stuttgart-things/machinery` |
+| [`platforms/machinery-catalog-locator-pr-preview`](./platforms/machinery-catalog-locator-pr-preview/) | `machinery-catalog-locator-pr-preview: "true"` | 1 appset | Same, for `machinery-catalog-locator` |
+| [`platforms/machinery-catalog-publisher-pr-preview`](./platforms/machinery-catalog-publisher-pr-preview/) | `machinery-catalog-publisher-pr-preview: "true"` | 1 appset (+ `appproject.yaml`) | Same, for `machinery-catalog-publisher` |
+| [`platforms/schmetterpause-pr-preview`](./platforms/schmetterpause-pr-preview/) | `schmetterpause-pr-preview: "true"` | 1 appset | Same, for `schmetterpause` — including its per-PR Postgres |
 
 When to pick which model:
 - **Aggregator-overlay** (next section) — when each cluster has bespoke versions, value overrides, or ordering and you want every change reviewed in the cluster repo.
