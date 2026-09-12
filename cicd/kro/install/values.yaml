@@ -9,7 +9,7 @@ destination:
 
 # Upstream kro OCI Helm chart version (registry.k8s.io/kro/charts/kro).
 # renovate: datasource=docker depName=registry.k8s.io/kro/charts/kro
-chartVersion: "0.9.1"
+chartVersion: "0.9.4"
 
 # Deep-merged on top of the valuesObject passed to the upstream chart.
 # Use for any upstream key (image pinning, resources, etc.).
