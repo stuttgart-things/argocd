@@ -107,7 +107,7 @@ omniPitcher:
   # adds the startupProbe that keeps liveness from killing it meanwhile;
   # v2.1.3 ends that wait on SIGTERM instead of sitting out the timeout.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-omni-pitcher
-  version: v2.1.3
+  version: v2.1.4
   hostname: omni-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the omni-pitcher kustomize OCI (parentRef +
