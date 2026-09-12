@@ -11,8 +11,9 @@ name: schmetterpause-db
 
 instances: 1
 
-# CNPG ships no default image; pin the major explicitly.
-imageName: ghcr.io/cloudnative-pg/postgresql:17
+# CNPG ships no default image; pin the major explicitly. Kept equal to the
+# install chart's database.imageName, which is what consumers actually get.
+imageName: ghcr.io/cloudnative-pg/postgresql:18
 
 storage:
   size: 8Gi
