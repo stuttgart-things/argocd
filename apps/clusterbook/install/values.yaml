@@ -15,15 +15,18 @@ destination:
 
 # Clusterbook OCI kustomize base (ghcr.io/stuttgart-things/clusterbook-kustomize).
 # Argo CD 2.13+ resolves oci:// repoURLs as kustomize sources.
+# Both tags below are published ONLY in v-prefixed form — a bare `1.25.9` is a
+# 404, not an older release.
 kustomize:
   repoURL: ghcr.io/stuttgart-things/clusterbook-kustomize
-  targetRevision: 1.24.0
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterbook-kustomize
+  targetRevision: v1.28.2
 
 # Clusterbook container image — patched into the Deployment rendered by the base.
 image:
   repository: ghcr.io/stuttgart-things/clusterbook
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterbook
-  tag: 1.25.9
+  tag: v1.28.2
 
 # PowerDNS integration — patched into the clusterbook-config ConfigMap rendered by the base.
 # When enabled, the pdns sub-Application also provisions the clusterbook-pdns Secret.

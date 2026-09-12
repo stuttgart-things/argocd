@@ -68,10 +68,10 @@ spec:
           namespace: clusterbook
         kustomize:
           repoURL: ghcr.io/stuttgart-things/clusterbook-kustomize
-          targetRevision: 1.24.0
+          targetRevision: v1.28.2
         image:
           repository: ghcr.io/stuttgart-things/clusterbook
-          tag: 1.24.0
+          tag: v1.28.2
         httpRoute:
           enabled: true
           hostname: clusterbook.my-cluster.example.com
@@ -103,8 +103,8 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `destination.server` | `https://kubernetes.default.svc` | Target cluster API |
 | `destination.namespace` | `clusterbook` | Namespace for Clusterbook |
 | `kustomize.repoURL` | `ghcr.io/stuttgart-things/clusterbook-kustomize` | OCI kustomize base |
-| `kustomize.targetRevision` | `1.24.0` | Kustomize base tag (flux `CLUSTERBOOK_VERSION`) |
-| `image.repository` / `tag` | `ghcr.io/stuttgart-things/clusterbook` / `1.24.0` | Container image override patched into the base Deployment |
+| `kustomize.targetRevision` | `v1.28.2` | Kustomize base tag (flux `CLUSTERBOOK_VERSION`). Published v-prefixed only |
+| `image.repository` / `tag` | `ghcr.io/stuttgart-things/clusterbook` / `v1.28.2` | Container image override patched into the base Deployment. Published v-prefixed only |
 | `pdns.enabled` | `false` | Render the PDNS Secret sub-Application + wire `envFrom` + set ConfigMap keys |
 | `pdns.url` / `zone` / `token` | empty | PowerDNS API URL, zone, token (inline is dev-only) |
 | `httpRoute.enabled` | `true` | Render the HTTPRoute sub-Application + delete the base's KCL HTTPRoute |
