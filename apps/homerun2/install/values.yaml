@@ -105,8 +105,9 @@ omniPitcher:
   enabled: true
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-omni-pitcher
   # v2.1.1+ retries Redis at startup (REDIS_STARTUP_TIMEOUT, 120s) and v2.1.2
-  # adds the startupProbe that keeps liveness from killing it meanwhile.
-  version: v2.1.2
+  # adds the startupProbe that keeps liveness from killing it meanwhile;
+  # v2.1.3 ends that wait on SIGTERM instead of sitting out the timeout.
+  version: v2.1.3
   hostname: omni-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the omni-pitcher kustomize OCI (parentRef +
@@ -144,10 +145,11 @@ coreCatcher:
   enabled: true
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-core-catcher
   # v1.0.1+ retries Redis at startup instead of exiting on the first dial;
-  # v1.0.2 adds the startupProbe covering that wait.
-  version: v1.0.2
+  # v1.0.2 adds the startupProbe covering that wait; v1.0.3 ends the wait
+  # on SIGTERM.
+  version: v1.0.3
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-core-catcher-kustomize
-  kustomizeVersion: v1.0.2               # may differ from image tag (e.g. -web suffix on older versions)
+  kustomizeVersion: v1.0.3               # may differ from image tag (e.g. -web suffix on older versions)
   hostname: core-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the core-catcher kustomize OCI (parentRef +

@@ -253,7 +253,7 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `redisStack.enabled` / `chartVersion` / `serviceType` / `persistence.*` / `image.*` / `sentinel.*` | enabled / `17.1.4` / `ClusterIP` / nfs-defaults / stuttgart-things mirrors | Delegates to `apps/redis-stack/install` |
 | `<component>.enabled` | `true` for `redisStack`/`omniPitcher`/`coreCatcher`/`scout`; `false` otherwise | Toggle component |
 | `<component>.version` | per the flux defaults | Image tag + (usually) OCI kustomize tag |
-| `coreCatcher.kustomizeVersion` | `v1.0.2` | OCI kustomize tag (may differ from image `version`) |
+| `coreCatcher.kustomizeVersion` | `v1.0.3` | OCI kustomize tag (may differ from image `version`) |
 | `<component>.hostname` | `<component>.example.com` | FQDN on the HTTPRoute |
 | `k8sPitcher.namespace` | `homerun2` | Optional override — k8s-pitcher often runs in a different namespace |
 | `httpRoute.enabled` / `gateway.{name,namespace}` | `true` / `cilium-gateway` / `default` | Render Gateway API HTTPRoutes for every enabled component that exposes one |
