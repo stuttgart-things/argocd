@@ -32,6 +32,13 @@
 {{- if .Values.wledMock.enabled }}
   {{- $routes = append $routes (dict "name" "homerun2-wled-mock" "hostname" .Values.wledMock.hostname "backend" (dict "name" "homerun2-wled-mock" "port" 80)) }}
 {{- end }}
+{{- /* config-viewer inlines its HTTPRoute in the kustomize OCI when
+       configViewer.inlineHttpRoute is set; the standalone Application below
+       skips it in that case (templates/config-viewer.yaml patches it
+       directly). See stuttgart-things/argocd#116. */ -}}
+{{- if and .Values.configViewer.enabled (not .Values.configViewer.inlineHttpRoute) }}
+  {{- $routes = append $routes (dict "name" "homerun2-config-viewer" "hostname" .Values.configViewer.hostname "backend" (dict "name" "homerun2-config-viewer" "port" 80)) }}
+{{- end }}
 {{- /* demo-pitcher inlines its HTTPRoute in the kustomize OCI when
        demoPitcher.inlineHttpRoute is set; the standalone Application below
        skips it in that case (templates/demo-pitcher.yaml patches it

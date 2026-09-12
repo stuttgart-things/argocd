@@ -237,6 +237,19 @@ wledMock:
   version: v1.0.0
   hostname: wled-mock.example.com
 
+# config-viewer (read-only view of which alert triggers what in which catcher,
+# stuttgart-things/homerun-library#122). Reads the Deployments and ConfigMaps of
+# destination.namespace through the Kubernetes API with the Role its kustomize
+# base ships (get/list deployments + configmaps, nothing else). No Redis, no
+# Secrets. The base ships its HTTPRoute: set inlineHttpRoute to patch it in
+# place, otherwise the standalone homerun2-httproute Application renders one.
+configViewer:
+  enabled: false
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-config-viewer
+  version: v0.1.0
+  hostname: config-viewer.example.com
+  inlineHttpRoute: false
+
 # demo-pitcher (web UI for manually pitching messages to Redis Streams).
 demoPitcher:
   enabled: false

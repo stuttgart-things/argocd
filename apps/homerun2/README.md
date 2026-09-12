@@ -21,6 +21,7 @@ apps/homerun2/
 │       ├── k8s-pitcher.yaml                   Application "...-k8s-pitcher"        (sync-wave 0)
 │       ├── light-catcher.yaml                 Application "...-light-catcher"      (sync-wave 0)
 │       ├── wled-mock.yaml                     Application "...-wled-mock"          (sync-wave 0)
+│       ├── config-viewer.yaml                 Application "...-config-viewer"      (sync-wave 0, reads the Kubernetes API — no Redis, no Secrets)
 │       ├── demo-pitcher.yaml                  Application "...-demo-pitcher"       (sync-wave 0)
 │       ├── led-catcher.yaml                   Application "...-led-catcher"        (sync-wave 0)
 │       ├── notification-catcher.yaml          Application "...-notification-catcher" (sync-wave 0, consumer only — no Service, no route)
@@ -57,6 +58,7 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `k8sPitcher` | Watches K8s API (informers/collectors) → pitches to omni | no | yes |
 | `lightCatcher` | Redis Streams consumer → WLED HTTP | yes | no |
 | `wledMock` | Mock WLED device + dashboard (dev) | yes | no |
+| `configViewer` | Read-only view of which alert triggers what in which catcher — components, findings, severity × system matrix, dry run ([homerun-library#122](https://github.com/stuttgart-things/homerun-library/issues/122)) | yes | no |
 | `demoPitcher` | Web UI for manually pitching messages | yes | no |
 | `ledCatcher` | Redis Streams consumer → LED display | yes | no |
 | `gitPitcher` | Watches Git repos → pitches | no | no |
@@ -77,6 +79,8 @@ Each enabled non-redis-stack component renders one Argo CD `Application` whose s
 8. **(scout + wled-mock) Namespace delete** — scout's and wled-mock's bases ship their own `homerun2` Namespace; we strip it, because otherwise that Application owns the namespace and `prune: true` would take the whole stack down with it when scout is disabled. The parent stack manages the namespace via `CreateNamespace=true` on the destination. (git-pitcher's base used to ship one too; as of v1.0.0 it no longer does.)
 
 9. **(scout only) Auth-token Secret** — same treatment as omni-pitcher: patched from `authToken`, or deleted so an ESO-managed Secret takes over. The base ships a literal `changeme`, and that Secret is the only thing guarding `/analytics/*`
+
+10. **(config-viewer only) no Redis patches** — the viewer reads the Kubernetes API, not the bus, so there is no `*-redis` Secret and no `REDIS_ADDR` to patch. Its base ships a namespace-scoped `Role` + `RoleBinding` (`get`/`list` on `deployments` and `configmaps`), which the Application's AppProject must allow. The only patches are the image and the HTTPRoute (inlined or deleted)
 
 Every `<component>.version` default now carries a `# renovate:` comment, so the catalog defaults track upstream releases instead of ageing silently. The chart uses one `version` for both the image tag and the kustomize OCI tag, which holds because both artifacts ship from the same Release workflow — `coreCatcher` is the exception and takes a separate `kustomizeVersion`.
 

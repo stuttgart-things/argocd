@@ -1,0 +1,64 @@
+{{- if .Values.configViewer.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-config-viewer" }}
+{{- $ns := .Values.destination.namespace }}
+---
+# config-viewer: read-only view of which alert triggers what in which catcher
+# (stuttgart-things/homerun-library#122). It reads Deployments and ConfigMaps
+# of its own namespace through the Kubernetes API - its base ships a Role +
+# RoleBinding for exactly that - and never talks to Redis, so unlike the
+# other components there is no redis Secret or REDIS_ADDR to patch.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-config-viewer" $appName | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "config-viewer" | quote }}
+    targetRevision: {{ .Values.configViewer.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+{{- if .Values.configViewer.inlineHttpRoute }}
+        # The kustomize OCI ships the HTTPRoute alongside the Service
+        # (stuttgart-things/argocd#116, option B); patch parentRef + hostname
+        # per env. templates/httproute.yaml skips config-viewer in that case.
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |-
+{{ include "homerun2.httpRouteJSONPatch" (dict "gateway" .Values.httpRoute.gateway "hostname" .Values.configViewer.hostname) | indent 12 }}
+{{- else }}
+        - target:
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+{{- end }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.configViewer.version) | indent 12 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+{{- if .Values.configViewer.inlineHttpRoute }}
+  {{- include "homerun2.inlineRouteIgnoreDifferences" $name | nindent 2 }}
+{{- end }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
