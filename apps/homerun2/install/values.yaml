@@ -265,7 +265,7 @@ wledMock:
 configViewer:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-config-viewer
-  version: v0.1.0
+  version: v0.2.1
   hostname: config-viewer.example.com
   inlineHttpRoute: false
 
