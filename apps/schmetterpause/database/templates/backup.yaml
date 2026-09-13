@@ -1,0 +1,83 @@
+{{- if .Values.backup.enabled }}
+{{- $secret := printf "%s-backup" .Values.name }}
+---
+# The S3 key pair AND the CA the ObjectStore verifies the endpoint with, in one
+# Secret. endpointCA must name a Secret; the cluster trust bundle exists only as
+# the ConfigMap trust-manager publishes into every namespace, so templateFrom
+# copies it in -- and follows it when the CA rotates.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $secret | quote }}
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: {{ .Values.backup.secretStore.kind | quote }}
+    name: {{ .Values.backup.secretStore.name | quote }}
+  target:
+    name: {{ $secret | quote }}
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        ACCESS_KEY_ID: {{ "{{ .access_key }}" | quote }}
+        ACCESS_SECRET_KEY: {{ "{{ .secret_key }}" | quote }}
+      templateFrom:
+        - configMap:
+            name: {{ .Values.backup.caConfigMap | quote }}
+            items:
+              - key: {{ .Values.backup.caKey | quote }}
+                templateAs: Values
+  data:
+    - secretKey: access_key
+      remoteRef:
+        key: {{ .Values.backup.remoteKey | quote }}
+        property: {{ .Values.backup.accessKeyProperty | quote }}
+    - secretKey: secret_key
+      remoteRef:
+        key: {{ .Values.backup.remoteKey | quote }}
+        property: {{ .Values.backup.secretKeyProperty | quote }}
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
+  configuration:
+    destinationPath: {{ .Values.backup.destinationPath | quote }}
+    endpointURL: {{ .Values.backup.endpointURL | quote }}
+    endpointCA:
+      name: {{ $secret | quote }}
+      key: {{ .Values.backup.caKey | quote }}
+    s3Credentials:
+      accessKeyId:
+        name: {{ $secret | quote }}
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: {{ $secret | quote }}
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+---
+# Owned by the ScheduledBackup, so the Backup objects go when it goes. The data
+# in the bucket does not: the ObjectStore's retentionPolicy decides that.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ printf "%s-daily" .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  immediate: {{ .Values.backup.immediate }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ .Values.name | quote }}
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+{{- end }}

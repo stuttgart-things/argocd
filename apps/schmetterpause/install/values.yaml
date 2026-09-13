@@ -124,3 +124,23 @@ database:
   # down leaves the Postgres pod, its Services and its volume running in a
   # namespace nothing points at any more.
   protect: true
+  # Backups through the Barman Cloud plugin -- WAL archiving and a daily base
+  # backup. Off by default. Every field is explained in
+  # apps/schmetterpause/database/values.yaml; switching it on for an existing
+  # Cluster restarts its Postgres pod. secretStore.name empty means the
+  # top-level secretStore above.
+  backup:
+    enabled: false
+    endpointURL: ""
+    destinationPath: ""
+    retentionPolicy: 30d
+    schedule: "0 0 3 * * *"
+    immediate: false
+    secretStore:
+      kind: ClusterSecretStore
+      name: ""
+    remoteKey: ""
+    accessKeyProperty: access_key
+    secretKeyProperty: secret_key
+    caConfigMap: cluster-trust-bundle
+    caKey: trust-bundle.pem

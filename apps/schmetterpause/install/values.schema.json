@@ -53,7 +53,7 @@
           "minLength": 1
         }
       },
-      "description": "Provide `server` (cluster URL) or `name` (registered cluster name) \u2014 at least one required. If both are set (a consumer overriding the default `server` with a `name`), the templates prefer `name`; that is intentional, so a consumer does not have to null out the chart default.",
+      "description": "Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. If both are set (a consumer overriding the default `server` with a `name`), the templates prefer `name`; that is intentional, so a consumer does not have to null out the chart default.",
       "required": [
         "namespace"
       ],
@@ -207,6 +207,69 @@
         "protect": {
           "type": "boolean",
           "description": "Annotate the CNPG Cluster Prune=false + Delete=false. Leave on unless the database is meant to be torn down with its Application, as in a per-PR preview."
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Passed to apps/schmetterpause/database, which validates it. secretStore.name empty means the top-level secretStore.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "endpointURL": {
+              "type": "string"
+            },
+            "destinationPath": {
+              "type": "string"
+            },
+            "retentionPolicy": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*[dwm]$"
+            },
+            "schedule": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Six fields, seconds first."
+            },
+            "immediate": {
+              "type": "boolean"
+            },
+            "secretStore": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "ClusterSecretStore",
+                    "SecretStore"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            },
+            "remoteKey": {
+              "type": "string"
+            },
+            "accessKeyProperty": {
+              "type": "string",
+              "minLength": 1
+            },
+            "secretKeyProperty": {
+              "type": "string",
+              "minLength": 1
+            },
+            "caConfigMap": {
+              "type": "string",
+              "minLength": 1
+            },
+            "caKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         }
       },
       "required": [

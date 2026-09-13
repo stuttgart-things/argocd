@@ -113,3 +113,33 @@ one into the base.
 Real example: `clusters/labul/vsphere/platform-sthings/argocd/homerun2-test1/schmetterpause.yaml`
 in `stuttgart-things/stuttgart-things`, whose environment profile (and the reasoning behind
 every value) lives next to it in `argocd/clusters/homerun2-test1/schmetterpause-profile.yaml`.
+
+## Backups
+
+`database.backup` switches on continuous WAL archiving and a daily base backup through the Barman Cloud plugin: an `ExternalSecret` (S3 key pair plus the CA copied from `cluster-trust-bundle`), an `ObjectStore`, a `ScheduledBackup` with `method: plugin`, and `spec.plugins` on the Cluster. Off by default.
+
+Not the in-tree `spec.backup.barmanObjectStore`: CloudNativePG 1.30 deprecates it and 1.31.0 removes it.
+
+**Preconditions:** `infra/cloudnative-pg/barman-cloud` on the cluster (without the `ObjectStore` CRD the database Application does not sync), a bucket, and a secret-store entry with the key pair — its own entry, not the app's.
+
+```yaml
+        database:
+          backup:
+            enabled: true
+            endpointURL: https://artifacts.example.com
+            destinationPath: s3://schmetterpause-cnpg/
+            remoteKey: schmetterpause-backup
+            # secretStore defaults to the top-level one
+```
+
+**Switching it on restarts the Postgres pod** — do it outside the hours the database is used. `immediate` stays `false` for the same reason; take the first backup by hand once archiving runs.
+
+**It works when two things are true**, and a green sync says neither:
+
+```bash
+kubectl -n schmetterpause get cluster schmetterpause-db \
+  -o jsonpath='{.status.conditions[?(@.type=="ContinuousArchiving")].status}'   # True
+kubectl -n schmetterpause get backups.postgresql.cnpg.io                          # a completed one
+```
+
+**Restore** is a new Cluster bootstrapped from the object store, into an empty namespace — never an in-place overwrite: an `ExternalSecret` and `ObjectStore` like the ones above, then a `Cluster` with `bootstrap.recovery.source` naming an `externalClusters` entry that uses the plugin with `barmanObjectName` and `serverName: schmetterpause-db`. Set `storage.storageClass` explicitly, and give the restored Cluster **no** WAL archiver on the same `serverName` — two clusters archiving into one path corrupt each other's timeline.

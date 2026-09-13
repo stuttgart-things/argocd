@@ -3,40 +3,194 @@
   "title": "schmetterpause-database sub-chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespace", "name", "instances", "imageName", "storage", "bootstrap"],
+  "required": [
+    "namespace",
+    "name",
+    "instances",
+    "imageName",
+    "storage",
+    "bootstrap"
+  ],
   "properties": {
-    "namespace":  { "type": "string", "minLength": 1 },
-    "name":       { "type": "string", "minLength": 1 },
-    "instances":  { "type": "integer", "minimum": 1 },
-    "imageName":  { "type": "string", "minLength": 1 },
-    "enableSuperuserAccess": { "type": "boolean" },
-    "protect": { "type": "boolean", "description": "Annotate the Cluster with Prune=false,Delete=false. The PVC is owned by the Cluster, so deleting it destroys the data." },
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instances": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "imageName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enableSuperuserAccess": {
+      "type": "boolean"
+    },
+    "protect": {
+      "type": "boolean",
+      "description": "Annotate the Cluster with Prune=false,Delete=false. The PVC is owned by the Cluster, so deleting it destroys the data."
+    },
     "storage": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["size"],
+      "required": [
+        "size"
+      ],
       "properties": {
-        "size":         { "type": "string", "pattern": "^[0-9]+(Mi|Gi|Ti)$" },
-        "storageClass": { "type": "string", "description": "Leave empty only on a cluster with exactly one default StorageClass." }
+        "size": {
+          "type": "string",
+          "pattern": "^[0-9]+(Mi|Gi|Ti)$"
+        },
+        "storageClass": {
+          "type": "string",
+          "description": "Leave empty only on a cluster with exactly one default StorageClass."
+        }
       }
     },
     "bootstrap": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["database", "owner", "secretName"],
+      "required": [
+        "database",
+        "owner",
+        "secretName"
+      ],
       "properties": {
-        "database":      { "type": "string", "minLength": 1 },
-        "owner":         { "type": "string", "minLength": 1 },
-        "secretName":    { "type": "string", "minLength": 1 },
-        "encoding":      { "type": "string" },
-        "localeCollate": { "type": "string" },
-        "localeCType":   { "type": "string" }
+        "database": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "encoding": {
+          "type": "string"
+        },
+        "localeCollate": {
+          "type": "string"
+        },
+        "localeCType": {
+          "type": "string"
+        }
       }
     },
     "destination": {
       "type": "object",
       "additionalProperties": true,
       "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Barman Cloud plugin backups. Needs infra/cloudnative-pg/barman-cloud; enabling restarts the Postgres pod.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "endpointURL": {
+          "type": "string"
+        },
+        "destinationPath": {
+          "type": "string"
+        },
+        "retentionPolicy": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[dwm]$"
+        },
+        "schedule": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Six fields, seconds first."
+        },
+        "immediate": {
+          "type": "boolean"
+        },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ]
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "remoteKey": {
+          "type": "string"
+        },
+        "accessKeyProperty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "secretKeyProperty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "caConfigMap": {
+          "type": "string",
+          "minLength": 1
+        },
+        "caKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "endpointURL",
+          "destinationPath",
+          "remoteKey",
+          "secretStore"
+        ],
+        "properties": {
+          "endpointURL": {
+            "pattern": "^https://"
+          },
+          "destinationPath": {
+            "pattern": "^s3://"
+          },
+          "remoteKey": {
+            "minLength": 1
+          },
+          "secretStore": {
+            "required": [
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -28,6 +28,15 @@ spec:
     {{- with .Values.storage.storageClass }}
     storageClass: {{ . | quote }}
     {{- end }}
+  {{- if .Values.backup.enabled }}
+  # WAL goes through the Barman Cloud plugin into the ObjectStore of the same
+  # name (templates/backup.yaml). Adding this to a running Cluster restarts it.
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ .Values.name | quote }}
+  {{- end }}
   bootstrap:
     initdb:
       database: {{ .Values.bootstrap.database | quote }}
