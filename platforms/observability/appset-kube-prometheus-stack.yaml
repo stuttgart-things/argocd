@@ -49,10 +49,15 @@ spec:
         helm:
           valuesObject:
             project: '{{ .name }}'
-            # The inner Application carries the `-observability` suffix and
-            # never collides with a per-cluster overlay that may also point
-            # at infra/kube-prometheus-stack/install.
-            applicationName: kube-prometheus-stack-observability-{{ .name }}
+            # MUST differ from this template's own metadata.name above. Both
+            # land in `argocd`, so an inner Application with the generated
+            # parent's name is the same object: the parent server-side-applies
+            # the child spec over itself, the ApplicationSet controller puts
+            # its own back a moment later, and the chart never deploys —
+            # everything reports "successfully synced" meanwhile. That is what
+            # the first version of this file did. The `-secrets` / `-httproute`
+            # Applications derive from this name too.
+            applicationName: kube-prometheus-stack-{{ .name }}
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
