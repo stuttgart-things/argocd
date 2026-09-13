@@ -6,10 +6,33 @@ metadata:
   name: {{ .name | quote }}
   namespace: {{ .namespace | quote }}
 spec:
+  {{- /* Fields the API server defaults are filled in where the values leave
+         them out: implicit, they come back on the live object and Argo
+         reports the route OutOfSync forever while it works. merge never
+         overrides a value that was given. */}}
+  {{- $parentRefs := list }}
+  {{- range .parentRefs }}
+  {{- $parentRefs = append $parentRefs (merge (deepCopy .) (dict "group" "gateway.networking.k8s.io" "kind" "Gateway")) }}
+  {{- end }}
+  {{- $rules := list }}
+  {{- range .rules }}
+  {{- $rule := deepCopy . }}
+  {{- if not (hasKey $rule "matches") }}
+  {{- $_ := set $rule "matches" (list (dict "path" (dict "type" "PathPrefix" "value" "/"))) }}
+  {{- end }}
+  {{- if hasKey $rule "backendRefs" }}
+  {{- $backendRefs := list }}
+  {{- range $rule.backendRefs }}
+  {{- $backendRefs = append $backendRefs (merge (deepCopy .) (dict "group" "" "kind" "Service" "weight" 1)) }}
+  {{- end }}
+  {{- $_ := set $rule "backendRefs" $backendRefs }}
+  {{- end }}
+  {{- $rules = append $rules $rule }}
+  {{- end }}
   parentRefs:
-    {{- toYaml .parentRefs | nindent 4 }}
+    {{- toYaml $parentRefs | nindent 4 }}
   hostnames:
     {{- toYaml .hostnames | nindent 4 }}
   rules:
-    {{- toYaml .rules | nindent 4 }}
+    {{- toYaml $rules | nindent 4 }}
 {{- end }}
