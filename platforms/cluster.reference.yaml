@@ -109,6 +109,13 @@ spec:
     security-platform/external-secrets: 'true'  # → appset-external-secrets-install
     security-platform/kyverno: 'true'           # → appset-kyverno-install
 
+    # ---- profile: observability-platform ----
+    observability-platform: 'true'              # umbrella
+    observability-platform/kube-prometheus-stack: 'true'  # → appset-kube-prometheus-stack [ann: fqdn, secret-store, alert-webhook-url]
+    # gate (operator: Exists) — present this label only once the ClusterSecretStore
+    # named in the secret-store annotation exists and can read the entry:
+    observability-platform.stuttgart-things.com/secrets-config: 'true'
+
     # ---- profile: kind-platform (only when clusterType: kind) ----
     # kind-platform: 'true'
     # kind-platform/cilium-install: 'true'        # → appset-cilium-install-kind
@@ -167,3 +174,12 @@ spec:
     # storage-platform.stuttgart-things.com/nfs-name: nfs-csi            # default nfs-csi (the SC name)
     # storage-platform.stuttgart-things.com/nfs-subdir: <cluster>        # default = cluster name
     # storage-platform.stuttgart-things.com/nfs-mount-permissions: '0'   # default 0
+
+    # ---- [user] observability: kube-prometheus-stack (needs the secrets-config gate label above) ----
+    # observability-platform.stuttgart-things.com/secret-store: vault-observability   # [req] ClusterSecretStore
+    # observability-platform.stuttgart-things.com/secret-key: <cluster>               # default = cluster name
+    #   the entry needs: grafana-admin-user, grafana-admin-password, alertmanager-webhook-token
+    # observability-platform.stuttgart-things.com/alert-webhook-url: https://omni.platform.sthings-vsphere.labul.sva.de/pitch/grafana  # [req]
+    # observability-platform.stuttgart-things.com/storage-class: openebs-hostpath    # default = cluster default SC
+    # observability-platform.stuttgart-things.com/storage-size: 10Gi                 # default 10Gi
+    # observability-platform.stuttgart-things.com/retention: 15d                     # default 15d

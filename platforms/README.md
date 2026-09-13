@@ -72,6 +72,17 @@ component at `'false'` rather than omitting it.
 | `security-platform/external-secrets` | `appset-external-secrets-install` |
 | `security-platform/kyverno` | `appset-kyverno-install` |
 
+### `observability-platform` — kube-prometheus-stack
+| Label | AppSet | Needs annotations |
+|---|---|---|
+| `observability-platform/kube-prometheus-stack` | `appset-kube-prometheus-stack` → Prometheus Operator, Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics | **gate label** `observability-platform.stuttgart-things.com/secrets-config` + `…/secret-store`, `…/alert-webhook-url` **(user)**; optional `…/secret-key` (def cluster), `…/storage-class` (def cluster default), `…/storage-size` (def `10Gi`), `…/retention` (def `15d`); `…/fqdn` *(auto)* for Grafana |
+
+> ⚠️ Like the NFS StorageClass, the stack **also requires** its gate label
+> `observability-platform.stuttgart-things.com/secrets-config` (operator `Exists`) —
+> set it once the ClusterSecretStore and its entry (`grafana-admin-user`,
+> `grafana-admin-password`, `alertmanager-webhook-token`) exist. See
+> [`platforms/observability`](./observability/).
+
 ### `kind-platform` — only when `spec.clusterType: kind`
 | Label | AppSet |
 |---|---|
@@ -93,7 +104,8 @@ component at `'false'` rather than omitting it.
   `cluster-name`, `ip`, `fqdn`, `fqdn-secondary`, `lb-range-start`, `lb-range-stop`, `cluster-type`, allocation-*.
 - **`[user]` you provide** (component config):
   `vault-server` / `vault-pki-path` / `vault-token-secret`, `wildcard-issuer-name`,
-  `expose-external`, and all `storage-platform.stuttgart-things.com/nfs-*`.
+  `expose-external`, all `storage-platform.stuttgart-things.com/nfs-*`, and all
+  `observability-platform.stuttgart-things.com/*`.
 
 ## Presets
 
