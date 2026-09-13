@@ -51,3 +51,38 @@ is disabled or routes elsewhere, the rules still fire and show in the
 Prometheus UI — they simply reach nobody. Check the route before believing the
 alert works; a rule that fires into nothing is worse than no rule, because it
 looks like coverage.
+
+## Release drift targets
+
+A target with `additionalMetricsRelabels: {probe_kind: release}` checks which
+version a service runs rather than whether it answers. Pair it with a module
+that fetches the endpoint the service reports its version on and sets
+`fail_if_body_not_matches_regexp` to the release it should run:
+
+```yaml
+config:
+  modules:
+    myapp_newest_release:
+      prober: http
+      http:
+        preferred_ip_protocol: ip4
+        fail_if_body_not_matches_regexp:
+          - '^v1.2.3\s*$'
+
+targets:
+  - name: myapp-version
+    url: https://myapp.example.com/version
+    module: myapp_newest_release
+    additionalMetricsRelabels:
+      probe_kind: release
+```
+
+The label keeps the target out of `BlackboxProbeFailed` and
+`BlackboxCertificateExpiringSoon` — a release behind is not an outage — and
+puts it into `BlackboxReleaseDrift` at `severity: info`. That rule also counts a
+404, so a release older than the version endpoint shows as drift instead of
+passing unnoticed.
+
+The expected version is only as current as whatever writes it. Keep it moving
+without a human (a Renovate rule with automerge), or it lags exactly like the
+deployment pin it is meant to watch.

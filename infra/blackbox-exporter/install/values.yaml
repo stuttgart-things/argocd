@@ -60,6 +60,8 @@ config:
 #     url: https://example.com/  # what blackbox fetches
 #     module: http_2xx           # optional, defaults to http_2xx
 #     interval: 60s              # optional
+#     additionalMetricsRelabels:   # optional; `probe_kind: release` marks a
+#       probe_kind: release        # version check, see the rules below
 targets: []
 
 # Alerts over whatever is in `targets`. Generic on purpose: they are written
@@ -68,11 +70,17 @@ targets: []
 #
 # `severity` is load-bearing where kube-prometheus-stack routes
 # `severity =~ "warning|critical"` onward and drops everything else.
+#
+# A target labelled `probe_kind: release` asks a different question: not
+# whether the service answers, but whether it runs the release it should. It
+# uses a module with `fail_if_body_not_matches_regexp` against the endpoint
+# the service reports its version on. Its failure is not an outage, so the
+# two outage rules leave it out and BlackboxReleaseDrift takes it instead.
 alerts:
   enabled: true
   rules:
     - alert: BlackboxProbeFailed
-      expr: probe_success == 0
+      expr: probe_success{probe_kind!="release"} == 0
       for: 5m
       labels:
         severity: critical
@@ -84,7 +92,7 @@ alerts:
           the certificate and the application — so it says people cannot use it,
           not which part broke.
     - alert: BlackboxCertificateExpiringSoon
-      expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 14
+      expr: probe_ssl_earliest_cert_expiry{probe_kind!="release"} - time() < 86400 * 14
       for: 1h
       labels:
         severity: warning
@@ -93,6 +101,23 @@ alerts:
         description: >-
           Renewal is somebody's job somewhere; this is the alert that says
           nobody did it. Fourteen days is enough to notice over a holiday.
+    - alert: BlackboxReleaseDrift
+      # A body that is not the expected version, or a 404: a release older than
+      # the endpoint the version is read from has no such route at all.
+      expr: probe_failed_due_to_regex{probe_kind="release"} == 1 or probe_http_status_code{probe_kind="release"} == 404
+      for: 30m
+      labels:
+        # info on purpose. It falls into the null receiver on the platform
+        # cluster: visible in Prometheus and Alertmanager, and nobody is woken
+        # because an environment is a release behind.
+        severity: info
+      annotations:
+        summary: "{{ $labels.instance }} is not running the newest release"
+        description: >-
+          The version {{ $labels.instance }} reports does not match the release
+          the probe expects, or the endpoint does not exist yet. Something is
+          a release behind; whether that is a forgotten pin or a deliberate hold
+          is for a person to look at, not to be woken for.
 
 # Deep-merged on top of the computed valuesObject passed to the upstream chart.
 # Use for any upstream key not exposed as a first-class value above.
