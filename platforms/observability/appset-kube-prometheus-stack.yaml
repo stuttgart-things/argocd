@@ -1,0 +1,103 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kube-prometheus-stack-observability
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            observability-platform: "true"
+          matchExpressions:
+            # Grafana is routed through the cluster's own gateway, whose
+            # hostname comes from the reservation — same gate as
+            # platforms/network's cilium-gateway.
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            # The Grafana admin and the Alertmanager webhook token come from a
+            # ClusterSecretStore named in the annotations below. Present this
+            # label only once that store exists on the cluster and its role
+            # can read the entry — without it the stack would start with the
+            # upstream default Grafana password and an Alertmanager whose
+            # token file never appears. Same pattern as storage-platform's
+            # nfs-config gate.
+            - key: observability-platform.stuttgart-things.com/secrets-config
+              operator: Exists
+            - key: observability-platform/kube-prometheus-stack
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: kube-prometheus-stack-observability-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "5"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.30.0
+        path: infra/kube-prometheus-stack/install
+        helm:
+          valuesObject:
+            project: '{{ .name }}'
+            # The inner Application carries the `-observability` suffix and
+            # never collides with a per-cluster overlay that may also point
+            # at infra/kube-prometheus-stack/install.
+            applicationName: kube-prometheus-stack-observability-{{ .name }}
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.30.0
+            destination:
+              server: '{{ .server }}'
+              namespace: monitoring
+            clusterName: '{{ .name }}'
+            prometheus:
+              # Empty = the cluster's default StorageClass. Name one on
+              # clusters with two defaults.
+              storageClass: '{{ index .metadata.annotations "observability-platform.stuttgart-things.com/storage-class" }}'
+              storageSize: '{{ default "10Gi" (index .metadata.annotations "observability-platform.stuttgart-things.com/storage-size") }}'
+              retention: '{{ default "15d" (index .metadata.annotations "observability-platform.stuttgart-things.com/retention") }}'
+              scrapeInterval: 60s
+            grafana:
+              enabled: true
+              adminSecret: kube-prometheus-stack-grafana-admin
+            alertmanager:
+              enabled: true
+              webhook:
+                enabled: true
+                url: '{{ index .metadata.annotations "observability-platform.stuttgart-things.com/alert-webhook-url" }}'
+            externalSecrets:
+              enabled: true
+              secretStore:
+                kind: ClusterSecretStore
+                name: '{{ index .metadata.annotations "observability-platform.stuttgart-things.com/secret-store" }}'
+              remoteKey: '{{ default .name (index .metadata.annotations "observability-platform.stuttgart-things.com/secret-key") }}'
+            httpRoute:
+              enabled: true
+              hostname: 'grafana.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              gateway:
+                name: '{{ .name }}-gateway'
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
