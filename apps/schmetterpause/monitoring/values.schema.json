@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "schmetterpause monitoring",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namespace", "interval", "app", "database", "backup"],
+  "properties": {
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "namespace": { "type": "string", "minLength": 1 },
+    "interval":  { "type": "string", "pattern": "^[0-9]+(s|m)$" },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "podLabels": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string" }
+        },
+        "port": { "type": "string", "minLength": 1 }
+      },
+      "required": ["podLabels", "port"]
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "clusterName": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled", "clusterName"]
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "maxAgeHours": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["enabled", "maxAgeHours"]
+    }
+  }
+}

@@ -11,7 +11,9 @@ apps/schmetterpause/
 ├── install/        app-of-apps chart (what consumers point at) — renders:
 │                     Application "schmetterpause"     (sync-wave   0) → the published kustomize OCI, environment patched in
 │                     Application "schmetterpause-db"  (sync-wave -10) → apps/schmetterpause/database
-└── database/       CloudNativePG Cluster
+│                     Application "schmetterpause-monitoring" (sync-wave 5, opt-in) → apps/schmetterpause/monitoring
+├── database/       CloudNativePG Cluster
+└── monitoring/     PodMonitors (app, database) and alert rules
 ```
 
 ## Why the database is a separate chart
@@ -140,6 +142,39 @@ Not the in-tree `spec.backup.barmanObjectStore`: CloudNativePG 1.30 deprecates i
 kubectl -n schmetterpause get cluster schmetterpause-db \
   -o jsonpath='{.status.conditions[?(@.type=="ContinuousArchiving")].status}'   # True
 kubectl -n schmetterpause get backups.postgresql.cnpg.io                          # a completed one
+```
+
+## Monitoring
+
+`monitoring.enabled` renders `apps/schmetterpause/monitoring` as its own Application at sync-wave 5. Off by default: its `PodMonitor`s and `PrometheusRule` need the Prometheus Operator CRDs on the target cluster — `infra/kube-prometheus-stack`, or on clusterbook clusters the `observability-platform` label — and without them the Application does not sync.
+
+| Object | Selects / watches |
+|---|---|
+| `PodMonitor schmetterpause` | pods labelled `app.kubernetes.io/name: schmetterpause`, port `metrics`, `/metrics` |
+| `PodMonitor <database.name>` | CNPG instances (`cnpg.io/cluster`, `cnpg.io/podRole: instance`), port `metrics` (9187). Our own monitor rather than `spec.monitoring.enablePodMonitor`, which CNPG 1.30 deprecates |
+| `PrometheusRule schmetterpause` | the alerts below |
+
+**Precondition: schmetterpause ≥ v0.8.0.** The container port `metrics` (`SP_METRICS_ADDR`, 9090) exists from that release on. The Service does not name it, so neither HTTPRoute can reach `/metrics`; the PodMonitor scrapes the pod directly. Enabled against an older `version`, the app monitor finds no port and `SchmetterpauseMetricsDown` fires.
+
+| Alert | Severity | When |
+|---|---|---|
+| `SchmetterpauseMetricsDown` | warning | no healthy `/metrics` target for 10 min — also while the app is scaled to 0 for a restore |
+| `SchmetterpauseDatabaseExporterDown` | warning | the CNPG exporter silent for 10 min, which also silences the backup alerts |
+| `SchmetterpauseWALArchivingFailing` | critical | last failed archive newer than the last successful one, for 15 min |
+| `SchmetterpauseWALArchiveBacklog` | warning | more than 10 WAL segments `ready` for 30 min |
+| `SchmetterpauseBackupTooOld` | warning | newest base backup older than `monitoring.backupMaxAgeHours` (26) |
+| `SchmetterpauseBackupFailed` | warning | a failed base backup newer than the last successful one |
+
+The last four only exist with `database.backup.enabled`. Two choices in them are deliberate:
+
+- **Not "seconds since last archival".** With nobody writing, no WAL segment fills, and that number grows all night while everything is fine. A failure newer than the last success is the signal.
+- **The backup timestamps are the plugin's**, `barman_cloud_cloudnative_pg_io_*`. `cnpg_collector_last_available_backup_timestamp` stays 0 for plugin backups — an alert on it would fire forever.
+
+Whether the site answers at all stays the blackbox probe's job from outside; these rules are the inside view.
+
+```yaml
+        monitoring:
+          enabled: true
 ```
 
 **Restore** is a new Cluster bootstrapped from the object store, into an empty namespace — never an in-place overwrite: an `ExternalSecret` and `ObjectStore` like the ones above, then a `Cluster` with `bootstrap.recovery.source` naming an `externalClusters` entry that uses the plugin with `barmanObjectName` and `serverName: schmetterpause-db`. Set `storage.storageClass` explicitly, and give the restored Cluster **no** WAL archiver on the same `serverName` — two clusters archiving into one path corrupt each other's timeline.

@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: schmetterpause-monitoring
+description: PodMonitors and alert rules for schmetterpause — the app's /metrics listener, the CloudNativePG exporter, WAL archiving and Barman Cloud backups. Loaded as a sub-Application by apps/schmetterpause/install; needs the Prometheus Operator CRDs on the target cluster.
+type: application
+version: 0.1.0

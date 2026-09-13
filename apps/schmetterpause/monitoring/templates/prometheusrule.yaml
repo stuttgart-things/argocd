@@ -1,0 +1,77 @@
+{{- $ns := .Values.namespace }}
+{{- $db := .Values.database.clusterName }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: schmetterpause
+  namespace: {{ $ns | quote }}
+spec:
+  groups:
+    - name: schmetterpause.app
+      rules:
+        # No healthy /metrics target. Also fires while the app is scaled to 0
+        # on purpose — a restore — which is the one time somebody is watching
+        # anyway. Whether the site answers at all is the blackbox probe's job
+        # on platform-sthings; this is the inside view.
+        - alert: SchmetterpauseMetricsDown
+          expr: absent(up{namespace="{{ $ns }}", job="{{ $ns }}/schmetterpause"} == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: schmetterpause exposes no metrics
+            description: No schmetterpause pod in {{ $ns }} has answered on /metrics for 10 minutes.
+{{- if .Values.database.enabled }}
+    - name: schmetterpause.database
+      rules:
+        - alert: SchmetterpauseDatabaseExporterDown
+          expr: absent(cnpg_collector_up{namespace="{{ $ns }}", cluster="{{ $db }}"} == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $db }} exports no metrics"
+            description: The CloudNativePG exporter of {{ $db }} in {{ $ns }} has reported nothing for 10 minutes, so its backup and archiving alerts cannot fire either.
+{{- end }}
+{{- if and .Values.database.enabled .Values.backup.enabled }}
+    - name: schmetterpause.backup
+      rules:
+        # Not "seconds since the last archival": with nobody writing, no WAL
+        # segment fills and that number grows all night while everything is
+        # fine. A failure newer than the last success is the signal.
+        - alert: SchmetterpauseWALArchivingFailing
+          expr: cnpg_pg_stat_archiver_last_failed_time{namespace="{{ $ns }}"} > cnpg_pg_stat_archiver_last_archived_time{namespace="{{ $ns }}"}
+          for: 15m
+          labels:
+            severity: critical
+          annotations:
+            summary: WAL archiving of {{ $db }} is failing
+            description: The last WAL archive attempt of {{ $db }} failed and none has succeeded since, for 15 minutes. Point-in-time recovery stops at the last archived segment.
+        - alert: SchmetterpauseWALArchiveBacklog
+          expr: cnpg_collector_pg_wal_archive_status{namespace="{{ $ns }}", value="ready"} > 10
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: WAL segments of {{ $db }} are waiting to be archived
+            description: 'More than 10 WAL segments of {{ $db }} have been ready for archiving for 30 minutes.'
+        # The Barman Cloud plugin's own timestamp: cnpg_collector_last_available_backup_timestamp
+        # stays 0 for plugin backups. 0 here means "never" and alerts, as it should.
+        - alert: SchmetterpauseBackupTooOld
+          expr: time() - barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="{{ $ns }}"} > {{ mul .Values.backup.maxAgeHours 3600 }}
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: No recent base backup of {{ $db }}
+            description: The newest base backup of {{ $db }} is older than {{ .Values.backup.maxAgeHours }} hours; the daily ScheduledBackup has not completed.
+        - alert: SchmetterpauseBackupFailed
+          expr: barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp{namespace="{{ $ns }}"} > barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="{{ $ns }}"}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: The last base backup of {{ $db }} failed
+            description: A base backup of {{ $db }} failed after the last successful one. kubectl -n {{ $ns }} get backup shows which.
+{{- end }}

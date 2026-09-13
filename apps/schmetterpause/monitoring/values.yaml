@@ -1,0 +1,32 @@
+---
+# Namespace schmetterpause and its database run in.
+namespace: schmetterpause
+
+# Scrape interval for both PodMonitors.
+interval: 60s
+
+# The app's pods, selected by the label the kustomize base puts on them. Their
+# container port `metrics` exists since schmetterpause v0.8.0
+# (SP_METRICS_ADDR); the Service does not name it, so it is reachable from
+# inside the cluster only.
+app:
+  podLabels:
+    app.kubernetes.io/name: schmetterpause
+  port: metrics
+
+# The CloudNativePG Cluster. Its instances export on port `metrics` (9187),
+# including the Barman Cloud plugin's backup timestamps.
+database:
+  enabled: true
+  clusterName: schmetterpause-db
+
+# Rules about WAL archiving and base backups. Only meaningful with
+# database.backup.enabled in the install chart — without a plugin there is no
+# archive to fail.
+backup:
+  enabled: false
+  # The schedule is daily; 26 h leaves room for one slow run before it alerts.
+  maxAgeHours: 26
+
+# Inert pass-through so the catalog verifier's probe values validate.
+destination: {}

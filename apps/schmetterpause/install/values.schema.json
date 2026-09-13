@@ -10,6 +10,19 @@
     "hostname"
   ],
   "properties": {
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "PodMonitors and alert rules, rendered as their own Application from apps/schmetterpause/monitoring. Needs the Prometheus Operator CRDs on the target cluster and version >= v0.8.0.",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "interval": { "type": "string", "pattern": "^[0-9]+(s|m)$" },
+        "backupMaxAgeHours": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": { "required": ["interval", "backupMaxAgeHours"] }
+    },
     "catalog": {
       "type": "object",
       "additionalProperties": false,

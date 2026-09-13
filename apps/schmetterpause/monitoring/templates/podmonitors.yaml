@@ -1,0 +1,32 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: schmetterpause
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  selector:
+    matchLabels:
+      {{- toYaml .Values.app.podLabels | nindent 6 }}
+  podMetricsEndpoints:
+    - port: {{ .Values.app.port | quote }}
+      path: /metrics
+      interval: {{ .Values.interval | quote }}
+{{- if .Values.database.enabled }}
+---
+# A PodMonitor of our own rather than the Cluster's spec.monitoring.enablePodMonitor,
+# which CloudNativePG 1.30 marks deprecated in favour of exactly this.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Values.database.clusterName | quote }}
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: {{ .Values.database.clusterName | quote }}
+      cnpg.io/podRole: instance
+  podMetricsEndpoints:
+    - port: metrics
+      interval: {{ .Values.interval | quote }}
+{{- end }}
