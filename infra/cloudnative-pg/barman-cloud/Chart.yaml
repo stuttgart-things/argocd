@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: cloudnative-pg-barman-cloud
+description: App-of-apps chart packaging the Barman Cloud plugin for CloudNativePG (cnpg/plugin-barman-cloud) — WAL archiving, base backups and recovery against S3-compatible object storage, in place of the in-tree barmanObjectStore that CloudNativePG 1.31.0 removes
+type: application
+version: 0.1.0
+appVersion: "v0.15.0"

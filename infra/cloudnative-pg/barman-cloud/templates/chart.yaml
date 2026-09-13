@@ -1,0 +1,41 @@
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $defaultName := printf "cnpg-barman-cloud-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+The plugin needs nothing from us beyond living in the operator's namespace.
+The CRD is created explicitly rather than left to the upstream default, so a
+later change there cannot quietly stop installing it.
+*/}}
+{{- $computed := dict "crds" (dict "create" true) }}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # -9: after the operator (-10) and cert-manager, whose CRDs and Issuer
+    # support the plugin's certificates need, and before any Cluster that
+    # names the plugin.
+    argocd.argoproj.io/sync-wave: "-9"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: plugin-barman-cloud
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: plugin-barman-cloud
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
