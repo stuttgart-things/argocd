@@ -42,5 +42,45 @@ protect: true
 # The app connects as the owner role; nothing needs superuser, so it stays off.
 enableSuperuserAccess: false
 
+# Backups through the Barman Cloud plugin: continuous WAL archiving and a
+# scheduled base backup into S3-compatible object storage. OFF by default, and
+# it has to be:
+#
+#   - it needs the plugin in the operator's namespace
+#     (infra/cloudnative-pg/barman-cloud); without its ObjectStore CRD this
+#     chart does not sync at all;
+#   - it needs a bucket, and an entry in the secret store holding its key pair;
+#   - switching it on for an EXISTING Cluster adds spec.plugins, which restarts
+#     the Postgres pod. Do it outside the hours the database is in use.
+#
+# "Working" is two facts, and a green sync is neither: the Cluster's
+# ContinuousArchiving condition is True, and a Backup reaches phase completed.
+backup:
+  enabled: false
+  # https:// address of the object store. Its certificate is checked against
+  # the cluster trust bundle (caConfigMap), never skipped.
+  endpointURL: ""
+  # s3://<bucket>/ -- the Cluster name becomes the server directory below it.
+  destinationPath: ""
+  retentionPolicy: 30d
+  # Six fields, seconds first: CloudNativePG's cron format, not the usual five.
+  schedule: "0 0 3 * * *"
+  # false on purpose: an immediate backup fires while enabling restarts the pod
+  # and fails. Take the first one by hand once ContinuousArchiving is True.
+  immediate: false
+  secretStore:
+    kind: ClusterSecretStore
+    name: ""
+  # Entry name under the store's mount, flat -- never a path with /data/ in it.
+  # Its own entry rather than the app's: a write that rewrites a whole KV entry
+  # to add the key pair could reset the session key with it.
+  remoteKey: ""
+  accessKeyProperty: access_key
+  secretKeyProperty: secret_key
+  # endpointCA must name a Secret, and the trust bundle trust-manager publishes
+  # is a ConfigMap -- the ExternalSecret copies it in and follows rotations.
+  caConfigMap: cluster-trust-bundle
+  caKey: trust-bundle.pem
+
 # Inert pass-through so the catalog verifier's probe values validate.
 destination: {}
