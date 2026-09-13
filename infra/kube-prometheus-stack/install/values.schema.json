@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "kube-prometheus-stack app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": { "type": "string", "format": "uri" },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repoURL", "targetRevision"]
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["server", "namespace"]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "clusterName": {
+      "type": "string",
+      "description": "Value of the `cluster` external label on every series and alert. Empty = no label."
+    },
+    "prometheus": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "storageClass":   { "type": "string", "description": "Empty = the cluster's default StorageClass." },
+        "storageSize":    { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" },
+        "retention":      { "type": "string", "minLength": 1 },
+        "scrapeInterval": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
+      },
+      "required": ["storageSize", "retention", "scrapeInterval"]
+    },
+    "controlPlane": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kubeControllerManager": { "type": "boolean" },
+        "kubeScheduler":         { "type": "boolean" },
+        "kubeEtcd":              { "type": "boolean" },
+        "kubeProxy":             { "type": "boolean" }
+      },
+      "required": ["kubeControllerManager", "kubeScheduler", "kubeEtcd", "kubeProxy"]
+    },
+    "grafana": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "adminSecret": { "type": "string", "description": "Secret with admin-user/admin-password. Empty = upstream default credentials." }
+      },
+      "required": ["enabled"]
+    },
+    "alertmanager": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "webhook": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled":     { "type": "boolean" },
+            "url":         { "type": "string" },
+            "tokenSecret": { "type": "string", "minLength": 1 },
+            "caConfigMap": { "type": "string" },
+            "caKey":       { "type": "string" }
+          },
+          "required": ["enabled"],
+          "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+          "then": {
+            "required": ["url", "tokenSecret"],
+            "properties": { "url": { "pattern": "^https?://" } }
+          }
+        }
+      },
+      "required": ["enabled"]
+    },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
+            "name": { "type": "string" }
+          },
+          "required": ["kind", "name"]
+        },
+        "remoteKey":                    { "type": "string" },
+        "grafanaAdminUserProperty":     { "type": "string", "minLength": 1 },
+        "grafanaAdminPasswordProperty": { "type": "string", "minLength": 1 },
+        "webhookTokenProperty":         { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": {
+        "required": ["secretStore", "remoteKey"],
+        "properties": {
+          "remoteKey": { "minLength": 1, "not": { "pattern": "/data/" } },
+          "secretStore": { "properties": { "name": { "minLength": 1 } } }
+        }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":  { "type": "boolean" },
+        "hostname": { "type": "string", "minLength": 1 },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name":      { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "namespace"]
+        }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": { "required": ["hostname", "gateway"] }
+    },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed valuesObject passed to the upstream chart.",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

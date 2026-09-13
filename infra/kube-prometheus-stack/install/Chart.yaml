@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: kube-prometheus-stack-install
+description: App-of-apps chart packaging the upstream prometheus-community/kube-prometheus-stack (Prometheus Operator, Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics) with optional ExternalSecrets and a Gateway API HTTPRoute for Grafana.
+type: application
+version: 0.1.0
+appVersion: "91.0.0"

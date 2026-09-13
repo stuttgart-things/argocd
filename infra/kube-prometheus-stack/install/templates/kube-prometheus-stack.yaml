@@ -1,0 +1,121 @@
+{{- $defaultName := printf "kube-prometheus-stack-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+
+{{- /* ---- Prometheus ---- */}}
+{{- $pvc := dict
+      "accessModes" (list "ReadWriteOnce")
+      "resources" (dict "requests" (dict "storage" .Values.prometheus.storageSize))
+}}
+{{- if .Values.prometheus.storageClass }}
+{{- $_ := set $pvc "storageClassName" .Values.prometheus.storageClass }}
+{{- end }}
+{{- $promSpec := dict
+      "replicas" 1
+      "scrapeInterval" .Values.prometheus.scrapeInterval
+      "evaluationInterval" .Values.prometheus.scrapeInterval
+      "retention" .Values.prometheus.retention
+      "serviceMonitorSelectorNilUsesHelmValues" false
+      "podMonitorSelectorNilUsesHelmValues" false
+      "ruleSelectorNilUsesHelmValues" false
+      "probeSelectorNilUsesHelmValues" false
+      "resources" (dict "requests" (dict "cpu" "100m" "memory" "512Mi") "limits" (dict "memory" "1536Mi"))
+      "storageSpec" (dict "volumeClaimTemplate" (dict "spec" $pvc))
+}}
+{{- if .Values.clusterName }}
+{{- $_ := set $promSpec "externalLabels" (dict "cluster" .Values.clusterName) }}
+{{- end }}
+
+{{- /* ---- Alertmanager ---- */}}
+{{- $amSpec := dict
+      "replicas" 1
+      "retention" "120h"
+      "resources" (dict "requests" (dict "cpu" "10m" "memory" "32Mi") "limits" (dict "memory" "128Mi"))
+}}
+{{- $am := dict "enabled" .Values.alertmanager.enabled "alertmanagerSpec" $amSpec }}
+{{- $hook := .Values.alertmanager.webhook }}
+{{- if and .Values.alertmanager.enabled $hook.enabled }}
+{{- $_ := set $amSpec "secrets" (list $hook.tokenSecret) }}
+{{- $httpConfig := dict "authorization" (dict
+      "type" "Bearer"
+      "credentials_file" (printf "/etc/alertmanager/secrets/%s/token" $hook.tokenSecret)) }}
+{{- if $hook.caConfigMap }}
+{{- $_ := set $amSpec "configMaps" (list $hook.caConfigMap) }}
+{{- $_ := set $httpConfig "tls_config" (dict "ca_file" (printf "/etc/alertmanager/configmaps/%s/%s" $hook.caConfigMap $hook.caKey)) }}
+{{- end }}
+{{- $_ := set $am "config" (dict
+      "route" (dict
+        "receiver" "null"
+        "group_by" (list "namespace" "alertname")
+        "group_wait" "30s"
+        "group_interval" "5m"
+        "repeat_interval" "4h"
+        "routes" (list (dict "receiver" "webhook" "matchers" (list `severity =~ "warning|critical"`))))
+      "receivers" (list
+        (dict "name" "null")
+        (dict "name" "webhook" "webhook_configs" (list (dict
+          "url" $hook.url
+          "send_resolved" true
+          "http_config" $httpConfig))))
+      "inhibit_rules" (list
+        (dict "source_matchers" (list `severity = "critical"`) "target_matchers" (list `severity =~ "warning|info"`) "equal" (list "namespace" "alertname"))
+        (dict "source_matchers" (list `severity = "warning"`) "target_matchers" (list `severity = "info"`) "equal" (list "namespace" "alertname")))
+      "templates" (list "/etc/alertmanager/config/*.tmpl")) }}
+{{- end }}
+
+{{- /* ---- Grafana ---- */}}
+{{- $grafana := dict "enabled" .Values.grafana.enabled }}
+{{- if .Values.grafana.enabled }}
+{{- $_ := set $grafana "replicas" 1 }}
+{{- $_ := set $grafana "defaultDashboardsEnabled" true }}
+{{- $_ := set $grafana "defaultDashboardsTimezone" "browser" }}
+{{- /* Ephemeral: dashboards are provisioned from ConfigMaps on every start; in-UI edits do not persist. */}}
+{{- $_ := set $grafana "persistence" (dict "enabled" false) }}
+{{- $_ := set $grafana "ingress" (dict "enabled" false) }}
+{{- $_ := set $grafana "resources" (dict "requests" (dict "cpu" "20m" "memory" "128Mi") "limits" (dict "memory" "768Mi")) }}
+{{- if .Values.grafana.adminSecret }}
+{{- $_ := set $grafana "admin" (dict "existingSecret" .Values.grafana.adminSecret "userKey" "admin-user" "passwordKey" "admin-password") }}
+{{- end }}
+{{- if .Values.httpRoute.enabled }}
+{{- $_ := set $grafana "grafana.ini" (dict "server" (dict "root_url" (printf "https://%s" .Values.httpRoute.hostname))) }}
+{{- end }}
+{{- end }}
+
+{{- $computed := dict
+      "crds" (dict "enabled" true)
+      "defaultRules" (dict "create" true)
+      "kubeControllerManager" (dict "enabled" .Values.controlPlane.kubeControllerManager)
+      "kubeScheduler" (dict "enabled" .Values.controlPlane.kubeScheduler)
+      "kubeEtcd" (dict "enabled" .Values.controlPlane.kubeEtcd)
+      "kubeProxy" (dict "enabled" .Values.controlPlane.kubeProxy)
+      "prometheusOperator" (dict "resources" (dict "requests" (dict "cpu" "20m" "memory" "64Mi") "limits" (dict "memory" "256Mi")))
+      "prometheus" (dict "prometheusSpec" $promSpec)
+      "alertmanager" $am
+      "grafana" $grafana
+      "prometheus-node-exporter" (dict "resources" (dict "requests" (dict "cpu" "10m" "memory" "24Mi") "limits" (dict "memory" "64Mi")))
+      "kube-state-metrics" (dict "resources" (dict "requests" (dict "cpu" "10m" "memory" "32Mi") "limits" (dict "memory" "128Mi")))
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: kube-prometheus-stack
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
