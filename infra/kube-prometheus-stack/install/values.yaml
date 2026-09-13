@@ -1,0 +1,109 @@
+---
+# Reference back to this catalog repo — used by the secrets and httpRoute
+# Applications to load infra/kube-prometheus-stack/{secrets,httproute} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: monitoring
+
+# Upstream prometheus-community/kube-prometheus-stack Helm chart version.
+# renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
+chartVersion: 91.0.0
+
+# Stamped on every series and alert as the `cluster` label when set, so an
+# alert that reaches a shared channel says which cluster it came from.
+clusterName: ""
+
+prometheus:
+  # "" = the cluster's default StorageClass. Name it on clusters with more
+  # than one default, or the PVC lands on whichever the API server picks.
+  storageClass: ""
+  storageSize: 10Gi
+  retention: 15d
+  # 60s (vs the chart default 30s) roughly halves scrape CPU and TSDB write
+  # volume. Also used as the rule evaluation interval.
+  scrapeInterval: 60s
+
+# Control-plane scrape jobs. Off by default: on k3s and RKE2 the controller
+# manager, scheduler and etcd bind their metrics to localhost or are embedded
+# in one process, and Cilium in kube-proxy-replacement mode has no kube-proxy.
+# The chart's default ServiceMonitors would only produce permanent TargetDown
+# alerts. kubelet, cAdvisor and kube-apiserver are scraped either way.
+controlPlane:
+  kubeControllerManager: false
+  kubeScheduler: false
+  kubeEtcd: false
+  kubeProxy: false
+
+grafana:
+  enabled: true
+  # Secret with keys `admin-user` and `admin-password`. Empty = the upstream
+  # default credentials (admin / prom-operator) — set this on anything
+  # reachable. `externalSecrets` below can create it.
+  adminSecret: ""
+
+alertmanager:
+  enabled: true
+  # A webhook receiver for warning and critical alerts, e.g. homerun2's
+  # omni-pitcher `/pitch/grafana`. Everything else — info, Watchdog — goes to
+  # a null receiver. Off: the upstream default config (null receiver only).
+  webhook:
+    enabled: false
+    url: ""
+    # Secret with key `token`, sent as a Bearer token. Mounted as a file, so
+    # the token never appears in the Alertmanager config or the Application.
+    tokenSecret: kube-prometheus-stack-alertmanager-webhook
+    # ConfigMap holding the CA bundle the webhook's certificate chains to —
+    # trust-manager's `cluster-trust-bundle` on stuttgart-things clusters.
+    # Empty = the system roots.
+    caConfigMap: cluster-trust-bundle
+    caKey: trust-bundle.pem
+
+# ExternalSecrets for the two Secrets above, from one entry in an existing
+# (Cluster)SecretStore. Rendered as its own Application at sync-wave -5, so the
+# Secrets exist before Grafana and Alertmanager start.
+externalSecrets:
+  enabled: false
+  secretStore:
+    kind: ClusterSecretStore
+    name: ""
+  # Entry name under the store's mount, flat — never a path with /data/ in it.
+  remoteKey: ""
+  grafanaAdminUserProperty: grafana-admin-user
+  grafanaAdminPasswordProperty: grafana-admin-password
+  webhookTokenProperty: alertmanager-webhook-token
+
+# Gateway API HTTPRoute for Grafana (opt-in). Also sets Grafana's root_url.
+httpRoute:
+  enabled: false
+  hostname: grafana.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications. ServerSideApply matters
+# here: the operator's CRDs exceed the client-side annotation size limit.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

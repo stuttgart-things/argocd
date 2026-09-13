@@ -1,0 +1,14 @@
+---
+namespace: monitoring
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: grafana
+    hostname: grafana.example.com
+    backend:
+      name: kube-prometheus-stack-grafana
+      port: 80
+
+# Inert pass-through so the catalog verifier's probe values validate.
+destination: {}
