@@ -104,23 +104,6 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" $scoutEnv) | indent 12 }}
-{{- /* scout reads its ScoutProfile once at startup: stamp the spec's hash on
-       the pod template so a changed profile rolls the Deployment. */}}
-{{- if .Values.scout.profile.enabled }}
-        - target:
-            kind: Deployment
-            name: {{ $name }}
-          patch: |
-            apiVersion: apps/v1
-            kind: Deployment
-            metadata:
-              name: {{ $name }}
-            spec:
-              template:
-                metadata:
-                  annotations:
-                    homerun2.stuttgart-things.com/profile-checksum: {{ .Values.scout.profile | toJson | sha256sum | quote }}
-{{- end }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}
