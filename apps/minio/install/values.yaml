@@ -15,7 +15,7 @@ destination:
 
 # Upstream MinIO OCI chart version (ghcr.io/stuttgart-things/charts/minio).
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/minio/minio
-chartVersion: 16.0.10
+chartVersion: 17.0.21
 
 # Pinned MinIO image (stuttgart-things mirror). global.security.allowInsecureImages=true
 # is set because this overrides the chart's default image digest.
