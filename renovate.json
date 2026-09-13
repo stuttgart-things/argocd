@@ -41,6 +41,16 @@
       "minimumReleaseAge": "0 days"
     },
     {
+      "description": "Hold the redis chart at 17.x (same rule as stuttgart-things/flux). 22.x refuses the stuttgart-things redis-stack-server/redis-sentinel images apps/homerun2/install and apps/redis-stack use, unless global.security.allowInsecureImages is set, moves the password to REDIS_PASSWORD_FILE and adds readOnlyRootFilesystem -- untested with our start scripts (stuttgart-things/flux#355). Migrate deliberately, not via renovate.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/stuttgart-things/charts/redis/redis"
+      ],
+      "allowedVersions": "<18.0.0"
+    },
+    {
       "description": "Auto-merge patch and digest updates once CI passes — keeps low-risk bumps from piling up",
       "matchUpdateTypes": [
         "patch",
