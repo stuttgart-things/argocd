@@ -23,7 +23,7 @@ kustomize:
 image:
   repository: ghcr.io/stuttgart-things/clusterbook
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterbook
-  tag: 1.25.9
+  tag: 1.28.2
 
 # PowerDNS integration — patched into the clusterbook-config ConfigMap rendered by the base.
 # When enabled, the pdns sub-Application also provisions the clusterbook-pdns Secret.

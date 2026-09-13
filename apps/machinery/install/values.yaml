@@ -28,7 +28,7 @@ kustomize:
 image:
   repository: ghcr.io/stuttgart-things/machinery
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/machinery
-  tag: v1.13.4
+  tag: v1.13.5
 
 # Optional MACHINERY_CONFIG. Three opt-in paths:
 #
