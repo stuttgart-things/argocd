@@ -1,3 +1,7 @@
+{{- /* Fields the API server defaults are spelled out: left implicit they
+       come back on the live object, and Argo reports the route OutOfSync
+       forever while it works (group/kind/weight, and PathPrefix / for a
+       rule without matches). */}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -8,6 +12,8 @@ spec:
   parentRefs:
     - name: {{ .Values.gateway.name | quote }}
       namespace: {{ .Values.gateway.namespace | quote }}
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - {{ .Values.fqdn | quote }}
   rules:
@@ -33,6 +39,9 @@ spec:
       backendRefs:
         - name: harbor-core
           port: 80
+          group: ""
+          kind: Service
+          weight: 1
     - matches:
         - path:
             type: PathPrefix
@@ -40,6 +49,9 @@ spec:
       backendRefs:
         - name: harbor-portal
           port: 80
+          group: ""
+          kind: Service
+          weight: 1
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -50,9 +62,18 @@ spec:
   parentRefs:
     - name: {{ .Values.gateway.name | quote }}
       namespace: {{ .Values.gateway.namespace | quote }}
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - {{ .Values.wildcard | quote }}
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
         - name: harbor-project-proxy
           port: 80
+          group: ""
+          kind: Service
+          weight: 1

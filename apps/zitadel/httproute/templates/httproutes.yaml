@@ -1,3 +1,7 @@
+{{- /* Fields the API server defaults are spelled out: left implicit they
+       come back on the live object, and Argo reports the route OutOfSync
+       forever while it works (group/kind/weight, and PathPrefix / for a
+       rule without matches). */}}
 {{- range .Values.routes }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
@@ -9,10 +13,19 @@ spec:
   parentRefs:
     - name: {{ $.Values.gateway.name | quote }}
       namespace: {{ $.Values.gateway.namespace | quote }}
+      group: gateway.networking.k8s.io
+      kind: Gateway
   hostnames:
     - {{ .hostname | quote }}
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
         - name: {{ .backend.name | quote }}
           port: {{ .backend.port }}
+          group: ""
+          kind: Service
+          weight: 1
 {{- end }}
