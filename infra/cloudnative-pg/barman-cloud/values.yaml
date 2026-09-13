@@ -1,0 +1,49 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+#
+# The namespace MUST be the operator's. The operator discovers plugins by the
+# `cnpg.io/pluginName` label on a Service in its own namespace, so a plugin
+# installed anywhere else is never found — no error at install, only a Cluster
+# that later reports the plugin does not exist. `postgres` matches ../install.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: postgres
+
+# Base name for the rendered Application. Empty derives
+# `cnpg-barman-cloud-<sha1(destination)[:8]>`, because Applications land in the
+# `argocd` namespace of ONE management cluster and a fixed name would make two
+# clusters' installs collide on the same object.
+applicationName: ""
+
+# Upstream plugin-barman-cloud chart version (app v0.15.0 at 0.8.0). Needs
+# CloudNativePG 1.26 or later and cert-manager: the chart renders a self-signed
+# Issuer and the two Certificates for operator <-> plugin TLS.
+# renovate: datasource=helm depName=plugin-barman-cloud registryUrl=https://cloudnative-pg.github.io/charts
+chartVersion: 0.8.0
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value (resources,
+# logLevel, image overrides, certificate.*, …).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+#
+# ServerSideApply for the same reason as ../install: the chart ships a CRD
+# (objectstores.barmancloud.cnpg.io), and client-side apply stores the whole
+# object in an annotation with a size limit.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

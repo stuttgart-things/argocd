@@ -30,6 +30,7 @@ infra/cloudnative-pg/
 │   ├── values.schema.json
 │   └── templates/
 │       └── chart.yaml              renders Application "cloudnative-pg-<hash>" (sync-wave -10)
+├── barman-cloud/                   the Barman Cloud backup plugin — one per cluster, beside the operator
 └── cluster/                        one PostgreSQL Cluster CR — N per cluster
     ├── Chart.yaml
     ├── values.yaml
@@ -245,3 +246,14 @@ Both charts were exercised on a live RKE2 cluster (v1.35.3, `openebs-hostpath` a
 - Upstream charts: <https://github.com/cloudnative-pg/charts> (`cloudnative-pg`, `cluster`)
 - CloudNativePG docs: <https://cloudnative-pg.io/documentation/current/>
 - Helmfile equivalents: [`stuttgart-things/helm`](https://github.com/stuttgart-things/helm) — `database/postgres.yaml.gotmpl`, `database/postgres-cluster.yaml.gotmpl`
+
+### `barman-cloud/` — the backup plugin
+
+One child `Application` pointing at the same repo, chart `plugin-barman-cloud` at `.Values.chartVersion` (**0.8.0**, app **v0.15.0**), with the `objectstores.barmancloud.cnpg.io` CRD.
+
+It is how a `Cluster` gets backups from here on. CloudNativePG 1.30 marks the in-tree `spec.backup.barmanObjectStore` for removal in **1.31.0** and its webhook warns on every Cluster that still uses it, so the `backups.*` route through `cluster/`'s `extraValues` leads to a configuration the next operator bump rejects. A Cluster opts in with an `ObjectStore` in its own namespace, `spec.plugins` naming `barman-cloud.cloudnative-pg.io` as WAL archiver, and a `ScheduledBackup` with `method: plugin` — `apps/schmetterpause/database` carries a worked, switchable example.
+
+Two preconditions, and neither fails loudly when missing:
+
+- **The operator's namespace.** The operator finds plugins by the `cnpg.io/pluginName` label on a Service in its own namespace. `destination.namespace` defaults to `postgres` to match `install/`; a plugin elsewhere installs cleanly and is never used.
+- **cert-manager.** The chart renders a self-signed Issuer and the two Certificates for operator ↔ plugin TLS. Without cert-manager the Application stays out of sync on resources whose kinds do not exist.
