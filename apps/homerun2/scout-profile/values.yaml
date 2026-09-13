@@ -4,8 +4,9 @@
 name: default
 
 # spec of the ScoutProfile (homerun2.stuttgart-things.com/v1alpha1). Schema:
-# stuttgart-things/homerun2-scout docs/scout-profile.md. scout reads it once
-# at startup; non-empty fields override its environment.
+# stuttgart-things/homerun2-scout docs/scout-profile.md. scout reads it at
+# startup; non-empty fields override its environment. From v0.11.1 it reads it
+# again every SCOUT_INTERVAL and restarts itself when it changes.
 #
 # Never put alerting.pitcherToken here: apps/homerun2/install hands scout the
 # token from a Secret (ALERT_PITCHER_TOKEN) instead.

@@ -171,9 +171,11 @@ coreCatcher:
 scout:
   enabled: true
   # v0.8.3 re-creates its RediSearch index until it exists instead of trying
-  # once at startup.
+  # once at startup. v0.11.1 restarts itself when its ScoutProfile changes;
+  # the chart no longer rolls scout for a changed profile, so older versions
+  # would keep the profile they started with.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-scout
-  version: v0.9.1
+  version: v0.11.1
   hostname: scout.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the scout kustomize OCI (parentRef +
@@ -184,8 +186,9 @@ scout:
   # in the kustomize base).
   inlineHttpRoute: false
   # ScoutProfile CR (apps/homerun2/scout-profile, sync-wave 1). scout reads it
-  # at startup; without one it logs "could not load ScoutProfile" and runs on
-  # its environment defaults, which leave alerting off. `name` must match the
+  # at startup and every SCOUT_INTERVAL after, restarting itself when it was
+  # created, changed or deleted; without one it logs "could not load
+  # ScoutProfile" and runs on its environment defaults, which leave alerting off. `name` must match the
   # base's SCOUT_PROFILE_NAME (`default`). With alerting.pitcherURL set, scout
   # gets ALERT_PITCHER_TOKEN from homerun2-omni-pitcher-token - do not put a
   # pitcherToken into spec (the schema rejects it).
