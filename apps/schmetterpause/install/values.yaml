@@ -144,3 +144,19 @@ database:
     secretKeyProperty: secret_key
     caConfigMap: cluster-trust-bundle
     caKey: trust-bundle.pem
+
+# PodMonitors for the app's /metrics and the database's exporter, plus alert
+# rules (app, database, and — with database.backup.enabled — WAL archiving and
+# base backups), rendered from apps/schmetterpause/monitoring as its own
+# Application at sync-wave 5.
+#
+# Off by default: it needs the Prometheus Operator CRDs on the target cluster
+# (infra/kube-prometheus-stack), and without them this Application cannot sync.
+# It also needs a `version` of v0.8.0 or later — the release that added the
+# container port `metrics`; against an older one the app monitor finds nothing
+# and SchmetterpauseMetricsDown fires.
+monitoring:
+  enabled: false
+  interval: 60s
+  # The ScheduledBackup is daily; alert once the newest base backup is older.
+  backupMaxAgeHours: 26
