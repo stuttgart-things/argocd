@@ -15,7 +15,7 @@ destination:
 
 # Upstream backstage Helm chart (oci://ghcr.io/backstage/charts).
 # renovate: datasource=docker depName=ghcr.io/backstage/charts/backstage
-chartVersion: 2.10.0
+chartVersion: 2.10.1
 
 # Backstage container.
 replicas: 1
