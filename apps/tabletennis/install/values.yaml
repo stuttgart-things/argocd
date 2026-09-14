@@ -126,6 +126,9 @@ zaehlwerk:
 # everything homerun2-light-catcher and selects on those labels, so two
 # instances in one namespace would give each Service both sets of Pods.
 lightCatcher:
+  # Boolean here, but the string "true"/"false" is accepted too, so a
+  # platform AppSet can template it from a per-cluster label — the LED strip
+  # is physical hardware and belongs to the cluster, not to the catalog.
   enabled: false
   namespace: homerun2-tabletennis
   # REQUIRES v1.1.0 or later — the rules below match on the tags zaehlwerk
@@ -166,3 +169,19 @@ secrets:
   # uses, because it is the same Redis.
   vaultSecretName: homerun2
   refreshInterval: 1h
+
+# Whether deleting the parent Application also prunes what it deployed.
+#
+# ON (the default) puts a `resources-finalizer.argocd.argoproj.io` on every
+# child Application this chart renders, so Argo prunes the workloads before
+# removing the child. A per-PR preview wants that: a closed PR must take its
+# namespace with it.
+#
+# OFF is what a long-lived PLATFORM install wants, and the platforms/ AppSets
+# set it. There an opt-out should stop Argo CD managing the stack, not delete
+# it — and against an already deregistered cluster the prune can never
+# complete, so the child Applications hang in Terminating and then block their
+# AppProject (stuttgart-things/argocd#324). Without the finalizer the children
+# are removed immediately and the workloads are left running, unmanaged, which
+# is the intended outcome for an opt-out.
+cascadingDelete: true

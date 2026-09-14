@@ -13,8 +13,10 @@ kind: Application
 metadata:
   name: {{ printf "%s-omni-pitcher-routes" $appName | quote }}
   namespace: argocd
+  {{- if $.Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   annotations:
     # Ahead of the omni-pitcher Application (wave 0): the container mounts this
     # ConfigMap as a volume, and a Pod scheduled before it exists sits in

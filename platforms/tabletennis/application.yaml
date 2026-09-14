@@ -1,0 +1,31 @@
+---
+# Bootstrap Application for the tabletennis platform bundle.
+# Apply once on the management cluster (the one running Argo CD):
+#   kubectl apply -f platforms/tabletennis/application.yaml
+#
+# It renders platforms/tabletennis/ via kustomize (the kustomization.yaml in that
+# directory lists the ApplicationSets). The ApplicationSet then fans out to every
+# cluster Secret labelled `tabletennis-platform: "true"` — the tabletennis platform (schmetterpause + zaehlwerk).
+#
+# This file itself is intentionally NOT listed in kustomization.yaml so the
+# rendered set does not contain the bootstrap Application (no self-reference).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tabletennis-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: platforms/tabletennis
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

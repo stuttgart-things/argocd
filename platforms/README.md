@@ -58,6 +58,7 @@ component at `'false'` rather than omitting it.
 |---|---|---|
 | `storage-platform/openebs` | `appset-openebs` (storage) → `openebs-hostpath` **default SC** + VolumeSnapshot CRDs | — |
 | `storage-platform/longhorn` | `appset-longhorn` | — |
+| `storage-platform/cloudnative-pg` | `appset-cloudnative-pg` → CloudNativePG operator (CRDs + operator in `postgres`) | — — **opt-in**, an explicit `'true'`. A singleton per cluster: `tabletennis-platform` needs it, anything else growing a Postgres uses the same one. The Barman Cloud plugin is not included — backups are per-workload |
 | `storage-platform/nfs-csi-install` | `appset-nfs-csi-install` (driver + snapshot-controller) | — |
 | `storage-platform/nfs-csi-storageclasses` | `appset-nfs-csi-storageclasses` | **gate label** `storage-platform.stuttgart-things.com/nfs-config` + `…/nfs-server`, `…/nfs-share` **(user)**; optional `…/nfs-version` (def 4.1), `…/nfs-name` (def `nfs-csi`), `…/nfs-subdir` (def cluster), `…/nfs-mount-permissions` (def `0`) |
 
@@ -94,6 +95,28 @@ component at `'false'` rather than omitting it.
 `expose-external` (gateway/cluster-ca for kind) is gated by the annotation
 `clusterbook.stuttgart-things.com/expose-external: 'true'` (+ `lb-range-start/stop`).
 
+### `homerun2-platform` — the homerun2 event bus
+| Label | AppSet | Needs annotations |
+|---|---|---|
+| `homerun2-platform` | `appset-homerun2` → redis-stack + omni-pitcher + core-catcher + scout + led-catcher, their routes and their ExternalSecrets (the `flux/apps/homerun2/profiles/platform` profile) | **gate label** `homerun2-platform.stuttgart-things.com/secrets-config` + `…/secret-store` **(user)**; optional `…/secret-key` (def cluster name), `…/storage-class` (def `openebs-hostpath`), `…/redis-storage-size` (def `8Gi`); `…/fqdn` *(auto)* for every hostname |
+
+Opt one cluster out with `homerun2-platform/stack: 'false'`. The component set is
+fixed — an AppSet can only template strings, so a `<component>.enabled` boolean
+cannot come from a label. See [`platforms/homerun2`](./homerun2/).
+
+### `tabletennis-platform` — schmetterpause + zaehlwerk
+| Label | AppSet | Needs annotations |
+|---|---|---|
+| `tabletennis-platform` | `appset-tabletennis` → schmetterpause + its CNPG database, zaehlwerk, and (opt-in) the LED strip at the table | **gate label** `tabletennis-platform.stuttgart-things.com/secrets-config` + `…/secret-store` **(user)**; optional `…/storage-class`, `…/db-storage-size` (def `8Gi`), `…/homerun2-namespace` (def `homerun2`), `…/wled-endpoint`; `…/fqdn` *(auto)* |
+| `tabletennis-platform/light-catcher` | the LED strip, an opt-in `'true'` — physical hardware, so per cluster | `…/wled-endpoint` **(user)**, optional |
+
+> ⚠️ **Requires `storage-platform/cloudnative-pg: 'true'`.** schmetterpause's
+> database is a CNPG `Cluster`; without the CRD that Application's dry-run
+> rejects the whole apply.
+
+Opt out with `tabletennis-platform/tabletennis: 'false'`. See
+[`platforms/tabletennis`](./tabletennis/).
+
 ### Opt-in app/preview platforms (single label, no umbrella)
 `homerun2-pr-preview` · `machinery-pr-preview` · `machinery-catalog-publisher-pr-preview`
 — set the label to `'true'` to fan the matching `platforms/<name>/` AppSets onto the cluster.
@@ -105,7 +128,9 @@ component at `'false'` rather than omitting it.
 - **`[user]` you provide** (component config):
   `vault-server` / `vault-pki-path` / `vault-token-secret`, `wildcard-issuer-name`,
   `expose-external`, all `storage-platform.stuttgart-things.com/nfs-*`, and all
-  `observability-platform.stuttgart-things.com/*`.
+  `observability-platform.stuttgart-things.com/*`,
+  `homerun2-platform.stuttgart-things.com/*` and
+  `tabletennis-platform.stuttgart-things.com/*`.
 
 ## Presets
 
@@ -167,6 +192,51 @@ spec:
     clusterbook.stuttgart-things.com/vault-pki-path: pki/sign/sthings-vsphere
     clusterbook.stuttgart-things.com/vault-token-secret: cert-manager-vault-token
 ```
+
+### `homerun2-tabletennis` — app cluster running both app platforms (e.g. tabletennis)
+
+Network + storage + security, then the two app bundles. The CNPG operator is
+opt-in and tabletennis needs it.
+
+```yaml
+spec:
+  clusterType: default
+  labels:
+    network-platform: 'true'
+    network-platform/cilium-lb: 'true'
+    network-platform/cilium-gateway: 'true'
+    network-platform/cert-manager-install: 'true'
+    network-platform/cert-manager-selfsigned: 'true'
+    network-platform/cert-manager-cluster-ca: 'true'
+    network-platform/cert-manager-vault-pki: 'true'
+    network-platform/trust-manager-install: 'true'
+    network-platform/trust-manager-bundle: 'true'
+    storage-platform: 'true'
+    storage-platform/openebs: 'true'                 # default SC
+    storage-platform/cloudnative-pg: 'true'          # REQUIRED by tabletennis
+    security-platform: 'true'
+    security-platform/external-secrets: 'true'       # REQUIRED by both
+    security-platform/kyverno: 'true'
+    homerun2-platform: 'true'
+    homerun2-platform/stack: 'true'
+    homerun2-platform.stuttgart-things.com/secrets-config: 'true'
+    tabletennis-platform: 'true'
+    tabletennis-platform/tabletennis: 'true'
+    tabletennis-platform/light-catcher: 'true'       # only where a strip exists
+    tabletennis-platform.stuttgart-things.com/secrets-config: 'true'
+  annotations:
+    clusterbook.stuttgart-things.com/vault-server: https://openbao.platform.sthings.lab
+    clusterbook.stuttgart-things.com/vault-pki-path: pki/sign/sthings-lab
+    clusterbook.stuttgart-things.com/wildcard-issuer-name: vault-pki
+    homerun2-platform.stuttgart-things.com/secret-store: vault-tabletennis
+    tabletennis-platform.stuttgart-things.com/secret-store: vault-tabletennis
+    tabletennis-platform.stuttgart-things.com/wled-endpoint: http://wled-tt.lan
+```
+
+Present the two `secrets-config` gate labels only once that store exists and holds
+its entries — `homerun2` (`authToken`, `redisPassword`), `schmetterpause`
+(`session-key`, `username`, `password`) and `zaehlwerk` (`omni-pitcher-token`,
+`redis-password`), with `omni-pitcher-token` equal to homerun2's `authToken`.
 
 ### `kind-dev` — local kind cluster (e.g. cd-mgmt-1-kind-dev1)
 ```yaml

@@ -104,6 +104,10 @@ spec:
     # gate (operator: Exists) — present this label only when you supply nfs-server/nfs-share:
     storage-platform.stuttgart-things.com/nfs-config: 'true'
 
+    # CloudNativePG operator — opt-IN, and a singleton per cluster. Needed by
+    # tabletennis-platform; anything else growing a Postgres uses the same one.
+    storage-platform/cloudnative-pg: 'false'    # → appset-cloudnative-pg
+
     # ---- profile: security-platform ----
     security-platform: 'true'           # umbrella
     security-platform/external-secrets: 'true'  # → appset-external-secrets-install
@@ -115,6 +119,33 @@ spec:
     # gate (operator: Exists) — present this label only once the ClusterSecretStore
     # named in the secret-store annotation exists and can read the entry:
     observability-platform.stuttgart-things.com/secrets-config: 'true'
+
+    # ---- profile: homerun2-platform ----
+    # The homerun2 event bus: redis-stack + omni-pitcher + core-catcher + scout +
+    # led-catcher. The component set is FIXED — see platforms/homerun2/README.md.
+    homerun2-platform: 'true'
+    homerun2-platform/stack: 'true'             # → appset-homerun2 [ann: fqdn, secret-store]
+    # gate (operator: Exists) — present this label only once the ClusterSecretStore
+    # named in the secret-store annotation exists and can read the entry.
+    # ExternalSecrets fail closed: label it too early and the Pods sit in
+    # CreateContainerConfigError waiting for Secrets that never appear.
+    homerun2-platform.stuttgart-things.com/secrets-config: 'true'
+
+    # ---- profile: tabletennis-platform ----
+    # schmetterpause (league + CNPG database) and zaehlwerk (live scorekeeping).
+    # A platform of its own, beside homerun2 rather than inside it.
+    # REQUIRES storage-platform/cloudnative-pg: 'true' above — without the CNPG
+    # CRD the database Application's dry-run rejects the whole apply.
+    tabletennis-platform: 'true'
+    tabletennis-platform/tabletennis: 'true'    # → appset-tabletennis [ann: fqdn, secret-store]
+    # The LED strip at the table. Physical hardware, so per cluster; an opt-IN
+    # 'true' rather than an opt-out.
+    tabletennis-platform/light-catcher: 'false'
+    # gate (operator: Exists) — the store must hold BOTH the `schmetterpause` and
+    # the `zaehlwerk` entry. schmetterpause's database BOOTSTRAPS from the Secret
+    # its ExternalSecret produces, so without it the CNPG Cluster never
+    # initialises at all.
+    tabletennis-platform.stuttgart-things.com/secrets-config: 'true'
 
     # ---- profile: kind-platform (only when clusterType: kind) ----
     # kind-platform: 'true'
@@ -183,3 +214,24 @@ spec:
     # observability-platform.stuttgart-things.com/storage-class: openebs-hostpath    # default = cluster default SC
     # observability-platform.stuttgart-things.com/storage-size: 10Gi                 # default 10Gi
     # observability-platform.stuttgart-things.com/retention: 15d                     # default 15d
+
+    # ---- [user] homerun2-platform (needs the secrets-config gate label above) ----
+    # homerun2-platform.stuttgart-things.com/secret-store: vault-<cluster>   # [req] ClusterSecretStore
+    # homerun2-platform.stuttgart-things.com/secret-key: <cluster>           # default = cluster name
+    #   the entry needs: authToken, redisPassword
+    # homerun2-platform.stuttgart-things.com/storage-class: openebs-hostpath # default openebs-hostpath
+    # homerun2-platform.stuttgart-things.com/redis-storage-size: 8Gi         # default 8Gi
+
+    # ---- [user] tabletennis-platform (needs the secrets-config gate label above) ----
+    # tabletennis-platform.stuttgart-things.com/secret-store: vault-<cluster>  # [req] ClusterSecretStore
+    #   the store needs TWO entries:
+    #     schmetterpause: session-key, username, password
+    #     zaehlwerk:      omni-pitcher-token, redis-password
+    #   omni-pitcher-token must hold the SAME value as homerun2's authToken, or
+    #   /pitch answers 401 and the only symptom is a log line in zaehlwerk.
+    #   Set both zaehlwerk properties even if Redis is unused — ESO fails the
+    #   whole ExternalSecret on a missing key.
+    # tabletennis-platform.stuttgart-things.com/storage-class: openebs-hostpath # default = cluster default SC
+    # tabletennis-platform.stuttgart-things.com/db-storage-size: 8Gi            # default 8Gi
+    # tabletennis-platform.stuttgart-things.com/homerun2-namespace: homerun2    # default homerun2; blank where homerun2 is absent
+    # tabletennis-platform.stuttgart-things.com/wled-endpoint: http://wled-tt.lan  # default = homerun2's wled-mock

@@ -1,0 +1,196 @@
+---
+# The tabletennis platform — schmetterpause (league, with its CloudNativePG
+# database) and zaehlwerk (live scorekeeping), plus the optional LED strip at the
+# table. A platform of its own, beside homerun2 rather than inside it.
+#
+# Fans out across clusters labelled `tabletennis-platform: "true"` that are
+# clusterbook-registered and whose ClusterSecretStore already exists. One parent
+# app-of-apps per cluster, rendering apps/tabletennis/install, which delegates to
+# apps/schmetterpause/install and apps/zaehlwerk/install.
+#
+# Opt a cluster out with label `tabletennis-platform/tabletennis: "false"`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tabletennis-platform
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # `cascadingDelete: false` below is the other half, and it is threaded all the
+  # way to the grandchildren the two sub-charts render.
+  #
+  # NOTE THAT THIS DOES NOT PROTECT THE DATABASE, and nothing here needs to: the
+  # schmetterpause chart's own `database.protect` puts Prune=false + Delete=false
+  # on the CNPG Cluster, because the PVC holds an ownerReference on it and a
+  # prune would take the data with it. It is on by default and this bundle leaves
+  # it there.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            tabletennis-platform: "true"
+          matchExpressions:
+            - key: tabletennis-platform/tabletennis
+              operator: NotIn
+              values: ["false"]
+            # Both applications publish over the cluster's own gateway and every
+            # hostname is derived from the reserved FQDN. The operator stamps
+            # allocation-ip="" on registration-only kind clusters, so Exists
+            # alone over-matches.
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
+            # schmetterpause's app + database credentials and zaehlwerk's panel
+            # token all come from the ClusterSecretStore named below, and the
+            # database BOOTSTRAPS from the Secret its ExternalSecret produces --
+            # so without the store the CNPG Cluster never initialises at all.
+            # Present this label only once the store exists and holds both
+            # entries.
+            - key: tabletennis-platform.stuttgart-things.com/secrets-config
+              operator: Exists
+  template:
+    metadata:
+      # `-platform` suffix so the parent cannot collide with the chart-rendered
+      # children, which derive from `applicationName`
+      # (`tabletennis-<cluster>-schmetterpause` and friends).
+      name: 'tabletennis-platform-{{ .name }}'
+      annotations:
+        # Informational only. Named after homerun2's wave (6) because zaehlwerk's
+        # panel points at homerun2's Services -- but top-level Applications do
+        # not order across appsets, and they do not need to: a panel URL that
+        # does not resolve yet costs one log line per point, not a failure.
+        argocd.argoproj.io/sync-wave: "7"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # NOT PINNED TO A TAG YET -- see the same comment in
+        # platforms/homerun2/appset-homerun2.yaml. This chart does not exist in
+        # any released tag at all yet.
+        targetRevision: main
+        path: apps/tabletennis/install
+        helm:
+          releaseName: 'tabletennis-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above.
+            applicationName: 'tabletennis-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              targetRevision: main
+            # No namespace: schmetterpause, zaehlwerk and the light-catcher each
+            # land in one of their own.
+            destination:
+              server: '{{ .server }}'
+            cascadingDelete: false
+
+            # Hostnames come out as schmetterpause.<domain> and
+            # zaehlwerk.<domain>.
+            domain: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+
+            # KEEP THIS GATEWAY INTERNAL. zaehlwerk has no authentication of its
+            # own -- no token, no session -- so its route IS the access control:
+            # anyone who can reach the hostname can start a match, score it, take
+            # a point back, end it, and with the panel wired, take over the LED
+            # strip. The clusterbook gateway is on the lab network, which is what
+            # makes this acceptable here.
+            gateway:
+              name: '{{ .name }}-gateway'
+              namespace: default
+              sectionNameHTTPS: https
+              sectionNameHTTP: http
+
+            secretStore:
+              kind: ClusterSecretStore
+              name: '{{ index .metadata.annotations "tabletennis-platform.stuttgart-things.com/secret-store" }}'
+
+            # Everything this platform knows about homerun2. Derives zaehlwerk's
+            # two panel URLs and the light-catcher's Redis address. Blank it on a
+            # cluster without homerun2 and zaehlwerk runs without a panel, which
+            # upstream supports and reports nothing about.
+            homerun2:
+              namespace: '{{ default "homerun2" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/homerun2-namespace") }}'
+
+            # Application VERSIONS are intentionally not overridden -- they
+            # inherit apps/tabletennis/install/values.yaml, which Renovate keeps
+            # bumped (schmetterpause and zaehlwerk each have their own
+            # interface-surface rule, so those bumps are never auto-merged).
+            schmetterpause:
+              enabled: true
+              values:
+                database:
+                  storage:
+                    size: '{{ default "8Gi" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-storage-size") }}'
+                    # Empty = the cluster's default StorageClass. Name one on a
+                    # cluster that has two defaults.
+                    #
+                    # `default ""` is load-bearing, not decoration: the generator
+                    # hands annotations over as map[string]interface{}, so `index`
+                    # on an absent key returns an untyped nil, and a bare
+                    # substitution prints it as the literal string "<no value>".
+                    # That would reach the cluster as a StorageClass named
+                    # `<no value>` and leave the PVC Pending. Every optional
+                    # annotation below gets the same treatment.
+                    storageClass: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/storage-class") }}'
+                # Monitoring stays off: it needs the Prometheus Operator CRDs,
+                # which come from observability-platform, and its `enabled` is a
+                # boolean an AppSet cannot template from a label. Turn it on
+                # through an overlay on clusters that run the stack.
+
+            zaehlwerk:
+              enabled: true
+              # schmetterpause's own origin, so its live tab can read the match
+              # stream once that exists. Upstream refuses the `*` wildcard, and
+              # this is the only origin that will ever need it.
+              allowedOrigins: 'https://schmetterpause.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+
+            # The LED strip is physical hardware, so this is genuinely per
+            # cluster. Templated from a label -- which is why the chart's
+            # `enabled` accepts a string: an AppSet can only template strings,
+            # and the string "false" is TRUTHY in a Go template, so the chart
+            # compares it with toString rather than using it as a boolean.
+            #
+            # `default (dict)` survives a cluster with no labels and `toString`
+            # survives `index` returning an untyped nil for an absent key --
+            # without the latter the whole AppSet generates NOTHING, for every
+            # cluster. Same coercions as platforms/network's
+            # appset-trust-manager-bundle.
+            lightCatcher:
+              enabled: '{{ if eq (toString (index (default (dict) .metadata.labels) "tabletennis-platform/light-catcher")) "true" }}true{{ else }}false{{ end }}'
+              # Empty = homerun2's wled-mock Service, which only exists where
+              # that component is enabled. A real strip is the WLED device's own
+              # address.
+              wledEndpoint: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/wled-endpoint") }}'
+
+            secrets:
+              enabled: true
+              clusterSecretStoreName: '{{ index .metadata.annotations "tabletennis-platform.stuttgart-things.com/secret-store" }}'
+              # The Vault entry holding homerun2's credentials -- the
+              # light-catcher reads the SAME redis password as every other
+              # homerun2 component, because it is the same Redis. Keep this in
+              # step with homerun2-platform's `secret-key` annotation.
+              vaultSecretName: '{{ default .name (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/secret-key") }}'
+              refreshInterval: 1h
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

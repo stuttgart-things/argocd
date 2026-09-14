@@ -91,8 +91,10 @@ kind: Application
 metadata:
   name: {{ printf "%s-smoke-test" $appName | quote }}
   namespace: argocd
+  {{- if $.Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   annotations:
     # After the components (0) and their routes (10) — the external pass
     # goes through the HTTPRoute, so the route has to exist first.

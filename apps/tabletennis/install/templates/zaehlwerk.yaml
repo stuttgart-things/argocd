@@ -11,11 +11,16 @@
 {{- if and .Values.zaehlwerk.panel .Values.homerun2.namespace }}
 {{- $panel = dict "homerun2Namespace" .Values.homerun2.namespace }}
 {{- end }}
+{{- /* `cascadingDelete` is threaded into the sub-chart too: an opt-out at
+       the platform level has to reach the leaves, or the children this
+       sub-chart renders keep their finalizers and hang in Terminating
+       against a deregistered cluster (argocd#324). */}}
 {{- $computed := dict
       "applicationName" $name
       "project"         .Values.project
       "destination"     (dict "namespace" $ns)
       "syncPolicy"      .Values.syncPolicy
+      "cascadingDelete" .Values.cascadingDelete
       "version"         .Values.zaehlwerk.version
       "hostname"        (include "tabletennis.hostname" (dict "root" . "name" "zaehlwerk"))
       "gateway"         (dict
@@ -37,8 +42,10 @@ kind: Application
 metadata:
   name: {{ $name | quote }}
   namespace: argocd
+  {{- if $.Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:

@@ -1,0 +1,31 @@
+---
+# Bootstrap Application for the homerun2 platform bundle.
+# Apply once on the management cluster (the one running Argo CD):
+#   kubectl apply -f platforms/homerun2/application.yaml
+#
+# It renders platforms/homerun2/ via kustomize (the kustomization.yaml in that
+# directory lists the ApplicationSets). The ApplicationSet then fans out to every
+# cluster Secret labelled `homerun2-platform: "true"` — the homerun2 event bus.
+#
+# This file itself is intentionally NOT listed in kustomization.yaml so the
+# rendered set does not contain the bootstrap Application (no self-reference).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homerun2-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: platforms/homerun2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

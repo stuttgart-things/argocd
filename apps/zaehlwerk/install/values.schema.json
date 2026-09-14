@@ -3,7 +3,12 @@
   "title": "zaehlwerk app-of-apps chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["project", "destination", "version", "hostname"],
+  "required": [
+    "project",
+    "destination",
+    "version",
+    "hostname"
+  ],
   "properties": {
     "applicationName": {
       "type": "string",
@@ -16,14 +21,36 @@
     "destination": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. If both are set, the templates prefer `name`, so a consumer does not have to null out the chart default.",
+      "description": "Provide `server` (cluster URL) or `name` (registered cluster name) \u2014 at least one required. If both are set, the templates prefer `name`, so a consumer does not have to null out the chart default.",
       "properties": {
-        "server": { "type": "string", "format": "uri" },
-        "name": { "type": "string", "minLength": 1 },
-        "namespace": { "type": "string", "minLength": 1 }
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["namespace"],
-      "anyOf": [{ "required": ["server"] }, { "required": ["name"] }]
+      "required": [
+        "namespace"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "server"
+          ]
+        },
+        {
+          "required": [
+            "name"
+          ]
+        }
+      ]
     },
     "syncPolicy": {
       "type": "object",
@@ -38,31 +65,52 @@
     "hostname": {
       "type": "string",
       "minLength": 1,
-      "description": "FQDN patched into the HTTPRoute. zaehlwerk has no authentication — the route is the access control, so this belongs on an internal gateway."
+      "description": "FQDN patched into the HTTPRoute. zaehlwerk has no authentication \u2014 the route is the access control, so this belongs on an internal gateway."
     },
     "gateway": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "namespace": { "type": "string", "minLength": 1 },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
         "sectionName": {
           "type": "string",
           "minLength": 1,
           "description": "Listener the route attaches to. Omitting it would attach the route to every listener on the Gateway."
         }
       },
-      "required": ["name", "namespace"]
+      "required": [
+        "name",
+        "namespace"
+      ]
     },
     "secretStore": {
       "type": "object",
       "additionalProperties": false,
       "description": "Store the `zaehlwerk-panel` ExternalSecret reads from. Named per cluster (pattern vault-<cluster>), never plain `vault`.",
       "properties": {
-        "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
-        "name": { "type": "string", "minLength": 1 }
+        "kind": {
+          "type": "string",
+          "enum": [
+            "ClusterSecretStore",
+            "SecretStore"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["kind", "name"]
+      "required": [
+        "kind",
+        "name"
+      ]
     },
     "allowedOrigins": {
       "type": "string",
@@ -71,7 +119,7 @@
     "panel": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The scoreboard panel. All URLs empty = no panel, in which case the chart REMOVES OMNI_PITCHER_URL from the base's ConfigMap — zaehlwerk tests whether the variable is set, so an empty string would be dialled as a URL.",
+      "description": "The scoreboard panel. All URLs empty = no panel, in which case the chart REMOVES OMNI_PITCHER_URL from the base's ConfigMap \u2014 zaehlwerk tests whether the variable is set, so an empty string would be dialled as a URL.",
       "properties": {
         "homerun2Namespace": {
           "type": "string",
@@ -85,14 +133,24 @@
           "type": "string",
           "description": "The led-catcher zaehlwerk switches onto the tabletennis stream for the duration of a match."
         },
-        "matchStreams": { "type": "string" },
-        "idleStreams": { "type": "string" },
-        "idleTimeout": { "type": "string" }
+        "matchStreams": {
+          "type": "string"
+        },
+        "idleStreams": {
+          "type": "string"
+        },
+        "idleTimeout": {
+          "type": "string"
+        }
       }
     },
     "reloader": {
       "type": "boolean",
       "description": "Stakater Reloader annotation on the Deployment. zaehlwerk reads its config only at start, so without it a changed panel URL sits unnoticed. No-op without the controller."
+    },
+    "cascadingDelete": {
+      "type": "boolean",
+      "description": "Put a resources-finalizer on every rendered child Application, so deleting the parent prunes the workloads. True (the default) for preview environments; the platforms/ AppSets set it false, because for a long-lived install an opt-out should stop managing the stack rather than delete it, and a prune against a deregistered cluster hangs the children in Terminating (argocd#324)."
     }
   }
 }

@@ -1,0 +1,218 @@
+---
+# The homerun2 event bus, as a steady-state platform install.
+#
+# Fans out across clusters labelled `homerun2-platform: "true"` that are
+# clusterbook-registered (they carry the `<cluster>-gateway` Gateway and its
+# wildcard cert the HTTPRoutes below depend on) and whose ClusterSecretStore
+# already exists. One parent app-of-apps per cluster, rendering
+# apps/homerun2/install, which in turn renders the redis-stack, the pitchers and
+# catchers, and the routes.
+#
+# THE PROFILE IS FIXED: redis-stack + omni-pitcher + core-catcher + scout +
+# led-catcher, which is what `flux/apps/homerun2/profiles/platform` installs. It
+# is not per-cluster selectable, and that is a limitation of the mechanism rather
+# than a decision: an AppSet can only template STRINGS into a chart's values, so
+# a `<component>.enabled` boolean cannot come from a cluster label without
+# widening every one of those thirteen schemas to accept a string. A cluster that
+# needs a different component set uses the aggregator-overlay model instead (see
+# the repo README, "When to pick which model").
+#
+# Opt a cluster out with label `homerun2-platform/stack: "false"`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: homerun2-platform
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # `cascadingDelete: false` below is the other half: it takes the finalizers
+  # off the children so an opt-out stops Argo managing homerun2 rather than
+  # deleting it. Same pair as platforms/cicd/appset-machinery.yaml.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            homerun2-platform: "true"
+          matchExpressions:
+            - key: homerun2-platform/stack
+              operator: NotIn
+              values: ["false"]
+            # The routes need the clusterbook `<cluster>-gateway` Gateway and
+            # `<cluster>-gateway-tls` wildcard cert, and every hostname below is
+            # derived from the reserved FQDN. The operator stamps
+            # allocation-ip="" on registration-only kind clusters, so Exists
+            # alone over-matches -- NotIn [""] excludes those.
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
+            # Every component's Redis password and the /pitch bearer token come
+            # from the ClusterSecretStore named in the annotations below. Present
+            # this label only once that store exists and its role can read the
+            # entry -- ExternalSecrets fail closed, so without it the Pods sit in
+            # CreateContainerConfigError waiting for Secrets that never appear.
+            # Same pattern as storage-platform's nfs-config gate.
+            - key: homerun2-platform.stuttgart-things.com/secrets-config
+              operator: Exists
+  template:
+    metadata:
+      # `-platform` suffix on the parent so it cannot collide with the
+      # chart-rendered children, which derive from `applicationName`
+      # (`homerun2-<cluster>-omni-pitcher` and friends). An inner Application
+      # carrying the generated parent's name would be the same object: the parent
+      # server-side-applies the child spec over itself, the ApplicationSet
+      # controller puts its own back a moment later, and nothing ever deploys --
+      # while everything reports "successfully synced".
+      name: 'homerun2-platform-{{ .name }}'
+      annotations:
+        # Informational -- top-level Applications don't order across appsets;
+        # retry handles the race if the Gateway or the ClusterSecretStore is not
+        # up yet.
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      # The parent renders Application CRDs, which must land in the argocd ns on
+      # the management cluster. The children target the remote cluster via
+      # valuesObject.destination.server below.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # NOT PINNED TO A TAG YET, deliberately: this AppSet passes
+        # `cascadingDelete`, which the chart gained in the same change, so no
+        # released tag carries it and a pin would fail schema validation with
+        # "Additional property cascadingDelete is not allowed". Convert both this
+        # and `catalog.targetRevision` below to the first tag that contains them
+        # -- renovate's "Catalog self-pin" rule then keeps them moving. Until
+        # then a chart change reaches every labelled cluster on the next
+        # reconcile without a review gate, which is the cost of `main`.
+        targetRevision: main
+        path: apps/homerun2/install
+        helm:
+          releaseName: 'homerun2-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above -- see the
+            # comment there.
+            applicationName: 'homerun2-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              targetRevision: main
+            # Target the labelled remote cluster, not the management one.
+            destination:
+              server: '{{ .server }}'
+              namespace: homerun2
+            # A long-lived platform install: an opt-out should stop Argo CD
+            # managing homerun2, not uninstall it -- and against an already
+            # deregistered cluster a prune can never complete, leaving the child
+            # Applications stuck in Terminating (#324).
+            cascadingDelete: false
+
+            # Component VERSIONS are intentionally not overridden -- they inherit
+            # apps/homerun2/install/values.yaml, which Renovate keeps bumped, so
+            # the platform tracks the released chart default rather than a second
+            # pinned copy.
+            #
+            # Components left at their chart defaults (off): k8s-pitcher,
+            # light-catcher, wled-mock, config-viewer, demo-pitcher, git-pitcher,
+            # notification-catcher, the ScoutProfile and the smoke-test. The
+            # first five are dev/lab tools, git-pitcher is the cicd profile, and
+            # notification-catcher needs a notify ConfigMap this bundle cannot
+            # know. Without a ScoutProfile scout runs on its environment defaults
+            # and leaves alerting off -- add one through an overlay if the cluster
+            # wants alerts.
+
+            redisStack:
+              enabled: true
+              persistence:
+                enabled: true
+                # The chart default is `standard`, which does not exist on these
+                # clusters. `openebs-hostpath` is the fleet default SC
+                # (storage-platform/openebs); name another one here on a cluster
+                # that uses longhorn or an NFS class.
+                storageClass: '{{ default "openebs-hostpath" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/storage-class") }}'
+                size: '{{ default "8Gi" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/redis-storage-size") }}'
+              # Read the password from the ESO-managed Secret rather than an
+              # inline literal. `secrets.enabled` below materializes it under
+              # exactly this name.
+              auth:
+                existingSecret: redis-stack-auth
+
+            omniPitcher:
+              enabled: true
+              hostname: 'omni-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              # The stream allowlist the bus offers, matching what the flux path
+              # ships. `tabletennis` is in it on every cluster, not only those
+              # running the tabletennis platform: an allowlisted stream nothing
+              # writes to costs nothing (Redis creates a stream on first XADD),
+              # and having it here means adding that platform later needs no
+              # change to homerun2. Without the rule, zaehlwerk's scores would
+              # land on `messages` -- the pitch still returns 200, every Pod
+              # reports Healthy, and the tabletennis catcher watches an empty
+              # stream.
+              #
+              # NOT included: the flux default's `/pitch/grafana -> alerts` and
+              # `/pitch/github -> github-events` rules. This profile runs no
+              # notification-catcher, so routing Alertmanager off `messages`
+              # would only hide alerts from core-catcher and scout. A cluster
+              # that wants them adds both rules AND
+              # `notificationCatcher.redisStream: alerts` in the same change.
+              routesContent: |
+                streams:
+                  - messages
+                  - tabletennis
+                default_stream: messages
+                routes:
+                  - match:
+                      system: tabletennis
+                    stream: tabletennis
+
+            coreCatcher:
+              enabled: true
+              hostname: 'core-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+
+            scout:
+              enabled: true
+              hostname: 'scout.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+
+            # The catcher zaehlwerk switches onto the tabletennis stream during a
+            # match. On in the flux platform profile too; harmless on a cluster
+            # without tabletennis, where it just consumes `messages`.
+            ledCatcher:
+              enabled: true
+              hostname: 'led-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+
+            httpRoute:
+              enabled: true
+              gateway:
+                name: '{{ .name }}-gateway'
+                namespace: default
+
+            secrets:
+              enabled: true
+              clusterSecretStoreName: '{{ index .metadata.annotations "homerun2-platform.stuttgart-things.com/secret-store" }}'
+              # Vault KV entry under the store's mount, carrying `authToken` and
+              # `redisPassword`. Defaults to the cluster name so a fleet can use
+              # one entry per cluster without an annotation per cluster.
+              vaultSecretName: '{{ default .name (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/secret-key") }}'
+              refreshInterval: 1h
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
