@@ -53,8 +53,14 @@ spec:
             # so without the store the CNPG Cluster never initialises at all.
             # Present this label only once the store exists and holds both
             # entries.
+            # Gated on the VALUE, not on `Exists` the way storage-platform's
+            # nfs-config gate is. Under Exists a label set to 'false' still
+            # satisfies the gate -- and cluster.reference.yaml's own convention
+            # is to write every label a cluster does not want as an explicit
+            # 'false', which would then switch this on rather than off.
             - key: tabletennis-platform.stuttgart-things.com/secrets-config
-              operator: Exists
+              operator: In
+              values: ["true"]
   template:
     metadata:
       # `-platform` suffix so the parent cannot collide with the chart-rendered

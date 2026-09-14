@@ -46,7 +46,7 @@ aggregator-overlay model instead (repo README, *When to pick which model*).
 |---|---|
 | `homerun2-platform: 'true'` | **[user]** the gate |
 | `homerun2-platform/stack: 'false'` | **[user]** opt this cluster out |
-| `homerun2-platform.stuttgart-things.com/secrets-config` | **[user]** gate label — present it only once the ClusterSecretStore exists and can read the entry |
+| `homerun2-platform.stuttgart-things.com/secrets-config: 'true'` | **[user]** gate — set it to `'true'` only once the ClusterSecretStore exists and can read the entry |
 | `clusterbook.stuttgart-things.com/allocation-ip` | *[auto]* must exist and be non-empty |
 
 | Annotation | |
@@ -56,6 +56,12 @@ aggregator-overlay model instead (repo README, *When to pick which model*).
 | `homerun2-platform.stuttgart-things.com/secret-key` | **[user]** optional, default = the cluster name — the Vault KV entry holding `authToken` + `redisPassword` |
 | `homerun2-platform.stuttgart-things.com/storage-class` | **[user]** optional, default `openebs-hostpath` — for redis-stack's PVC |
 | `homerun2-platform.stuttgart-things.com/redis-storage-size` | **[user]** optional, default `8Gi` |
+
+The gate is matched on the **value** `'true'`, not merely on the label existing —
+unlike `storage-platform`'s `nfs-config`. Under `Exists` a label written as
+`'false'` still satisfies the gate, and this repo's own convention is to write
+every label a cluster does not want as an explicit `'false'`, which would then
+switch it on rather than off.
 
 The `secrets-config` gate is not ceremony. ExternalSecrets fail closed, so a
 cluster labelled before its store exists gets Pods sitting in

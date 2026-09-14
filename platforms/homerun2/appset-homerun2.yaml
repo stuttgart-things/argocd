@@ -57,9 +57,14 @@ spec:
             # this label only once that store exists and its role can read the
             # entry -- ExternalSecrets fail closed, so without it the Pods sit in
             # CreateContainerConfigError waiting for Secrets that never appear.
-            # Same pattern as storage-platform's nfs-config gate.
+            # Gated on the VALUE, not on `Exists` the way storage-platform's
+            # nfs-config gate is. Under Exists a label set to 'false' still
+            # satisfies the gate -- and cluster.reference.yaml's own convention
+            # is to write every label a cluster does not want as an explicit
+            # 'false', which would then switch this on rather than off.
             - key: homerun2-platform.stuttgart-things.com/secrets-config
-              operator: Exists
+              operator: In
+              values: ["true"]
   template:
     metadata:
       # `-platform` suffix on the parent so it cannot collide with the

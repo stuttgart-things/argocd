@@ -125,11 +125,13 @@ spec:
     # led-catcher. The component set is FIXED — see platforms/homerun2/README.md.
     homerun2-platform: 'true'
     homerun2-platform/stack: 'true'             # → appset-homerun2 [ann: fqdn, secret-store]
-    # gate (operator: Exists) — present this label only once the ClusterSecretStore
-    # named in the secret-store annotation exists and can read the entry.
+    # gate — set this to 'true' only once the ClusterSecretStore named in the
+    # secret-store annotation exists and can read the entry.
     # ExternalSecrets fail closed: label it too early and the Pods sit in
     # CreateContainerConfigError waiting for Secrets that never appear.
-    homerun2-platform.stuttgart-things.com/secrets-config: 'true'
+    # Matched on the VALUE: 'false' (or absent) keeps it off. Flip it to
+    # 'true' once the store exists -- not before.
+    homerun2-platform.stuttgart-things.com/secrets-config: 'false'
 
     # ---- profile: tabletennis-platform ----
     # schmetterpause (league + CNPG database) and zaehlwerk (live scorekeeping).
@@ -141,11 +143,13 @@ spec:
     # The LED strip at the table. Physical hardware, so per cluster; an opt-IN
     # 'true' rather than an opt-out.
     tabletennis-platform/light-catcher: 'false'
-    # gate (operator: Exists) — the store must hold BOTH the `schmetterpause` and
+    # gate — set to 'true' only once the store holds BOTH the `schmetterpause` and
     # the `zaehlwerk` entry. schmetterpause's database BOOTSTRAPS from the Secret
     # its ExternalSecret produces, so without it the CNPG Cluster never
     # initialises at all.
-    tabletennis-platform.stuttgart-things.com/secrets-config: 'true'
+    # Matched on the VALUE: 'false' (or absent) keeps it off. Flip it to
+    # 'true' once the store exists -- not before.
+    tabletennis-platform.stuttgart-things.com/secrets-config: 'false'
 
     # ---- profile: kind-platform (only when clusterType: kind) ----
     # kind-platform: 'true'

@@ -98,7 +98,7 @@ component at `'false'` rather than omitting it.
 ### `homerun2-platform` — the homerun2 event bus
 | Label | AppSet | Needs annotations |
 |---|---|---|
-| `homerun2-platform` | `appset-homerun2` → redis-stack + omni-pitcher + core-catcher + scout + led-catcher, their routes and their ExternalSecrets (the `flux/apps/homerun2/profiles/platform` profile) | **gate label** `homerun2-platform.stuttgart-things.com/secrets-config` + `…/secret-store` **(user)**; optional `…/secret-key` (def cluster name), `…/storage-class` (def `openebs-hostpath`), `…/redis-storage-size` (def `8Gi`); `…/fqdn` *(auto)* for every hostname |
+| `homerun2-platform` | `appset-homerun2` → redis-stack + omni-pitcher + core-catcher + scout + led-catcher, their routes and their ExternalSecrets (the `flux/apps/homerun2/profiles/platform` profile) | **gate** `homerun2-platform.stuttgart-things.com/secrets-config: 'true'` + `…/secret-store` **(user)**; optional `…/secret-key` (def cluster name), `…/storage-class` (def `openebs-hostpath`), `…/redis-storage-size` (def `8Gi`); `…/fqdn` *(auto)* for every hostname |
 
 Opt one cluster out with `homerun2-platform/stack: 'false'`. The component set is
 fixed — an AppSet can only template strings, so a `<component>.enabled` boolean
@@ -107,7 +107,7 @@ cannot come from a label. See [`platforms/homerun2`](./homerun2/).
 ### `tabletennis-platform` — schmetterpause + zaehlwerk
 | Label | AppSet | Needs annotations |
 |---|---|---|
-| `tabletennis-platform` | `appset-tabletennis` → schmetterpause + its CNPG database, zaehlwerk, and (opt-in) the LED strip at the table | **gate label** `tabletennis-platform.stuttgart-things.com/secrets-config` + `…/secret-store` **(user)**; optional `…/storage-class`, `…/db-storage-size` (def `8Gi`), `…/homerun2-namespace` (def `homerun2`), `…/wled-endpoint`; `…/fqdn` *(auto)* |
+| `tabletennis-platform` | `appset-tabletennis` → schmetterpause + its CNPG database, zaehlwerk, and (opt-in) the LED strip at the table | **gate** `tabletennis-platform.stuttgart-things.com/secrets-config: 'true'` + `…/secret-store` **(user)**; optional `…/storage-class`, `…/db-storage-size` (def `8Gi`), `…/homerun2-namespace` (def `homerun2`), `…/wled-endpoint`; `…/fqdn` *(auto)* |
 | `tabletennis-platform/light-catcher` | the LED strip, an opt-in `'true'` — physical hardware, so per cluster | `…/wled-endpoint` **(user)**, optional |
 
 > ⚠️ **Requires `storage-platform/cloudnative-pg: 'true'`.** schmetterpause's
@@ -219,11 +219,11 @@ spec:
     security-platform/kyverno: 'true'
     homerun2-platform: 'true'
     homerun2-platform/stack: 'true'
-    homerun2-platform.stuttgart-things.com/secrets-config: 'true'
+    homerun2-platform.stuttgart-things.com/secrets-config: 'true'    # only once the store exists
     tabletennis-platform: 'true'
     tabletennis-platform/tabletennis: 'true'
     tabletennis-platform/light-catcher: 'true'       # only where a strip exists
-    tabletennis-platform.stuttgart-things.com/secrets-config: 'true'
+    tabletennis-platform.stuttgart-things.com/secrets-config: 'true' # only once the store exists
   annotations:
     clusterbook.stuttgart-things.com/vault-server: https://openbao.platform.sthings.lab
     clusterbook.stuttgart-things.com/vault-pki-path: pki/sign/sthings-lab

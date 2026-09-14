@@ -58,7 +58,7 @@ stack.
 | `tabletennis-platform: 'true'` | **[user]** the gate |
 | `tabletennis-platform/tabletennis: 'false'` | **[user]** opt this cluster out |
 | `tabletennis-platform/light-catcher: 'true'` | **[user]** the LED strip at the table |
-| `tabletennis-platform.stuttgart-things.com/secrets-config` | **[user]** gate label — present it only once the ClusterSecretStore holds both entries |
+| `tabletennis-platform.stuttgart-things.com/secrets-config: 'true'` | **[user]** gate — set it to `'true'` only once the ClusterSecretStore holds both entries |
 | `clusterbook.stuttgart-things.com/allocation-ip` | *[auto]* must exist and be non-empty |
 
 | Annotation | |
