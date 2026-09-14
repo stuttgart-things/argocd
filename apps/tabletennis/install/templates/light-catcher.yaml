@@ -1,0 +1,184 @@
+{{- if .Values.lightCatcher.enabled }}
+{{- /* It reads homerun2's Redis, so there has to be a homerun2 to read from. */}}
+{{- if not .Values.homerun2.namespace }}
+{{- fail "lightCatcher.enabled needs homerun2.namespace: this catcher consumes the tabletennis stream from homerun2's redis-stack, so without homerun2 on this cluster it has nothing to read." }}
+{{- end }}
+{{- $appName := include "tabletennis.appName" . }}
+{{- /* The base names every object homerun2-light-catcher and selects on those
+       labels — the Service, the Deployment selector, its pod anti-affinity. That
+       is why this instance gets a namespace of its own rather than a name
+       suffix: renamed into homerun2's namespace, the two Services would each
+       route to both instances. In a namespace of its own the base applies
+       unchanged. */}}
+{{- $base := "homerun2-light-catcher" }}
+{{- $ns := .Values.lightCatcher.namespace }}
+{{- $redisNs := .Values.homerun2.namespace }}
+{{- $wled := .Values.lightCatcher.wledEndpoint | default (printf "http://homerun2-wled-mock.%s.svc.cluster.local" $redisNs) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-light-catcher" $appName | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    # The `oci://` prefix is required — without it Argo treats repoURL as a git
+    # URL and fails with "failed to list refs: repository not found".
+    repoURL: oci://ghcr.io/stuttgart-things/homerun2-light-catcher-kustomize
+    targetRevision: {{ .Values.lightCatcher.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+        - target:
+            kind: Ingress
+            name: {{ $base }}
+          patch: |
+            apiVersion: networking.k8s.io/v1
+            kind: Ingress
+            metadata:
+              name: {{ $base }}
+            $patch: delete
+        {{- /* No route. This instance drives the strip at the table and has no
+               reader; the dashboard on homerun2's own light-catcher is the one
+               worth exposing, and a second route would need a second hostname
+               to say nothing new. */}}
+        - target:
+            kind: HTTPRoute
+            name: {{ $base }}
+          patch: |
+            apiVersion: gateway.networking.k8s.io/v1
+            kind: HTTPRoute
+            metadata:
+              name: {{ $base }}
+            $patch: delete
+        - target:
+            kind: Deployment
+            name: {{ $base }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $base }}
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: {{ $base }}
+                      image: ghcr.io/stuttgart-things/homerun2-light-catcher:{{ .Values.lightCatcher.version }}
+                      env:
+                        # Across the namespace boundary, into homerun2's bus.
+                        - name: REDIS_ADDR
+                          value: redis-stack.{{ $redisNs }}.svc.cluster.local
+                        - name: REDIS_PORT
+                          value: "6379"
+                        - name: REDIS_STREAM
+                          value: {{ .Values.lightCatcher.redisStream | quote }}
+                        # A consumer group of its own. The name is per stream, so
+                        # it would not collide with homerun2's light-catcher
+                        # today — but a shared name is one REDIS_STREAMS change
+                        # away from two catchers splitting the table's points
+                        # between them.
+                        - name: CONSUMER_GROUP
+                          value: {{ .Values.lightCatcher.consumerGroup | quote }}
+{{- if .Values.lightCatcher.redisPassword }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $base }}
+          patch: |
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ printf "%s-redis" $base }}
+            stringData:
+              password: {{ .Values.lightCatcher.redisPassword | quote }}
+{{- else }}
+        {{- /* Deleted so an ESO-managed Secret of the same name takes over —
+               `secrets.enabled` renders one into this namespace. */}}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $base }}
+          patch: |
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ printf "%s-redis" $base }}
+            $patch: delete
+{{- end }}
+        {{- /* The WHOLE profile, replacing the base's wildcard rules — and that
+               replacement is why this is a second instance rather than a second
+               stream on homerun2's catcher. The base matches `info` on systems
+               ["*"] and fires DJ Light for three seconds, so every point would
+               trigger it; a profile has no rule that matches and does nothing,
+               nor one that excludes a system.
+
+               First match wins, in document order (light-catcher v1.0.2+).
+               zaehlwerk tags every transition `transition=<kind>` and, where it
+               went to one, `side=a|b` (zaehlwerk v0.3.0+). What has no rule — an
+               undo, a correction that lowered a score — lights nothing and logs
+               `no matching effect`.
+
+               match_won is SUCCESS like set_won, so the tags are what tells them
+               apart. A point's one-second flash does not cut the match effect
+               short: the older timer stands down for the newer effect. */}}
+        - target:
+            kind: ConfigMap
+            name: {{ printf "%s-profile" $base }}
+          patch: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ printf "%s-profile" $base }}
+            data:
+              profile.yaml: |
+{{- if .Values.lightCatcher.profileContent }}
+{{ .Values.lightCatcher.profileContent | trimSuffix "\n" | indent 16 }}
+{{- else }}
+                effects:
+                  tabletennis-match:
+                    systems: [tabletennis]
+                    severity: [success]
+                    tags: [transition=match_won]
+                    fx: Fireworks
+                    duration: 10
+                    color: forest
+                    segments: [0]
+                    endpoint: {{ $wled }}
+                  tabletennis-set:
+                    systems: [tabletennis]
+                    severity: [success]
+                    tags: [transition=set_won]
+                    fx: Rainbow
+                    duration: 4
+                    color: forest
+                    segments: [0]
+                    endpoint: {{ $wled }}
+                  tabletennis-point-a:
+                    systems: [tabletennis]
+                    severity: [info]
+                    tags: [transition=point, side=a]
+                    fx: Solid
+                    duration: 1
+                    color: blue
+                    segments: [0]
+                    endpoint: {{ $wled }}
+                  tabletennis-point-b:
+                    systems: [tabletennis]
+                    severity: [info]
+                    tags: [transition=point, side=b]
+                    fx: Solid
+                    duration: 1
+                    color: red
+                    segments: [0]
+                    endpoint: {{ $wled }}
+{{- end }}
+  destination:
+    {{- include "tabletennis.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

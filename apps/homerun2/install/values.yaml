@@ -129,34 +129,12 @@ omniPitcher:
   # while both sides look healthy.
   #
   #   routesContent: |
-  #     streams: [messages, alerts, github-events, tabletennis]
+  #     streams: [messages, tabletennis]
   #     default_stream: messages
   #     routes:
-  #       - match: { endpoint: /pitch/grafana }
-  #         stream: alerts
-  #       - match: { endpoint: /pitch/github }
-  #         stream: github-events
   #       - match: { system: tabletennis }
   #         stream: tabletennis
-  #
-  # That block is what the flux path ships as its default. Note the first rule:
-  # with it, Alertmanager and Grafana leave `messages`, so a notification-catcher
-  # on this chart's default stream stops seeing them — set
-  # `notificationCatcher.redisStream: alerts` in the same change.
   routesContent: ""
-
-  # The tabletennis stream, without hand-writing the file above. When true (and
-  # `routesContent` empty) the chart renders a minimal routing file: streams
-  # `messages` + `tabletennis`, `messages` as the catch-all, and the one rule
-  # that puts `system: tabletennis` onto its own stream.
-  #
-  # NEEDED BY ANYTHING ZAEHLWERK TALKS TO, not just the tabletennis
-  # light-catcher: zaehlwerk pitches with `system: tabletennis` and also switches
-  # the led-catcher onto that stream for the duration of a match. Without a rule
-  # the scores land on `messages`, the pitch still returns 200, and every Pod
-  # reports Healthy — so `lightCatcherTabletennis.enabled` without this fails the
-  # render rather than deploying something that looks fine and shows nothing.
-  tabletennisStream: false
 
   # Where the routing file is mounted. ROUTES_CONFIG points at
   # <routesPath>/routes.yaml.
@@ -269,44 +247,6 @@ lightCatcher:
   # stuttgart-things/homerun2-light-catcher#16 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
-
-# light-catcher-tabletennis — a SECOND light-catcher, for the strip at the table
-# tennis table, reading only the `tabletennis` stream zaehlwerk pitches to.
-#
-# A SECOND INSTANCE, NOT A SECOND STREAM. Adding `tabletennis` to the existing
-# light-catcher sends every point through a profile of wildcard rules (`info` on
-# systems ["*"] fires DJ Light for three seconds per point), and a profile has no
-# rule that matches and does nothing, nor one that excludes a system. The strip at
-# the table is not the strip that shows cluster alerts anyway.
-#
-# ITS OWN NAMESPACE, NOT A NAME SUFFIX. The kustomize base names everything
-# homerun2-light-catcher and selects on those labels — the Service, the Deployment
-# selector, its pod anti-affinity. Renamed into the homerun2 namespace, the two
-# Services would each route to both instances. In a namespace of its own the base
-# applies unchanged.
-#
-# The version is `lightCatcher.version` — one pin for both instances, because two
-# instances of one component on two versions is a difference nobody is tracking.
-# That value is read even when `lightCatcher.enabled` is false. REQUIRES v1.1.0 or
-# later: the rules match on tags, which an older catcher ignores, and then the
-# first rule takes every set AND match, and side a's colour every point.
-lightCatcherTabletennis:
-  enabled: false
-  namespace: homerun2-tabletennis
-  # Where the effects are sent. The default points at the wled-mock in the
-  # homerun2 namespace, which only exists with `wledMock.enabled: true` — a real
-  # strip is the WLED device's own address.
-  wledEndpoint: http://homerun2-wled-mock.homerun2.svc.cluster.local
-  # The stream zaehlwerk's scores arrive on. Must match the stream name in
-  # omni-pitcher's routing file (`omniPitcher.tabletennisStream` uses
-  # `tabletennis`).
-  redisStream: tabletennis
-  consumerGroup: homerun2-light-catcher-tabletennis
-  # Empty = the four built-in tabletennis effects (match won, set won, point to
-  # side a, point to side b), each pointed at `wledEndpoint`. Set this to replace
-  # the whole profile.yaml — `wledEndpoint` is then ignored, so spell the endpoint
-  # out in every effect.
-  profileContent: ""
 
 # wled-mock (mock WLED device + dashboard, for dev/testing).
 # Note: the homerun2-wled-mock-kustomize OCI ships from the

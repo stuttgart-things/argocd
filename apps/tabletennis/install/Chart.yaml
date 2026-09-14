@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: tabletennis-install
+description: App-of-apps entry for the tabletennis platform — schmetterpause (matchmaking, league and tournaments, with its CloudNativePG database) and zaehlwerk (live scorekeeping), plus the optional light-catcher for the LED strip at the table. A platform of its own, beside homerun2 rather than inside it; it talks to homerun2 over the event bus and names the namespace it runs in, nothing more.
+type: application
+version: 0.1.0

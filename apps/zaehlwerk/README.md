@@ -9,6 +9,11 @@ schmetterpause holds the league that match counts towards. They are separate ser
 separate namespaces but one thing to operate — a cluster that wants one almost always wants
 both.
 
+**Normally you do not point a consumer at this chart directly.**
+[`apps/tabletennis/install`](../tabletennis/) is the platform entry: it renders this entry and
+schmetterpause together and wires the panel from one `homerun2.namespace` value. Use this chart
+on its own only where zaehlwerk is wanted without the league.
+
 ## Layout
 
 ```
@@ -103,10 +108,21 @@ CATCHER_URL:      http://homerun2-led-catcher.homerun2.svc.cluster.local
 
 Two things on the homerun2 side have to agree with it, and neither fails loudly:
 
-1. **omni-pitcher must route the stream.** Set `omniPitcher.tabletennisStream: true` in
-   `apps/homerun2/install`. Without it there is no `tabletennis` stream, the pitch still
-   returns 200, every Pod is `Healthy`, and the scores sit on `messages` where no tabletennis
-   catcher is looking.
+1. **omni-pitcher must route the stream.** Add a `system: tabletennis` rule to
+   `omniPitcher.routesContent` in `apps/homerun2/install`:
+
+   ```yaml
+   omniPitcher:
+     routesContent: |
+       streams: [messages, tabletennis]
+       default_stream: messages
+       routes:
+         - match: { system: tabletennis }
+           stream: tabletennis
+   ```
+
+   Without it there is no `tabletennis` stream, the pitch still returns 200, every Pod is
+   `Healthy`, and the scores sit on `messages` where no tabletennis catcher is looking.
 2. **The bearer token must be the same value in two Vault entries.** zaehlwerk reads
    `zaehlwerk:omni-pitcher-token`; homerun2's omni-pitcher reads whatever
    `secrets.vaultSecretName`/`authToken` names. Put the same token in both, or `/pitch`
@@ -176,5 +192,7 @@ in before upstream reaches 1.0.0.
 ## Related
 
 - [`apps/schmetterpause`](../schmetterpause/) — the other half of the tabletennis pair.
-- [`apps/homerun2`](../homerun2/) — the bus the panel pitches to (`omniPitcher.tabletennisStream`,
-  `lightCatcherTabletennis`).
+- [`apps/tabletennis`](../tabletennis/) — the platform chart that deploys this entry together
+  with schmetterpause, and wires the panel from one `homerun2.namespace` value. Point a consumer
+  at that rather than at this chart directly, unless zaehlwerk is wanted on its own.
+- [`apps/homerun2`](../homerun2/) — the bus the panel pitches to.

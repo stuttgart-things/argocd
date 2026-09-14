@@ -52,7 +52,7 @@ Version columns show what the child `Application` currently pins. `—` in the V
 </details>
 
 <details>
-<summary><b><code>apps/</code> — user-facing applications</b> (5 of them listed)</summary>
+<summary><b><code>apps/</code> — user-facing applications</b> (6 of them listed)</summary>
 
 > The index below is not yet complete for `apps/` — entries are being added as they are touched.
 > `ls apps/` is the authoritative list.
@@ -60,9 +60,10 @@ Version columns show what the child `Application` currently pins. `—` in the V
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
 | [`headlamp`](./apps/headlamp/) | `chart` / `rbac` | `0.40.0` + — | Headlamp Kubernetes dashboard + ClusterRoleBinding for SSO group |
-| [`homerun2`](./apps/homerun2/) | `install` (+ `httproute` / `secrets` / `smoke-test` / `preview-*` sub-charts) | 13 components, each pinned separately — see its README | App-of-apps for the homerun2 event bus: redis-stack + pitchers, catchers, scout, config-viewer. Includes the tabletennis wiring (`omniPitcher.tabletennisStream`, `lightCatcherTabletennis`) |
+| [`homerun2`](./apps/homerun2/) | `install` (+ `httproute` / `secrets` / `smoke-test` / `preview-*` sub-charts) | 13 components, each pinned separately — see its README | App-of-apps for the homerun2 event bus: redis-stack + omni/demo/git/k8s pitchers, core/led/light/notification catchers, scout, config-viewer, wled-mock |
 | [`minio`](./apps/minio/) | `chart` / `certs` / `httproute` | `16.0.10` (OCI) + — + — | MinIO object storage (stuttgart-things mirrored image), cert-manager Certificates for console + API, Gateway API HTTPRoutes |
 | [`schmetterpause`](./apps/schmetterpause/) | `install` / `database` / `monitoring` | `v0.8.0` + — + — | Office table tennis matchmaking, league and tournaments, over the published kustomize OCI; CloudNativePG database as its own Application; opt-in PodMonitors + alert rules |
+| [`tabletennis`](./apps/tabletennis/) | `install` | delegates to `schmetterpause` + `zaehlwerk` | **The tabletennis platform**, beside homerun2 rather than inside it — one Application rendering schmetterpause + zaehlwerk, plus the optional LED strip at the table. Talks to homerun2 over the event bus and knows only the namespace it runs in |
 | [`zaehlwerk`](./apps/zaehlwerk/) | `install` | `v0.3.0` | Live scorekeeping for office table tennis. Pairs with `schmetterpause`; its panel pitches scores to homerun2's omni-pitcher and takes over the led-catcher during a match |
 
 </details>

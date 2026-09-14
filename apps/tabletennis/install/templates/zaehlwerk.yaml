@@ -1,0 +1,58 @@
+{{- if .Values.zaehlwerk.enabled }}
+{{- $appName := include "tabletennis.appName" . }}
+{{- $name := printf "%s-zaehlwerk" $appName }}
+{{- $ns := .Values.zaehlwerk.namespace }}
+{{- /* The panel: on when this platform asks for one AND homerun2 is on this
+       cluster to receive it. One namespace derives both URLs — where the scores
+       go, and the led-catcher zaehlwerk takes over for the duration of a match.
+       With homerun2.namespace empty the sub-chart gets no panel at all, which is
+       a supported and silent mode rather than a degraded one. */}}
+{{- $panel := dict }}
+{{- if and .Values.zaehlwerk.panel .Values.homerun2.namespace }}
+{{- $panel = dict "homerun2Namespace" .Values.homerun2.namespace }}
+{{- end }}
+{{- $computed := dict
+      "applicationName" $name
+      "project"         .Values.project
+      "destination"     (dict "namespace" $ns)
+      "syncPolicy"      .Values.syncPolicy
+      "version"         .Values.zaehlwerk.version
+      "hostname"        (include "tabletennis.hostname" (dict "root" . "name" "zaehlwerk"))
+      "gateway"         (dict
+                          "name"        .Values.gateway.name
+                          "namespace"   .Values.gateway.namespace
+                          "sectionName" .Values.gateway.sectionNameHTTPS)
+      "secretStore"     (dict "kind" .Values.secretStore.kind "name" .Values.secretStore.name)
+      "allowedOrigins"  .Values.zaehlwerk.allowedOrigins
+      "panel"           $panel
+}}
+{{- if .Values.destination.name }}
+{{- $_ := set (index $computed "destination") "name" .Values.destination.name }}
+{{- else }}
+{{- $_ := set (index $computed "destination") "server" .Values.destination.server }}
+{{- end }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/zaehlwerk/install
+    helm:
+      releaseName: {{ $name | quote }}
+      valuesObject:
+        {{- include "tabletennis.subValues" (dict "computed" $computed "override" .Values.zaehlwerk.values) | nindent 8 }}
+  destination:
+    {{- include "tabletennis.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

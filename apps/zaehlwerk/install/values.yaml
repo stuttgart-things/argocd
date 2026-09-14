@@ -13,7 +13,7 @@ project: default
 # Argo-registered cluster name); mutually exclusive per ArgoCD.
 destination:
   server: https://kubernetes.default.svc
-  # name: homerun2-tabletennis
+  # name: tabletennis
   namespace: zaehlwerk
 
 # The published base ships NO Namespace — several Applications can share a
@@ -127,10 +127,10 @@ panel:
 
   # Where scores go. omni-pitcher routes messages carrying `system:
   # tabletennis` onto the stream of that name — which it only does if its
-  # routing file says so. In apps/homerun2/install that is
-  # `omniPitcher.tabletennisStream: true`; without it the pitch succeeds, both
-  # sides look healthy, and the scores sit on `messages` where no tabletennis
-  # catcher is looking.
+  # routing file says so, i.e. a `system: tabletennis` rule in
+  # `omniPitcher.routesContent` on apps/homerun2/install. Without it the pitch
+  # succeeds, both sides look healthy, and the scores sit on `messages` where no
+  # tabletennis catcher is looking. Nothing here can check that.
   omniPitcherURL: ""
 
   # The led-catcher zaehlwerk switches onto the tabletennis stream for the

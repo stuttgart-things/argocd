@@ -1,0 +1,168 @@
+---
+# Reference back to this catalog repo — the schmetterpause, zaehlwerk and
+# secrets sub-Applications load their charts from it.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# Base name for the rendered Applications. Empty means derive it from the
+# destination as `tabletennis-<sha1(destination)[:8]>`, because every
+# Application lands in the `argocd` namespace of ONE management cluster: a fixed
+# name would make two clusters' deployments collide on the same object.
+applicationName: ""
+
+# AppProject all rendered Applications belong to.
+project: default
+
+# Where they deploy. Provide either `server` (cluster URL) or `name` (the
+# Argo-registered cluster name); mutually exclusive per ArgoCD.
+#
+# There is no `namespace` here on purpose: the three components live in three
+# namespaces of their own, set per component below.
+destination:
+  server: https://kubernetes.default.svc
+  # name: tabletennis
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
+
+# The cluster's domain. Each component's hostname defaults to
+# `<component>.<domain>`; set a component's own `hostname` to override.
+domain: cluster.example.com
+
+# Gateway both HTTPRoutes attach to.
+#
+# KEEP THIS ON AN INTERNAL GATEWAY. zaehlwerk has no authentication of its own —
+# no token, no session — so its route IS the access control: anyone who can
+# reach the hostname can start a match, score it, take a point back, end it, and
+# with the panel wired, take over the LED strip.
+gateway:
+  name: cilium-gateway
+  namespace: default
+  sectionNameHTTPS: https
+  sectionNameHTTP: http
+
+# ClusterSecretStore both applications' ExternalSecrets read from. Named per
+# cluster (pattern `vault-<cluster>`) and never plain `vault` —
+# `kubectl get clustersecretstore` is the reliable source.
+secretStore:
+  kind: ClusterSecretStore
+  name: vault-cluster
+
+# What this platform knows about homerun2: the namespace it runs in, and
+# nothing else. That one value derives zaehlwerk's panel URLs and the
+# light-catcher's Redis address.
+#
+# Empty means homerun2 is not on this cluster: zaehlwerk then runs without a
+# scoreboard panel (supported and silent), and `lightCatcher.enabled` is
+# refused, since it would have no Redis to read from.
+homerun2:
+  namespace: homerun2
+
+# schmetterpause — matchmaking, league and tournaments. Delegates to
+# apps/schmetterpause/install, which renders the app, its CloudNativePG database
+# and (opt-in) its monitoring.
+schmetterpause:
+  enabled: true
+  namespace: schmetterpause
+  hostname: ""                       # empty = schmetterpause.<domain>
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
+  version: v0.8.0
+  # Anything else from apps/schmetterpause/install's values, merged on top of
+  # what this chart computes (and winning over it). Its own schema validates the
+  # result, so the knobs are documented there rather than repeated here.
+  #
+  #   values:
+  #     database:
+  #       storage: { size: 8Gi, storageClass: openebs-hostpath }
+  #       backup:  { enabled: true, endpointURL: https://minio…, destinationPath: s3://… }
+  #     monitoring:
+  #       enabled: true
+  values: {}
+
+# zaehlwerk — live scorekeeping. Delegates to apps/zaehlwerk/install.
+zaehlwerk:
+  enabled: true
+  namespace: zaehlwerk
+  hostname: ""                       # empty = zaehlwerk.<domain>
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
+  version: v0.3.0
+  # Browser origins allowed to read the live match stream. schmetterpause's
+  # origin belongs here once its live tab exists; upstream refuses the `*`
+  # wildcard, and empty means none.
+  allowedOrigins: ""
+  # The scoreboard panel is wired from `homerun2.namespace` above. Set this to
+  # false to run zaehlwerk without one even where homerun2 is present — the
+  # chart then removes OMNI_PITCHER_URL from the base's ConfigMap rather than
+  # blanking it, because zaehlwerk asks whether the variable is SET and would
+  # dial an empty string forever.
+  panel: true
+  # Same pass-through as schmetterpause.values, against apps/zaehlwerk/install.
+  values: {}
+
+# The second light-catcher: the LED strip at the table, reading only the
+# `tabletennis` stream zaehlwerk pitches to.
+#
+# It belongs to this platform rather than to homerun2 — it exists for the table,
+# not for the bus — but it runs the homerun2 light-catcher image and reads
+# homerun2's Redis, so `homerun2.namespace` has to be set for it.
+#
+# A SECOND INSTANCE, NOT A SECOND STREAM on the existing light-catcher: the
+# base's profile matches `info` on systems ["*"] and fires DJ Light for three
+# seconds, so every point would trigger it, and a profile has no rule that
+# matches and does nothing. Its own NAMESPACE, not a name suffix: the base names
+# everything homerun2-light-catcher and selects on those labels, so two
+# instances in one namespace would give each Service both sets of Pods.
+lightCatcher:
+  enabled: false
+  namespace: homerun2-tabletennis
+  # REQUIRES v1.1.0 or later — the rules below match on the tags zaehlwerk
+  # v0.3.0+ emits, which an older catcher ignores; the first rule would then
+  # take every set AND match, and side a's colour every point.
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-light-catcher
+  version: v1.1.4
+  # Where the effects are sent. The default points at homerun2's wled-mock,
+  # which only exists with `wledMock.enabled: true` over there — a real strip is
+  # the WLED device's own address.
+  wledEndpoint: ""
+  # Must match the stream omni-pitcher routes `system: tabletennis` onto. See
+  # "What homerun2 has to be told" in the README — nothing here can check it.
+  redisStream: tabletennis
+  consumerGroup: homerun2-light-catcher-tabletennis
+  # Dev-only inline literal for the Redis password. Empty deletes the Secret the
+  # base ships, so an ESO-managed one takes over — which is what
+  # `secrets.enabled` below renders.
+  redisPassword: ""                  # pragma: allowlist secret
+  # Empty = the four built-in effects (match won, set won, point to side a,
+  # point to side b), each pointed at `wledEndpoint`. Set this to replace the
+  # whole profile.yaml; `wledEndpoint` is then ignored, so spell the endpoint
+  # out in every effect.
+  profileContent: ""
+
+# The light-catcher's Redis credential, as an ExternalSecret in its namespace.
+# Renders apps/homerun2/secrets (a generic ExternalSecret renderer) at
+# sync-wave -10, which also creates that namespace ahead of the catcher.
+#
+# schmetterpause and zaehlwerk do NOT go through this: their ExternalSecrets
+# ship inside their own published kustomize bases, and each chart patches the
+# store onto them.
+secrets:
+  enabled: false
+  clusterSecretStoreName: ""         # empty = secretStore.name above
+  # Vault KV entry holding homerun2's credentials. `redisPassword` is the
+  # property read — the same entry and property every other homerun2 component
+  # uses, because it is the same Redis.
+  vaultSecretName: homerun2
+  refreshInterval: 1h
