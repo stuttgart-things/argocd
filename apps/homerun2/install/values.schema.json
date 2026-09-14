@@ -215,6 +215,10 @@
         "routesPath": {
           "type": "string",
           "description": "Mount path for the routing file; ROUTES_CONFIG points at <routesPath>/routes.yaml."
+        },
+        "tabletennisStream": {
+          "type": "boolean",
+          "description": "Render a minimal routing file adding the `tabletennis` stream (messages stays the catch-all). Ignored when routesContent is set. Required by anything zaehlwerk talks to \u2014 without a rule the scores land on `messages` and nothing reports an error."
         }
       },
       "required": [
@@ -350,6 +354,42 @@
         },
         "inlineHttpRoute": {
           "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "lightCatcherTabletennis": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A second light-catcher in its own namespace, consuming only the tabletennis stream. Version comes from lightCatcher.version \u2014 one pin for both instances. Requires light-catcher v1.1.0+ (tag matching) and a tabletennis stream on omni-pitcher.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Its own namespace \u2014 the base selects on fixed labels, so two instances cannot share one."
+        },
+        "wledEndpoint": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the effects are sent. Ignored when profileContent is set."
+        },
+        "redisStream": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must match the stream name in omni-pitcher's routing file."
+        },
+        "consumerGroup": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profileContent": {
+          "type": "string",
+          "description": "Replaces the whole profile.yaml. Empty = the four built-in tabletennis effects."
         }
       },
       "required": [

@@ -1,0 +1,156 @@
+---
+# Base name for the rendered Application. Empty means derive it from the
+# destination as `zaehlwerk-<sha1(destination)[:8]>`, because the Application
+# lands in the `argocd` namespace of ONE management cluster: a fixed name would
+# make two clusters' deployments of this app collide on the same object. Set it
+# to something readable when this catalog entry is used for a single cluster.
+applicationName: ""
+
+# AppProject the rendered Application belongs to.
+project: default
+
+# Where it deploys. Provide either `server` (cluster URL) or `name` (the
+# Argo-registered cluster name); mutually exclusive per ArgoCD.
+destination:
+  server: https://kubernetes.default.svc
+  # name: homerun2-tabletennis
+  namespace: zaehlwerk
+
+# The published base ships NO Namespace — several Applications can share a
+# workload namespace, and a Namespace resource in more than one of them makes
+# ArgoCD flag it as a SharedResource, after which one Application's prune
+# deletes the namespace out from under the others. So CreateNamespace=true is
+# not optional here, it is how the namespace comes into being.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    # Honour the chart's ignoreDifferences during sync and selfHeal, so the
+    # controller never tries to rewrite fields the API server owns.
+    - RespectIgnoreDifferences=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
+
+# Tag of the published kustomize artifact. CI tags the artifact and the
+# container image with the same release version and bakes that image reference
+# into the rendered Deployment — so pinning this pins the application version
+# too, and no image patch is needed here.
+#
+# UPSTREAM IS PRE-1.0, AND THAT CHANGES WHAT A BUMP MEANS HERE. The patch
+# surface this chart drives — gateway name and listener, the hostname, the
+# secretStoreRef, and the three ConfigMap keys the panel is made of — is the
+# interface between the two repositories, and it is still moving. Under 0.x a
+# rename in it is a MINOR bump, not a major, so a minor of this package can
+# require a change here. renovate.json keeps these two packages out of the
+# shared images group and off auto-merge for exactly that reason.
+#
+# renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
+version: v0.3.0
+
+# FQDN the scoreboard is served on, patched into the HTTPRoute. The base ships
+# zaehlwerk.cluster.example.com.
+#
+# THIS ROUTE BELONGS ON AN INTERNAL GATEWAY. zaehlwerk has no authentication —
+# no token, no session — so the route is the access control. Everything behind
+# it is reachable by anyone who can reach the hostname: starting a match,
+# scoring it, taking a point back, ending it, and with the panel wired, taking
+# the LED strip. Upstream states this as a design decision, not an oversight
+# (kcl/httproute.k).
+hostname: zaehlwerk.cluster.example.com
+
+# Gateway the HTTPRoute attaches to. The base names a Gateway called `gateway`
+# in `default`, on listener `https`.
+#
+# The listener name is a value because the patch replaces `parentRefs`
+# wholesale and would otherwise bake it in: dropping it would attach the route
+# to every listener on the Gateway. There is only one route — upstream ships no
+# HTTP-to-HTTPS redirect, on the grounds that a plaintext request here leaks
+# nothing and the policy belongs on the Gateway once for everything behind it.
+gateway:
+  name: gateway
+  namespace: default
+  sectionName: https
+
+# ClusterSecretStore the `zaehlwerk-panel` ExternalSecret reads from. The base
+# points at `vault-cluster`, which resolves to nothing.
+#
+# The store is named per cluster (pattern `vault-<cluster>`) and is never plain
+# `vault` — `kubectl get clustersecretstore` is the reliable source.
+#
+# The Vault entry name is not patched: the store carries the KV mount, and the
+# base already asks for the entry `zaehlwerk` under it, with the properties
+# `omni-pitcher-token` and `redis-password`. An environment that needs a
+# different entry name should say so upstream rather than here.
+#
+# BOTH KEYS ARE OPTIONAL INSIDE THE SECRET — the Deployment reads them with
+# `optional: true`. A cluster with no `zaehlwerk` entry yet gets a Pod that
+# starts and scores; only the panel pitch comes back 401.
+secretStore:
+  kind: ClusterSecretStore
+  name: vault-cluster
+
+# Browser origins allowed to read the live match stream (ALLOWED_ORIGINS).
+# Empty — the default — means none, and the base leaves the key out entirely
+# rather than setting it to "*"; upstream refuses the wildcard on purpose
+# (internal/api/stream.go). schmetterpause's origin belongs here once its live
+# tab exists.
+allowedOrigins: ""
+
+# The scoreboard panel: where a scored point goes.
+#
+# NO PANEL IS THE DEFAULT, and the only form of "none" zaehlwerk accepts is the
+# variable being ABSENT — it tests `os.Getenv("OMNI_PITCHER_URL") != ""`, so
+# any non-empty sentinel is taken for a URL and dialled forever. The base ships
+# a placeholder (https://omni-pitcher.example.com) precisely so that kustomize
+# has a key to patch, because a key that was never rendered cannot be patched.
+#
+# So with `omniPitcherURL` empty this chart REMOVES the key from the ConfigMap
+# rather than blanking it. An unpatched placeholder is loud rather than broken:
+# the match still scores and the log carries one `panel pitch failed, point not
+# shown` per point, with a DNS error naming omni-pitcher.example.com — which is
+# the signal that this value was never set.
+panel:
+  # Shortcut for the common case: homerun2 on the SAME cluster. Set the
+  # namespace it runs in and both URLs below are derived —
+  #   omni-pitcher: http://homerun2-omni-pitcher.<ns>.svc.cluster.local
+  #   led-catcher:  http://homerun2-led-catcher.<ns>.svc.cluster.local
+  # Leave empty and nothing is derived. An explicit URL below wins over the
+  # derived one.
+  homerun2Namespace: ""
+
+  # Where scores go. omni-pitcher routes messages carrying `system:
+  # tabletennis` onto the stream of that name — which it only does if its
+  # routing file says so. In apps/homerun2/install that is
+  # `omniPitcher.tabletennisStream: true`; without it the pitch succeeds, both
+  # sides look healthy, and the scores sit on `messages` where no tabletennis
+  # catcher is looking.
+  omniPitcherURL: ""
+
+  # The led-catcher zaehlwerk switches onto the tabletennis stream for the
+  # duration of a match and back to its idle streams afterwards. Optional and
+  # independent of the pitch: scores can go to omni-pitcher with no catcher
+  # being taken over.
+  catcherURL: ""
+
+  # Which streams the catcher is switched to during a match and back to when
+  # idle, and how long idle means. Empty leaves each key out of the ConfigMap,
+  # which is how the base ships and what makes zaehlwerk fall back to its
+  # compiled-in behaviour.
+  matchStreams: ""
+  idleStreams: ""
+  idleTimeout: ""
+
+# Stakater Reloader annotation on the Deployment: roll zaehlwerk when
+# zaehlwerk-config or the panel Secret changes. zaehlwerk reads both only at
+# start, so without this a changed panel URL sits unnoticed until someone
+# restarts the Deployment by hand — which is exactly what happened on
+# labda-dev-a. A no-op on clusters without the Reloader controller
+# (infra/reloader/install), so it is on by default.
+reloader: true

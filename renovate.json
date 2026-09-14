@@ -51,7 +51,7 @@
       "allowedVersions": "<18.0.0"
     },
     {
-      "description": "Auto-merge patch and digest updates once CI passes — keeps low-risk bumps from piling up",
+      "description": "Auto-merge patch and digest updates once CI passes \u2014 keeps low-risk bumps from piling up",
       "matchUpdateTypes": [
         "patch",
         "digest"
@@ -70,7 +70,7 @@
       ]
     },
     {
-      "description": "Catalog self-pin (targetRevision). Promotion is deliberate: never auto-merge — a human merges the bump PR to roll a new release out to clusters. minimumReleaseAge=0 so the PR appears as soon as a tag is cut.",
+      "description": "Catalog self-pin (targetRevision). Promotion is deliberate: never auto-merge \u2014 a human merges the bump PR to roll a new release out to clusters. minimumReleaseAge=0 so the PR appears as soon as a tag is cut.",
       "matchDatasources": [
         "github-tags"
       ],
@@ -93,6 +93,21 @@
         "ghcr.io/stuttgart-things/schmetterpause-kustomize"
       ],
       "groupName": "schmetterpause",
+      "automerge": false,
+      "addLabels": [
+        "interface-surface"
+      ]
+    },
+    {
+      "description": "zaehlwerk is pre-1.0, and its patch surface IS the interface apps/zaehlwerk/install drives: gateway name and listener, the hostname, the secretStoreRef, and the three ConfigMap keys the scoreboard panel is made of. Under 0.x a rename in that surface is a MINOR bump, not a major - so a minor here can require a chart change and must not ride along on the patch auto-merge rule, nor disappear into the shared 'stuttgart-things images' group where a reviewer sees only a batch title. Same reasoning as the schmetterpause rule above; fold these back in once upstream reaches 1.0.0.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/stuttgart-things/zaehlwerk",
+        "ghcr.io/stuttgart-things/zaehlwerk-kustomize"
+      ],
+      "groupName": "zaehlwerk",
       "automerge": false,
       "addLabels": [
         "interface-surface"

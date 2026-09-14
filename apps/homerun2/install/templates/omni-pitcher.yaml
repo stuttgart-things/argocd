@@ -2,6 +2,7 @@
 {{- $appName := include "homerun2.appName" . }}
 {{- $name := "homerun2-omni-pitcher" }}
 {{- $ns := .Values.destination.namespace }}
+{{- $routesContent := include "homerun2.routesContent" . }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -31,7 +32,7 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.omniPitcher.version) | indent 12 }}
-{{- if .Values.omniPitcher.routesContent }}
+{{- if $routesContent }}
         # Config-driven stream routing (homerun2-omni-pitcher#105). ROUTES_CONFIG
         # names a file, so it needs the ConfigMap from
         # templates/omni-pitcher-routes.yaml mounted alongside it.
@@ -59,7 +60,7 @@ spec:
                     # ConfigMap in place. Without this the change reaches the
                     # filesystem and not the process, and looks applied while
                     # nothing happened.
-                    homerun2.sthings.io/routes-hash: {{ .Values.omniPitcher.routesContent | sha256sum | trunc 16 | quote }}
+                    homerun2.sthings.io/routes-hash: {{ $routesContent | sha256sum | trunc 16 | quote }}
                 spec:
                   volumes:
                     - name: routes

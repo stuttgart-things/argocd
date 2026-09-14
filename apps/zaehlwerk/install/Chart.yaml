@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: zaehlwerk-install
+description: App-of-apps entry for zaehlwerk — live scorekeeping for office table tennis. Renders one Argo CD Application over the published kustomize OCI artifact (ghcr.io/stuttgart-things/zaehlwerk-kustomize) with the environment patched in — gateway plus hostname on the HTTPRoute, the ClusterSecretStore on the panel ExternalSecret, and the scoreboard panel (omni-pitcher plus led-catcher) wired into zaehlwerk's ConfigMap. Counterpart to apps/schmetterpause/install; the two are one thing to operate.
+type: application
+version: 0.1.0
+appVersion: "v0.3.0"

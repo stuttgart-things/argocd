@@ -1,0 +1,138 @@
+{{- $name := include "zaehlwerk.appName" . }}
+{{- $ns := .Values.destination.namespace }}
+{{- $omniPitcherURL := include "zaehlwerk.panelOmniPitcherURL" . }}
+{{- $configData := include "zaehlwerk.configData" . }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    # The `oci://` prefix is required — without it Argo treats repoURL as a git
+    # URL and fails with "failed to list refs: repository not found".
+    repoURL: oci://ghcr.io/stuttgart-things/zaehlwerk-kustomize
+    targetRevision: {{ .Values.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+        {{- /* One route only: upstream ships no HTTP-to-HTTPS redirect.
+               parentRefs is replaced wholesale rather than field by field, so
+               `sectionName` has to be repeated here — dropping it would attach
+               the route to every listener on the Gateway.
+
+               `group` + `kind` are spelled out even though the base omits them,
+               because the Gateway API webhook defaults them into the live
+               object: a replace that leaves them off never matches what is on
+               the cluster and the Application sits OutOfSync forever while
+               server-side-applying cleanly every time. */}}
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: zaehlwerk
+          patch: |-
+            - op: replace
+              path: /spec/parentRefs
+              value:
+                - group: gateway.networking.k8s.io
+                  kind: Gateway
+                  name: {{ .Values.gateway.name }}
+                  namespace: {{ .Values.gateway.namespace }}
+                  sectionName: {{ .Values.gateway.sectionName }}
+            - op: replace
+              path: /spec/hostnames
+              value:
+                - {{ .Values.hostname | quote }}
+        {{- /* The panel Secret's store. The base's `vault-cluster` is a
+               placeholder that resolves to nothing, so without this patch the
+               ExternalSecret stays SecretSyncedError — and because both keys
+               are optional in the Deployment, the Pod still starts and only
+               the pitch comes back 401. */}}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: zaehlwerk-panel
+          patch: |-
+            - op: replace
+              path: /spec/secretStoreRef/kind
+              value: {{ .Values.secretStore.kind }}
+            - op: replace
+              path: /spec/secretStoreRef/name
+              value: {{ .Values.secretStore.name }}
+        {{- if not $omniPitcherURL }}
+        {{- /* NO PANEL. The key is REMOVED, not blanked: zaehlwerk asks whether
+               OMNI_PITCHER_URL is set, so an empty string is a URL it dials
+               forever. The base ships the placeholder precisely so there is a
+               key here to remove — kustomize can patch a key it can see but
+               not one that was never rendered. */}}
+        - target:
+            kind: ConfigMap
+            name: zaehlwerk-config
+          patch: |-
+            - op: remove
+              path: /data/OMNI_PITCHER_URL
+        {{- end }}
+        {{- if $configData }}
+        {{- /* Everything this environment sets, as a strategic merge so keys
+               the base does not carry (CATCHER_URL, ALLOWED_ORIGINS) are added
+               rather than replaced. */}}
+        - target:
+            kind: ConfigMap
+            name: zaehlwerk-config
+          patch: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: zaehlwerk-config
+            data:
+{{ $configData | indent 14 }}
+        {{- end }}
+        {{- if .Values.reloader }}
+        {{- /* zaehlwerk reads its ConfigMap and Secret only at start, so a
+               changed panel URL otherwise sits unnoticed until a manual
+               rollout restart. No-op without the Reloader controller. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: zaehlwerk
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: zaehlwerk
+              annotations:
+                reloader.stakater.com/auto: "true"
+        {{- end }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+  {{- /* The base's route declares neither `group`/`kind` on its backendRef nor
+         a `weight`, and the API server defaults all three in. Asserting them
+         here would mean tracking Gateway API defaulting rules per version in a
+         JSON patch, so they are ignored instead — the same trade
+         apps/homerun2/install makes for its inline routes (argocd#114). */}}
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zaehlwerk
+      jqPathExpressions:
+        - .spec.parentRefs[].group
+        - .spec.parentRefs[].kind
+        - .spec.rules[].backendRefs[].group
+        - .spec.rules[].backendRefs[].kind
+        - .spec.rules[].backendRefs[].weight
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

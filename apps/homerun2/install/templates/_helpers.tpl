@@ -10,6 +10,51 @@ Hashes whichever destination identifier is set: `destination.server` (URL) or
 {{- end -}}
 
 {{/*
+homerun2.routesContent -- the effective omni-pitcher routing file.
+
+Three outcomes, in precedence order:
+
+  1. `omniPitcher.routesContent` set  -> that file, verbatim. An environment that
+     needs alerts or github-events streams writes them here; see the block in
+     values.yaml.
+  2. `omniPitcher.tabletennisStream`  -> the minimal file that adds the one
+     stream zaehlwerk needs, keeping `messages` as the catch-all.
+  3. neither                          -> EMPTY, which is the single-stream path:
+     no ConfigMap, no volume, no ROUTES_CONFIG, and REDIS_STREAM takes every
+     message.
+
+Why (2) exists at all: zaehlwerk pitches with `system: tabletennis` and nothing
+routes that anywhere by default, so the scores land on `messages`. The pitch
+returns 200, every Pod reports Healthy, and the tabletennis catcher shows an
+empty stream — the failure has no error in it. A boolean is the smallest thing
+that closes that gap without turning routing on for consumers who never asked
+for it: flipping the default would move /pitch/grafana onto an `alerts` stream
+that this chart's notification-catcher does not consume by default, and their
+Teams notifications would stop.
+
+Usage: include "homerun2.routesContent" .
+*/}}
+{{- define "homerun2.routesContent" -}}
+{{- if .Values.omniPitcher.routesContent -}}
+{{- .Values.omniPitcher.routesContent -}}
+{{- else if .Values.omniPitcher.tabletennisStream -}}
+# Rendered by apps/homerun2/install from `omniPitcher.tabletennisStream`.
+# Every stream named below must appear in `streams`, else omni-pitcher fails
+# startup.
+streams:
+  - messages
+  - tabletennis
+default_stream: messages
+routes:
+  # zaehlwerk pitches its scores with system: tabletennis; they go to the stream
+  # it also switches the led-catcher onto during a match.
+  - match:
+      system: tabletennis
+    stream: tabletennis
+{{- end -}}
+{{- end -}}
+
+{{/*
 homerun2.kustomizeRepo -- OCI repo URL for a homerun2-<name>-kustomize artifact.
 The `oci://` prefix is required — Argo CD treats `repoURL` without it as a git
 URL and fails with "failed to list refs: repository not found".

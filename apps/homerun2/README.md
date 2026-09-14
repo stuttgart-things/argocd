@@ -21,6 +21,8 @@ apps/homerun2/
 │       ├── scout-profile.yaml                 Application "...-scout-profile"      (sync-wave 1, only with scout.profile.enabled)
 │       ├── k8s-pitcher.yaml                   Application "...-k8s-pitcher"        (sync-wave 0)
 │       ├── light-catcher.yaml                 Application "...-light-catcher"      (sync-wave 0)
+│       ├── light-catcher-tabletennis.yaml     Application "...-light-catcher-tabletennis" (sync-wave 0, second instance in its OWN namespace)
+│       ├── omni-pitcher-routes.yaml           Application "...-omni-pitcher-routes" (sync-wave -10, only when there is a routing file)
 │       ├── wled-mock.yaml                     Application "...-wled-mock"          (sync-wave 0)
 │       ├── config-viewer.yaml                 Application "...-config-viewer"      (sync-wave 0, reads the Kubernetes API — no Redis, no Secrets)
 │       ├── demo-pitcher.yaml                  Application "...-demo-pitcher"       (sync-wave 0)
@@ -47,6 +49,7 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `cicd` | base + `gitPitcher.enabled: true` |
 | `all` | every component enabled (matches the flux root kustomization) |
 | `core+light` | base + `lightCatcher.enabled: true` + `wledMock.enabled: true` |
+| `tabletennis` | base + `omniPitcher.tabletennisStream: true` + `ledCatcher.enabled: true` + `lightCatcherTabletennis.enabled: true` — see [Tabletennis](#tabletennis-zaehlwerk-on-the-same-cluster) |
 
 ## Component cheat-sheet
 
@@ -58,6 +61,7 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `scout` | RediSearch analytics API — severity/system/alert aggregates + Prometheus `/metrics` for Grafana | yes | yes |
 | `k8sPitcher` | Watches K8s API (informers/collectors) → pitches to omni | no | yes |
 | `lightCatcher` | Redis Streams consumer → WLED HTTP | yes | no |
+| `lightCatcherTabletennis` | A second light-catcher, in its own namespace, consuming only the `tabletennis` stream | no | no |
 | `wledMock` | Mock WLED device + dashboard (dev) | yes | no |
 | `configViewer` | Read-only view of which alert triggers what in which catcher — components, findings, severity × system matrix, dry run ([homerun-library#122](https://github.com/stuttgart-things/homerun-library/issues/122)) | yes | no |
 | `demoPitcher` | Web UI for manually pitching messages | yes | no |
@@ -86,6 +90,58 @@ Each enabled non-redis-stack component renders one Argo CD `Application` whose s
 Every `<component>.version` default now carries a `# renovate:` comment, so the catalog defaults track upstream releases instead of ageing silently. The chart uses one `version` for both the image tag and the kustomize OCI tag, which holds because both artifacts ship from the same Release workflow — `coreCatcher` is the exception and takes a separate `kustomizeVersion`.
 
 `coreCatcher` is the only component that takes a separate `kustomizeVersion` from its image `version`. Earlier core-catcher kustomize tags used a `-web` suffix to enable web mode; recent tags accept `CATCHER_MODE: web` via env (which the chart sets unconditionally), so usually `kustomizeVersion == version`.
+
+## Tabletennis: zaehlwerk on the same cluster
+
+zaehlwerk pitches a scored point to omni-pitcher with `system: tabletennis`, and — with its
+`CATCHER_URL` set — takes over the led-catcher for the duration of a match. Three things have
+to line up, and **none of them fails loudly on its own**:
+
+```yaml
+omniPitcher:
+  enabled: true
+  tabletennisStream: true          # 1. route the stream
+ledCatcher:
+  enabled: true                    # 2. the catcher zaehlwerk takes over
+lightCatcherTabletennis:
+  enabled: true                    # 3. the strip at the table (optional)
+  wledEndpoint: http://wled-tt.lan # a real strip, or leave the wled-mock default
+```
+
+**1. The stream has to be routed.** Without a rule, omni-pitcher puts `system: tabletennis`
+onto its `default_stream` (`messages`). The pitch returns 200, every Pod reports Healthy, and
+the tabletennis catcher watches an empty stream — a failure with no error in it. The chart
+therefore **fails the render** if `lightCatcherTabletennis.enabled` is set without either
+`tabletennisStream` or a hand-written `routesContent`.
+
+`tabletennisStream: true` renders the minimal file — `messages` + `tabletennis`, `messages`
+still the catch-all, one rule. Clusters that also want Alertmanager and GitHub on streams of
+their own write the full file into `routesContent`; the block is in `values.yaml`. Note that
+doing so moves `/pitch/grafana` off `messages`, so `notificationCatcher.redisStream` has to
+move with it.
+
+**2. The token has to be the same value in two Vault entries.** zaehlwerk reads
+`zaehlwerk:omni-pitcher-token`; omni-pitcher reads whatever `secrets.vaultSecretName` /
+`authToken` names. Different values mean `/pitch` answers 401, which surfaces only as a
+`panel pitch failed, point not shown` line in zaehlwerk's log.
+
+**3. The second light-catcher is a second instance, not a second stream.** Adding
+`tabletennis` to the existing light-catcher would send every point through the base's wildcard
+profile (`info` on systems `["*"]` fires DJ Light for three seconds), and a profile has no
+rule that matches and does nothing. It also gets **its own namespace** rather than a name
+suffix: the base names everything `homerun2-light-catcher` and selects on those labels, so two
+instances in one namespace would give each Service both sets of Pods. With
+`secrets.enabled`, the chart renders a second, small `…-tabletennis-secrets` Application into
+that namespace — it also creates the namespace, at sync-wave −10, ahead of the catcher.
+
+The effects profile ships four rules (match won, set won, point to side a, point to side b),
+each pointed at `wledEndpoint`. They match on the tags zaehlwerk v0.3.0+ emits, so
+**light-catcher v1.1.0 or later is required** — an older catcher ignores tags, and then the
+first rule takes every set *and* match and side a's colour every point. Replace the whole file
+with `profileContent` if you need different effects.
+
+The scorekeeper itself is a separate catalog entry: [`apps/zaehlwerk`](../zaehlwerk/), which
+pairs with [`apps/schmetterpause`](../schmetterpause/).
 
 ## Consumer usage
 
@@ -261,6 +317,9 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `coreCatcher.kustomizeVersion` | `v1.0.3` | OCI kustomize tag (may differ from image `version`) |
 | `<component>.hostname` | `<component>.example.com` | FQDN on the HTTPRoute |
 | `k8sPitcher.namespace` | `homerun2` | Optional override — k8s-pitcher often runs in a different namespace |
+| `omniPitcher.tabletennisStream` | `false` | Render a routing file adding the `tabletennis` stream. Ignored when `routesContent` is set |
+| `omniPitcher.routesContent` / `routesPath` | `""` / `/config/routing` | Full routing file, verbatim. Wins over `tabletennisStream` |
+| `lightCatcherTabletennis.enabled` / `namespace` / `wledEndpoint` / `redisStream` / `consumerGroup` / `profileContent` | `false` / `homerun2-tabletennis` / the wled-mock Service / `tabletennis` / `homerun2-light-catcher-tabletennis` / `""` | Second light-catcher for the strip at the table. Version comes from `lightCatcher.version` |
 | `httpRoute.enabled` / `gateway.{name,namespace}` | `true` / `cilium-gateway` / `default` | Render Gateway API HTTPRoutes for every enabled component that exposes one |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the redis-stack + httpRoute Applications fetch manifests from |
 | `notificationCatcher.enabled` / `version` / `redisStream` / `dryRun` / `notifyConfigMap` / `teamsWebhookUrl` | `false` / `v3.0.1` / `messages` / `false` / `homerun2-notification-catcher-notify` / `""` | Fan-out to MS Teams / webhooks. Consumer only — no Service, no route. Needs the notify ConfigMap out-of-band; an empty `teamsWebhookUrl` deletes the base's placeholder Secret so an ESO-managed one takes over |
@@ -289,6 +348,7 @@ See [`kargo.md`](./kargo.md) for a full Warehouse + Stage example (dev → stagi
 
 - Flux equivalent: [`stuttgart-things/flux` — `apps/homerun2`](https://github.com/stuttgart-things/flux/tree/main/apps/homerun2)
 - Redis Stack chart: [`apps/redis-stack`](../redis-stack/)
+- Table tennis pair: [`apps/zaehlwerk`](../zaehlwerk/) + [`apps/schmetterpause`](../schmetterpause/)
 - Trust bundle source: [`infra/trust-manager`](../../infra/trust-manager/)
 - omni-pitcher docs: <https://stuttgart-things.github.io/homerun2-omni-pitcher/>
 - core-catcher docs: <https://stuttgart-things.github.io/homerun2-core-catcher/>
