@@ -12,8 +12,17 @@
 # grows a Postgres will want the same one. Two bundles installing it would race
 # on the same CRDs and namespace.
 #
-# NOT included: the Barman Cloud plugin (`infra/cloudnative-pg/barman-cloud`).
-# Backups are per-workload, so whichever platform enables them brings it.
+# NOT included here, but no longer left to an app platform either: the Barman
+# Cloud plugin is its own opt-in AppSet beside this one,
+# appset-cloudnative-pg-barman.yaml, behind
+# `storage-platform/cloudnative-pg-barman: "true"`.
+#
+# This file used to say backups were "per-workload, so whichever platform
+# enables them brings it". That was wrong in a way that went unnoticed: the
+# operator finds plugins only by a Service label IN ITS OWN NAMESPACE, so the
+# plugin is a singleton per cluster exactly like the operator, and no app
+# platform can own it without racing another. The result was a chart in the
+# catalog that nothing installed.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:

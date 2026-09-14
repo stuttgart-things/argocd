@@ -69,6 +69,13 @@ spec:
     auto-project: 'true'                # create a per-cluster ArgoCD AppProject (proj-<cluster>)
     allow-all: 'false'                  # widen the AppProject to allow-all sources/dests
 
+    # ---- profile: base-platform (what every cluster gets) ----
+    base-platform: 'true'               # umbrella
+    # Stakater Reloader. On by default and INERT until a workload opts in with
+    # `reloader.stakater.com/auto: "true"` -- it makes the annotation mean
+    # something, it does not restart anything on its own.
+    base-platform/reloader: 'true'      # → appset-reloader
+
     # ---- profile: cicd-platform (vSphere CI/CD stack) ----
     cicd-platform: 'true'               # umbrella
     cicd-platform/crossplane: 'true'    # → appset-crossplane (+ -configs/-functions/-provider-configs/-providers)
@@ -107,6 +114,11 @@ spec:
     # CloudNativePG operator — opt-IN, and a singleton per cluster. Needed by
     # tabletennis-platform; anything else growing a Postgres uses the same one.
     storage-platform/cloudnative-pg: 'false'    # → appset-cloudnative-pg
+    # Barman Cloud backup plugin -- opt-IN, needs the operator label above AND
+    # cert-manager on the cluster. Also a singleton: CloudNativePG finds plugins
+    # only in the operator's own namespace. Installing it does not back anything
+    # up; a database still opts in with an ObjectStore + ScheduledBackup.
+    storage-platform/cloudnative-pg-barman: 'false'  # → appset-cloudnative-pg-barman
 
     # ---- profile: security-platform ----
     security-platform: 'true'           # umbrella

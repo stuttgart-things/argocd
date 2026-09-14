@@ -16,6 +16,8 @@ Catalog entries rendered:
 | `longhorn-storage`               | -10  | `infra/longhorn/install`           | `longhorn-system`  | Longhorn distributed block storage. Defaults: `defaultClassReplicaCount: 1` (single-node-safe — bump for prod), StorageClass installed but **not** annotated as default. `preUpgradeChecker.jobEnabled: false` (required for GitOps) |
 | `nfs-csi-install-storage`       | -10  | `infra/nfs-csi/install`           | `kube-system`      | csi-driver-nfs (controller + node DaemonSet); no StorageClasses yet — those come from the next appset |
 | `nfs-csi-storageclasses-storage`|  -5  | `infra/nfs-csi/storageclasses`    | `kube-system`      | One `StorageClass` per cluster, fields sourced from cluster-Secret annotations. **Additionally gated on** the label `storage-platform.stuttgart-things.com/nfs-config` being present (any value) |
+| `cloudnative-pg-storage`        |  -5  | `infra/cloudnative-pg/install`     | `postgres`         | CloudNativePG operator + CRDs. **Opt-in**, an explicit `'true'` — a cluster with no PostgreSQL has no use for it. A singleton: `tabletennis-platform` needs it, anything else growing a Postgres uses the same one |
+| `cloudnative-pg-barman-storage` |  -5  | `infra/cloudnative-pg/barman-cloud`| `postgres`         | The Barman Cloud backup plugin, beside the operator. **Opt-in** and additionally requires the operator's own label. Needs cert-manager on the target cluster |
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 
@@ -52,6 +54,11 @@ To skip a single component on a specific cluster, add a per-component label on t
 | `storage-platform/nfs-csi-install: "false"`              | Skip `nfs-csi-install-storage` |
 | `storage-platform/nfs-csi-storageclasses: "false"`       | Skip `nfs-csi-storageclasses-storage` |
 
+The two CloudNativePG appsets invert this: they are opt-**in**, so they match an
+explicit `storage-platform/cloudnative-pg: "true"` (and, for the plugin, also
+`storage-platform/cloudnative-pg-barman: "true"`). An absent label means *not*
+installed. Removing the label is how you opt out.
+
 Semantics: each ApplicationSet selector is `storage-platform=true` AND `storage-platform/<component> NotIn ["false"]`. Absent label = included (default). Only the explicit string `"false"` opts out.
 
 If the cluster is managed by `clusterbook-operator`, add the label to the `ClusterbookCluster` CR's `spec.labels` — the operator propagates it onto the Argo Secret on the next reconcile.
@@ -65,6 +72,49 @@ Without the flag the parent Application carries `resources-finalizer.argocd.argo
 **What a cluster loses on opt-out is not the workloads but ArgoCD's management of them.** They keep running exactly as deployed; there is just no more self-heal, drift correction or upgrade. Clean-up stays manual: `kubectl delete ns <namespace>` (or equivalent) on the target cluster if you want the resources gone.
 
 This matters most for storage, so to be explicit: the CSI drivers, their DaemonSets, the StorageClasses and every live PV/PVC survive an opt-out untouched. Nothing gets unmounted from a running pod. `appset-nfs-csi-storageclasses` rolls out StorageClasses directly rather than an Application and keeps the flag.
+
+## CloudNativePG: the operator and the backup plugin
+
+Two appsets, both opt-in, both landing in `postgres`:
+
+| Label | Installs |
+|---|---|
+| `storage-platform/cloudnative-pg: 'true'` | the operator and its CRDs |
+| `+ storage-platform/cloudnative-pg-barman: 'true'` | the Barman Cloud plugin as well |
+
+**Both are singletons per cluster, which is why they live here** rather than in
+whichever app platform wants a database. The operator is obvious. The plugin is
+less so: CloudNativePG discovers plugins by the `cnpg.io/pluginName` label on a
+Service **in the operator's own namespace**, so there is exactly one place it can
+go, and two platforms installing it would race on the same Deployment and the
+same `objectstores.barmancloud.cnpg.io` CRD.
+
+`appset-cloudnative-pg.yaml` used to say backups were "per-workload, so whichever
+platform enables them brings it". No platform ever did, and given the namespace
+rule none could have without that race — so the chart sat in the catalog
+uninstalled while a dev cluster ran the plugin by hand. The plugin appset is that
+sentence corrected.
+
+> [!IMPORTANT]
+> **The plugin needs cert-manager on the target cluster.** The upstream chart
+> renders a self-signed `Issuer` and two `Certificate`s for operator ↔ plugin
+> TLS. It is not in the selector, because a cluster may get cert-manager from
+> `network-platform/cert-manager-install` or from somewhere else entirely.
+> Without it the Certificates stay unissued and the plugin Pod never goes ready.
+
+### What a database still has to do
+
+Installing the plugin does not back anything up. It makes the
+`objectstores.barmancloud.cnpg.io` CRD and the WAL archiver available; a `Cluster`
+opts in with an `ObjectStore` in its own namespace, `spec.plugins` naming
+`barman-cloud.cloudnative-pg.io`, and a `ScheduledBackup` with `method: plugin`.
+
+`apps/schmetterpause/database` renders all three from `database.backup.*` — see
+[`platforms/tabletennis`](../tabletennis/#backups) for how a cluster turns that
+on, and why it is an overlay rather than a label.
+
+Not the in-tree `spec.backup.barmanObjectStore`: CloudNativePG 1.30 deprecates it
+and 1.31.0 removes it.
 
 ## Default StorageClass conflicts
 

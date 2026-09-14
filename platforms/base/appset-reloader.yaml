@@ -1,0 +1,105 @@
+---
+# Stakater Reloader, as part of the base platform.
+#
+# Fans out across clusters labelled `base-platform: "true"`. One parent
+# app-of-apps per cluster, rendering infra/reloader/install, which in turn
+# renders the upstream Stakater chart into the `reloader` namespace ON THE
+# WORKLOAD CLUSTER -- the controller watches the ConfigMaps/Secrets and patches
+# the Deployments that live next to it, so a Reloader on the management cluster
+# would watch the wrong things and never fire.
+#
+# WHY IT IS A PLATFORM COMPONENT AND NOT AN APP'S BUSINESS: every bundle that
+# reads credentials from a store has the same problem -- ESO refreshes a Secret,
+# and the Pods holding the old value keep holding it until something restarts
+# them. platforms/tabletennis names `infra/reloader/install` as a precondition
+# for exactly that reason (a changed panel URL has to roll zaehlwerk), and until
+# this AppSet existed the catalog asked for a component no bundle installed.
+#
+# The controller is INERT until a workload opts in with
+# `reloader.stakater.com/auto: "true"` -- the chart sets `autoReloadAll: false`
+# on purpose, because with it on, one bad value from a failed ESO refresh rolls
+# every Deployment on the cluster at once.
+#
+# Opt a cluster out with label `base-platform/reloader: "false"`.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: reloader-base
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            base-platform: "true"
+          matchExpressions:
+            # Opt-OUT, the convention platforms/README.md describes and 33 of
+            # the other AppSets follow: the umbrella label is enough, and a
+            # component is deselected only by an explicit "false". A second
+            # matchLabels here would silently drop every cluster that carries
+            # the umbrella without the component label.
+            - key: base-platform/reloader
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: 'reloader-base-{{ .name }}'
+      annotations:
+        # Nothing depends on Reloader at apply time -- it reacts to changes, and
+        # a workload created before it is watched just as well afterwards. -10
+        # only to keep it with the other infra components.
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      # The parent renders an Application CRD, which must land in the argocd ns
+      # on the management cluster. The child targets the remote cluster via
+      # valuesObject.destination.server below.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.34.0
+        path: infra/reloader/install
+        helm:
+          releaseName: 'reloader-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent: the parent
+            # server-side-applies the child spec over itself, the ApplicationSet
+            # controller puts its own back a moment later, and nothing ever
+            # deploys -- while both report "successfully synced".
+            applicationName: 'reloader-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: reloader
+            # `chartVersion` is intentionally NOT set here -- it inherits
+            # infra/reloader/install/values.yaml, which Renovate keeps bumped and
+            # which is deliberately held at the version stuttgart-things/flux
+            # runs, so both fleets stay on one controller version. Pinning a
+            # second copy here would let the two drift.
+            #
+            # `reloadStrategy: annotations` and `autoReloadAll: false` likewise
+            # stay at the chart's defaults; see its values.yaml for why each one
+            # is what it is.
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

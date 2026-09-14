@@ -1,0 +1,108 @@
+---
+# The Barman Cloud plugin for CloudNativePG, beside the operator.
+#
+# WHAT IT IS: the supported way a CNPG `Cluster` gets backups from 1.31.0 on.
+# CloudNativePG 1.30 marks the in-tree `spec.backup.barmanObjectStore` for
+# removal and warns on every Cluster still using it, so WAL archiving and base
+# backups go through this plugin instead -- a `Cluster` opts in with an
+# `ObjectStore` in its own namespace, `spec.plugins` naming
+# `barman-cloud.cloudnative-pg.io`, and a `ScheduledBackup` with `method: plugin`.
+#
+# WHY IT SITS HERE AND NOT IN AN APP PLATFORM: the operator discovers plugins by
+# the `cnpg.io/pluginName` label on a Service IN ITS OWN NAMESPACE, so the plugin
+# is a singleton per cluster exactly like the operator -- one install in
+# `postgres`, serving every namespace that runs a database. Two platforms
+# installing it would race on the same Deployment and the same
+# `objectstores.barmancloud.cnpg.io` CRD.
+#
+# appset-cloudnative-pg.yaml used to say backups were "per-workload, so whichever
+# platform enables them brings it". Nothing ever did, which left the catalog with
+# a chart (infra/cloudnative-pg/barman-cloud) that no bundle installed while a
+# dev cluster ran the plugin by hand. This AppSet is that sentence being made
+# true in the only place the singleton allows.
+#
+# TWO PRECONDITIONS, and only the first is enforced by the selector:
+#   1. the operator (`storage-platform/cloudnative-pg: "true"`) -- a plugin with
+#      no operator to serve is inert;
+#   2. cert-manager on the target cluster, because the upstream chart renders a
+#      self-signed Issuer and the two Certificates for operator <-> plugin TLS.
+#      Not in the selector: a cluster may get cert-manager from
+#      `network-platform/cert-manager-install` or from somewhere else entirely,
+#      and gating on one label would exclude the latter. Without it the
+#      Certificates sit unissued and the plugin Pod never becomes ready.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cloudnative-pg-barman-storage
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324). The
+  # plugin Deployment and its CRD stay put either way, which is what you want:
+  # pruning `objectstores.barmancloud.cnpg.io` would delete the ObjectStore of
+  # every database that backs up, and with it the credentials each Cluster's
+  # WAL archiver is holding.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            storage-platform: "true"
+            # Both opt-IN, so explicit "true" rather than a NotIn ["false"] --
+            # same as the operator's own label. Backups need a bucket, an
+            # endpoint and an S3 key pair in the cluster's store, so this is
+            # never something to switch on by default.
+            storage-platform/cloudnative-pg: "true"
+            storage-platform/cloudnative-pg-barman: "true"
+  template:
+    metadata:
+      name: 'cloudnative-pg-barman-storage-{{ .name }}'
+      annotations:
+        # Same wave as the operator's AppSet. Ordering between the two is not
+        # what makes this work -- top-level Applications do not order across
+        # appsets -- but the chart renders its child at wave -9, after the
+        # operator's -10, and retry resolves the rest.
+        argocd.argoproj.io/sync-wave: "-5"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.34.0
+        path: infra/cloudnative-pg/barman-cloud
+        helm:
+          releaseName: 'cloudnative-pg-barman-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent and neither
+            # ever deploys while both report "successfully synced".
+            applicationName: 'cloudnative-pg-barman-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              # THE OPERATOR'S NAMESPACE, and it has to be: the operator finds
+              # plugins only in its own. Matches appset-cloudnative-pg.yaml.
+              namespace: postgres
+            # `chartVersion` is intentionally not set -- it inherits
+            # infra/cloudnative-pg/barman-cloud/values.yaml, which Renovate
+            # keeps bumped, so this tracks the chart default rather than a
+            # second pinned copy that could drift from the operator it serves.
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: argocd
 resources:
   - appset-cloudnative-pg.yaml
+  - appset-cloudnative-pg-barman.yaml
   - appset-openebs.yaml
   - appset-longhorn.yaml
   - appset-nfs-csi-install.yaml

@@ -1,0 +1,35 @@
+---
+# Bootstrap Application for the base platform bundle.
+# Apply once on the management cluster (the one running Argo CD):
+#   kubectl apply -f platforms/base/application.yaml
+#
+# It renders platforms/base/ via kustomize (the kustomization.yaml in that
+# directory lists the ApplicationSets). ApplicationSets then fan out to every
+# cluster Secret labelled `base-platform: "true"`.
+#
+# This file itself is intentionally NOT listed in kustomization.yaml so the
+# rendered set does not contain the bootstrap Application (no self-reference).
+#
+# `targetRevision: main` on purpose, like every other bundle's bootstrap
+# Application: it syncs the ApplicationSets in this directory, not the charts
+# they render. Those carry their own pinned `targetRevision`.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: base-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/stuttgart-things/argocd.git
+    targetRevision: main
+    path: platforms/base
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
