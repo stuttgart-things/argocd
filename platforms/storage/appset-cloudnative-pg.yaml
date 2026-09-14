@@ -1,0 +1,84 @@
+---
+# CloudNativePG operator for the storage platform.
+#
+# OPT-IN, not default-on: this installs a CRD-owning operator, and a cluster that
+# runs no PostgreSQL has no use for it. Set
+# `storage-platform/cloudnative-pg: "true"` to enable it.
+#
+# It lives here rather than in platforms/tabletennis because the operator is a
+# singleton per cluster and more than one platform will want it -- tabletennis
+# needs it today (schmetterpause's database is a CNPG `Cluster`, and without the
+# CRD that Application's dry-run rejects the whole apply), and anything else that
+# grows a Postgres will want the same one. Two bundles installing it would race
+# on the same CRDs and namespace.
+#
+# NOT included: the Barman Cloud plugin (`infra/cloudnative-pg/barman-cloud`).
+# Backups are per-workload, so whichever platform enables them brings it.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cloudnative-pg-storage
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324). The
+  # operator Deployment, its namespace and -- importantly -- its CRDs stay put
+  # either way, which is what you want: pruning the CRDs would delete every
+  # PostgreSQL Cluster on the cluster with them.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            storage-platform: "true"
+            # Opt-IN, so an explicit "true" rather than a NotIn ["false"].
+            storage-platform/cloudnative-pg: "true"
+  template:
+    metadata:
+      name: 'cloudnative-pg-storage-{{ .name }}'
+      annotations:
+        # Ahead of the app platforms (6, 7): a `Cluster` applied before the CRD
+        # exists fails the whole Application's dry-run. Informational only --
+        # top-level Applications do not order across appsets, so retry is what
+        # actually resolves the race.
+        argocd.argoproj.io/sync-wave: "-5"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.33.0
+        path: infra/cloudnative-pg/install
+        helm:
+          releaseName: 'cloudnative-pg-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent and neither ever
+            # deploys while both report "successfully synced".
+            applicationName: 'cloudnative-pg-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              # The chart's own default, kept explicit: it is a deliberate
+              # deviation from upstream's `cnpg-system`, matching
+              # stuttgart-things/helm. See the chart's values.yaml.
+              namespace: postgres
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

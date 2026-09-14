@@ -15,13 +15,37 @@
       "additionalProperties": false,
       "description": "PodMonitors and alert rules, rendered as their own Application from apps/schmetterpause/monitoring. Needs the Prometheus Operator CRDs on the target cluster and version >= v0.8.0.",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "interval": { "type": "string", "pattern": "^[0-9]+(s|m)$" },
-        "backupMaxAgeHours": { "type": "integer", "minimum": 1 }
+        "enabled": {
+          "type": "boolean"
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m)$"
+        },
+        "backupMaxAgeHours": {
+          "type": "integer",
+          "minimum": 1
+        }
       },
-      "required": ["enabled"],
-      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
-      "then": { "required": ["interval", "backupMaxAgeHours"] }
+      "required": [
+        "enabled"
+      ],
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "interval",
+          "backupMaxAgeHours"
+        ]
+      }
     },
     "catalog": {
       "type": "object",
@@ -66,7 +90,7 @@
           "minLength": 1
         }
       },
-      "description": "Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. If both are set (a consumer overriding the default `server` with a `name`), the templates prefer `name`; that is intentional, so a consumer does not have to null out the chart default.",
+      "description": "Provide `server` (cluster URL) or `name` (registered cluster name) \u2014 at least one required. If both are set (a consumer overriding the default `server` with a `name`), the templates prefer `name`; that is intentional, so a consumer does not have to null out the chart default.",
       "required": [
         "namespace"
       ],
@@ -288,6 +312,10 @@
       "required": [
         "enabled"
       ]
+    },
+    "cascadingDelete": {
+      "type": "boolean",
+      "description": "Put a resources-finalizer on every rendered child Application, so deleting the parent prunes the workloads. True (the default) for preview environments; the platforms/ AppSets set it false, because for a long-lived install an opt-out should stop managing the stack rather than delete it, and a prune against a deregistered cluster hangs the children in Terminating (argocd#324)."
     }
   }
 }

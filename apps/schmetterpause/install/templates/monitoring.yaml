@@ -19,8 +19,10 @@ kind: Application
 metadata:
   name: {{ printf "%s-monitoring" $name | quote }}
   namespace: argocd
+  {{- if $.Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   annotations:
     # After the app and its database: the monitors select their pods.
     argocd.argoproj.io/sync-wave: "5"

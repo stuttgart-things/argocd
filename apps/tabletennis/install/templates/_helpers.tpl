@@ -58,3 +58,20 @@ Usage: include "tabletennis.subValues" (dict "computed" $computed "override" .Va
 {{- $merged := mergeOverwrite (deepCopy .computed) (deepCopy (.override | default dict)) -}}
 {{- toYaml $merged -}}
 {{- end -}}
+
+{{/*
+tabletennis.lightCatcherEnabled -- "true" when the LED strip is on, empty
+otherwise, so callers can use a plain `if`.
+
+`lightCatcher.enabled` is compared as a STRING rather than used as a boolean. A
+platform AppSet templates it from a cluster label and hands over the string
+"true" or "false", and in a Go template the string "false" is TRUTHY -- so a
+plain `if` deploys the catcher on every cluster that carries the label at all.
+That is not hypothetical: it shipped for one commit here and showed up as an
+ExternalSecret (and its namespace) rendered for a catcher that did not exist.
+
+Same treatment as infra/trust-manager/bundle's includeVaultPkiCa.
+*/}}
+{{- define "tabletennis.lightCatcherEnabled" -}}
+{{- if eq (.Values.lightCatcher.enabled | default false | toString) "true" }}true{{ end -}}
+{{- end -}}

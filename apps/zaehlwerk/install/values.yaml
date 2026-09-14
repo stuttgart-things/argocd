@@ -154,3 +154,19 @@ panel:
 # labda-dev-a. A no-op on clusters without the Reloader controller
 # (infra/reloader/install), so it is on by default.
 reloader: true
+
+# Whether deleting the parent Application also prunes what it deployed.
+#
+# ON (the default) puts a `resources-finalizer.argocd.argoproj.io` on every
+# child Application this chart renders, so Argo prunes the workloads before
+# removing the child. A per-PR preview wants that: a closed PR must take its
+# namespace with it.
+#
+# OFF is what a long-lived PLATFORM install wants, and the platforms/ AppSets
+# set it. There an opt-out should stop Argo CD managing the stack, not delete
+# it — and against an already deregistered cluster the prune can never
+# complete, so the child Applications hang in Terminating and then block their
+# AppProject (stuttgart-things/argocd#324). Without the finalizer the children
+# are removed immediately and the workloads are left running, unmanaged, which
+# is the intended outcome for an opt-out.
+cascadingDelete: true

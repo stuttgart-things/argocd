@@ -1,4 +1,4 @@
-{{- if .Values.lightCatcher.enabled }}
+{{- if include "tabletennis.lightCatcherEnabled" . }}
 {{- /* It reads homerun2's Redis, so there has to be a homerun2 to read from. */}}
 {{- if not .Values.homerun2.namespace }}
 {{- fail "lightCatcher.enabled needs homerun2.namespace: this catcher consumes the tabletennis stream from homerun2's redis-stack, so without homerun2 on this cluster it has nothing to read." }}
@@ -20,8 +20,10 @@ kind: Application
 metadata:
   name: {{ printf "%s-light-catcher" $appName | quote }}
   namespace: argocd
+  {{- if $.Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:

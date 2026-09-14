@@ -23,8 +23,10 @@ kind: Application
 metadata:
   name: {{ printf "%s-db" $name | quote }}
   namespace: argocd
+  {{- if $.Values.cascadingDelete }}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   annotations:
     # Ahead of the app: its Deployment mounts the Secret this database
     # bootstraps from, and CNPG needs a moment to make the primary ready.
