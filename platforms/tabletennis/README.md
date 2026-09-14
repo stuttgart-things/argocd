@@ -102,6 +102,16 @@ instead of using it as a boolean (same treatment as
 the catcher on every cluster carrying the label at all — which it briefly did,
 showing up as an ExternalSecret and a namespace for a catcher that did not exist.
 
+## Pinning
+
+Both `targetRevision`s — the AppSet's own source and the `catalog` it hands the
+chart — are pinned to a catalog tag, and Renovate's *Catalog self-pin* rule keeps
+them moving. That rule never auto-merges: rolling a catalog release out to every
+labelled cluster stays a human decision.
+
+The bootstrap `application.yaml` deliberately stays on `main`, like every other
+bundle's — it syncs this directory's ApplicationSets, not the charts they render.
+
 ## Opt-out and teardown
 
 `tabletennis-platform/tabletennis: "false"` removes the parent and leaves the

@@ -80,10 +80,11 @@ spec:
         namespace: argocd
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
-        # NOT PINNED TO A TAG YET -- see the same comment in
-        # platforms/homerun2/appset-homerun2.yaml. This chart does not exist in
-        # any released tag at all yet.
-        targetRevision: main
+        # v0.34.0 is the first tag that carries this chart at all, and the
+        # `cascadingDelete` it passes -- see the same note in
+        # platforms/homerun2/appset-homerun2.yaml.
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.34.0
         path: apps/tabletennis/install
         helm:
           releaseName: 'tabletennis-{{ .name }}'
@@ -93,7 +94,8 @@ spec:
             project: '{{ .name }}'
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
-              targetRevision: main
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.34.0
             # No namespace: schmetterpause, zaehlwerk and the light-catcher each
             # land in one of their own.
             destination:
