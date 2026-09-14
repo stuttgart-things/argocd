@@ -90,15 +90,14 @@ spec:
         namespace: argocd
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
-        # NOT PINNED TO A TAG YET, deliberately: this AppSet passes
-        # `cascadingDelete`, which the chart gained in the same change, so no
-        # released tag carries it and a pin would fail schema validation with
-        # "Additional property cascadingDelete is not allowed". Convert both this
-        # and `catalog.targetRevision` below to the first tag that contains them
-        # -- renovate's "Catalog self-pin" rule then keeps them moving. Until
-        # then a chart change reaches every labelled cluster on the next
-        # reconcile without a review gate, which is the cost of `main`.
-        targetRevision: main
+        # v0.34.0 is the first tag that carries `cascadingDelete`; this AppSet
+        # shipped on `main` until it existed, because a pin at an older tag fails
+        # schema validation with "Additional property cascadingDelete is not
+        # allowed". Renovate's "Catalog self-pin" rule moves both pins from here
+        # on -- deliberately never auto-merged, so rolling a catalog release out
+        # to every labelled cluster stays a human decision.
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.34.0
         path: apps/homerun2/install
         helm:
           releaseName: 'homerun2-{{ .name }}'
@@ -109,7 +108,8 @@ spec:
             project: '{{ .name }}'
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
-              targetRevision: main
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.34.0
             # Target the labelled remote cluster, not the management one.
             destination:
               server: '{{ .server }}'
