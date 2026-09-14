@@ -32,12 +32,17 @@ watchGlobally: true
 # env-var strategy mutates the container spec, which is a field ArgoCD renders
 # from Git and will fight over.
 #
-# Either way Reloader writes into the live Deployment. Once a workload is
-# actually annotated, the Application that owns it needs an `ignoreDifferences`
-# entry for whatever Reloader stamps, or selfHeal reverts the patch and the two
-# take turns restarting the Pod. Verify the exact field on the first annotated
-# workload before rolling this out further — no workload here is annotated yet,
-# so nothing writes anything today.
+# Either way Reloader writes into the live Deployment, under
+# `spec.template.metadata.annotations` -- a path no chart here declares, so
+# Argo's three-way diff treats it as a field it does not own and selfHeal leaves
+# it alone. If a workload ever does turn OutOfSync from a reload, the Application
+# that owns it needs an `ignoreDifferences` entry for whatever Reloader stamps,
+# or the two take turns restarting the Pod.
+#
+# `apps/zaehlwerk/install` IS annotated (`reloader: true`, its default), so on a
+# cluster running the tabletennis platform this controller has work from the
+# moment it is installed. Check that Application's sync status first when rolling
+# this out to a cluster that did not have Reloader before.
 reloadStrategy: annotations
 
 # false = every workload opts in explicitly via

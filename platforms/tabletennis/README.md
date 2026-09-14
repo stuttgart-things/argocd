@@ -29,7 +29,55 @@ which Renovate keeps bumped. Both upstreams are pre-1.0 and carry an
 schmetterpause's **monitoring stays off**: it needs the Prometheus Operator CRDs
 (`observability-platform`), and its `enabled` is a boolean an AppSet cannot
 template from a label. Turn it on through an overlay on clusters that run the
-stack.
+stack. Database **backups** are off for the same reason plus one more — see
+[Backups](#backups).
+
+## Backups
+
+The CNPG database can archive WAL continuously and take a daily base backup
+through the Barman Cloud plugin. Two halves, and this bundle owns neither:
+
+**The plugin** comes from
+[`platforms/storage`](../storage/appset-cloudnative-pg-barman.yaml), behind
+`storage-platform/cloudnative-pg-barman: 'true'`. It is a singleton per cluster —
+CloudNativePG finds plugins only in the operator's own namespace — so it sits
+beside the operator rather than in here. It also needs cert-manager.
+
+**Switching it on for this database is an overlay**, not a label, and that is a
+limitation rather than a preference:
+
+- `database.backup.enabled` is a **boolean** in `apps/schmetterpause/install`'s
+  strict schema, and an AppSet can only template strings. The LED strip solves
+  that by having the chart accept `"true"`/`"false"` too; doing the same here
+  would mean widening the schemas of two charts that other bundles render.
+- The values that matter are not knobs with sensible defaults. A backup needs a
+  reachable object store (`endpointURL`), a bucket (`destinationPath`) and its
+  own entry in the secret store holding the S3 key pair (`remoteKey`) — a
+  cluster either has all three or backups are misconfigured rather than off.
+- Turning it on **restarts the Postgres pod**, because it adds `spec.plugins` to
+  an existing `Cluster`. Not something a label flip should do silently.
+
+So a cluster with a bucket sets, in its overlay:
+
+```yaml
+schmetterpause:
+  values:
+    database:
+      backup:
+        enabled: true
+        endpointURL: https://minio.example
+        destinationPath: s3://backups/
+        remoteKey: schmetterpause-backup
+```
+
+`secretStore` is inherited from this bundle's, so it needs no repetition. Every
+other field is documented in `apps/schmetterpause/database/values.yaml`.
+
+> [!NOTE]
+> **A green sync is not a working backup.** Two facts are: the Cluster's
+> `ContinuousArchiving` condition is `True`, and a `Backup` has reached phase
+> `completed`. Take the first one by hand — `immediate` is `false` on purpose,
+> since an immediate backup would fire while the enabling restart is in flight.
 
 ## Cluster preconditions
 
@@ -38,6 +86,9 @@ stack.
   apply. The operator AppSet lives in
   [`platforms/storage`](../storage/appset-cloudnative-pg.yaml) because it is a
   singleton per cluster and more than one platform will want it.
+- **`storage-platform/cloudnative-pg-barman: 'true'`** (only for backups) — the
+  Barman Cloud plugin, also in [`platforms/storage`](../storage/appset-cloudnative-pg-barman.yaml)
+  and also a singleton. See [Backups](#backups).
 - **A ClusterSecretStore** holding two entries: `schmetterpause` (`session-key`,
   `username`, `password`) and `zaehlwerk` (`omni-pitcher-token`,
   `redis-password`). Put **both** zaehlwerk properties there even if Redis is
@@ -47,9 +98,10 @@ stack.
   hostname can start a match, score it, take a point back, end it, and with the
   panel wired, take over the LED strip. The clusterbook gateway is on the lab
   network, which is what makes this acceptable.
-- **`infra/reloader/install`** (optional) so a changed panel URL actually rolls
-  zaehlwerk. The annotation is harmless without the controller, but then it needs
-  a manual rollout restart.
+- **Reloader** (optional) so a changed panel URL actually rolls zaehlwerk. It
+  comes from [`platforms/base`](../base/) — `base-platform: 'true'`, where it is
+  on by default. The annotation is harmless without the controller, but then a
+  changed URL needs a manual rollout restart.
 
 ## Labels and annotations
 

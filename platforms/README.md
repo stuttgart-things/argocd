@@ -28,6 +28,17 @@ component at `'false'` rather than omitting it.
 
 ## Profiles
 
+### `base-platform` — what every cluster gets
+| Label | AppSet | Needs annotations |
+|---|---|---|
+| `base-platform/reloader` | `appset-reloader` → Stakater Reloader in `reloader` on the workload cluster | — |
+
+Not owned by any one app platform, but depended on by several: ESO refreshes a
+Secret and the Pods holding the old value keep holding it. **Inert until a
+workload opts in** with `reloader.stakater.com/auto: "true"` — installing the
+bundle changes the behaviour of nothing already running. See
+[`platforms/base`](./base/).
+
 ### `cicd-platform` — vSphere CI/CD stack
 | Label | AppSet | Needs annotations |
 |---|---|---|
@@ -58,7 +69,8 @@ component at `'false'` rather than omitting it.
 |---|---|---|
 | `storage-platform/openebs` | `appset-openebs` (storage) → `openebs-hostpath` **default SC** + VolumeSnapshot CRDs | — |
 | `storage-platform/longhorn` | `appset-longhorn` | — |
-| `storage-platform/cloudnative-pg` | `appset-cloudnative-pg` → CloudNativePG operator (CRDs + operator in `postgres`) | — — **opt-in**, an explicit `'true'`. A singleton per cluster: `tabletennis-platform` needs it, anything else growing a Postgres uses the same one. The Barman Cloud plugin is not included — backups are per-workload |
+| `storage-platform/cloudnative-pg` | `appset-cloudnative-pg` → CloudNativePG operator (CRDs + operator in `postgres`) | — — **opt-in**, an explicit `'true'`. A singleton per cluster: `tabletennis-platform` needs it, anything else growing a Postgres uses the same one. The Barman Cloud plugin is its own opt-in appset, the row above |
+| `storage-platform/cloudnative-pg-barman` | `appset-cloudnative-pg-barman` → the Barman Cloud backup plugin, beside the operator in `postgres` | — — **opt-in**, and needs `storage-platform/cloudnative-pg: 'true'` too. Also a singleton: CloudNativePG finds plugins only in the operator's own namespace. Needs cert-manager on the cluster. Installing it backs nothing up — a database still opts in with an `ObjectStore` + `ScheduledBackup` |
 | `storage-platform/nfs-csi-install` | `appset-nfs-csi-install` (driver + snapshot-controller) | — |
 | `storage-platform/nfs-csi-storageclasses` | `appset-nfs-csi-storageclasses` | **gate label** `storage-platform.stuttgart-things.com/nfs-config` + `…/nfs-server`, `…/nfs-share` **(user)**; optional `…/nfs-version` (def 4.1), `…/nfs-name` (def `nfs-csi`), `…/nfs-subdir` (def cluster), `…/nfs-mount-permissions` (def `0`) |
 
