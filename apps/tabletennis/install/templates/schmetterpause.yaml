@@ -1,0 +1,52 @@
+{{- if .Values.schmetterpause.enabled }}
+{{- $appName := include "tabletennis.appName" . }}
+{{- $name := printf "%s-schmetterpause" $appName }}
+{{- $ns := .Values.schmetterpause.namespace }}
+{{- $computed := dict
+      "applicationName" $name
+      "project"         .Values.project
+      "catalog"         (dict "repoURL" .Values.catalog.repoURL "targetRevision" .Values.catalog.targetRevision)
+      "destination"     (dict "namespace" $ns)
+      "syncPolicy"      .Values.syncPolicy
+      "version"         .Values.schmetterpause.version
+      "hostname"        (include "tabletennis.hostname" (dict "root" . "name" "schmetterpause"))
+      "gateway"         (dict
+                          "name"             .Values.gateway.name
+                          "namespace"        .Values.gateway.namespace
+                          "sectionNameHTTPS" .Values.gateway.sectionNameHTTPS
+                          "sectionNameHTTP"  .Values.gateway.sectionNameHTTP)
+      "secretStore"     (dict "kind" .Values.secretStore.kind "name" .Values.secretStore.name)
+}}
+{{- /* The sub-chart's destination takes `server` or `name`, same as ours. */}}
+{{- if .Values.destination.name }}
+{{- $_ := set (index $computed "destination") "name" .Values.destination.name }}
+{{- else }}
+{{- $_ := set (index $computed "destination") "server" .Values.destination.server }}
+{{- end }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name | quote }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/schmetterpause/install
+    helm:
+      releaseName: {{ $name | quote }}
+      valuesObject:
+        {{- include "tabletennis.subValues" (dict "computed" $computed "override" .Values.schmetterpause.values) | nindent 8 }}
+  destination:
+    {{- include "tabletennis.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  {{- /* This Application's own desired state is three Applications, so its sync
+         is cheap; the database's own wave (-10) orders things inside it. */}}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

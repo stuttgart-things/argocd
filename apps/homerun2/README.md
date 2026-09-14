@@ -289,6 +289,7 @@ See [`kargo.md`](./kargo.md) for a full Warehouse + Stage example (dev → stagi
 
 - Flux equivalent: [`stuttgart-things/flux` — `apps/homerun2`](https://github.com/stuttgart-things/flux/tree/main/apps/homerun2)
 - Redis Stack chart: [`apps/redis-stack`](../redis-stack/)
+- Table tennis is a platform of its own beside this one: [`apps/tabletennis`](../tabletennis/). It needs exactly one setting here — a `tabletennis` stream in `omniPitcher.routesContent` — and nothing on either side reports it missing
 - Trust bundle source: [`infra/trust-manager`](../../infra/trust-manager/)
 - omni-pitcher docs: <https://stuttgart-things.github.io/homerun2-omni-pitcher/>
 - core-catcher docs: <https://stuttgart-things.github.io/homerun2-core-catcher/>
