@@ -1,0 +1,52 @@
+{{- if .Values.policy.enabled }}
+{{- /* Earlier tags carry a kyverno.io/v1 ClusterPolicy that Kyverno 1.19 refuses,
+       or no policy at all. Refuse to render rather than deploy either. A version
+       that is not a semver tag (a commit SHA) cannot be compared, so it is refused
+       too. */}}
+{{- $v := trimPrefix "v" .Values.version }}
+{{- $ok := false }}
+{{- if regexMatch "^[0-9]+\\.[0-9]+\\.[0-9]+$" $v }}
+{{- $ok = semverCompare ">=0.9.0" $v }}
+{{- end }}
+{{- if not $ok }}
+{{- fail (printf "policy.enabled needs a schmetterpause version of v0.9.0 or later, got %q: earlier tags carry a policy Kyverno 1.19 refuses, or none" .Values.version) }}
+{{- end }}
+{{- $name := include "schmetterpause.appName" . }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-policy" $name | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # Ahead of the app, so the pods of a rollout are checked by the policy that
+    # ships with the same release.
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    # Not copied into this catalog: read from the schmetterpause repository at
+    # the same tag as the app, so the policy on a cluster is the one that
+    # release was tested against (kyverno test over policy/tests there).
+    repoURL: https://github.com/stuttgart-things/schmetterpause.git
+    targetRevision: {{ .Values.version | quote }}
+    path: policy
+    directory:
+      recurse: false
+      # policy/tests holds kyverno test fixtures, Pods among them, which must
+      # never reach a cluster. One file, named.
+      include: verify-image-signature.yaml
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

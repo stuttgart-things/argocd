@@ -47,6 +47,19 @@
         ]
       }
     },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Kyverno ImageValidatingPolicy read from policy/ in the schmetterpause repository at `version`, rendered as its own Application. Needs Kyverno serving policies.kyverno.io/v1 and version >= v0.9.0. Cluster-scoped: enable in one consumer per cluster.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "catalog": {
       "type": "object",
       "additionalProperties": false,
