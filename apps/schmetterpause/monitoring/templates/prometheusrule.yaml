@@ -87,12 +87,18 @@ spec:
         # series with a single sample is 0. Without it, exactly the first
         # refusal would be missed.
         #
+        # The `> 0` on the increase() half is what makes that work. `or` adds a
+        # right-hand element only when no left-hand element has the same labels,
+        # the metric name aside, so an increase() of 0 hides the right half.
+        # Without the filter the first refusal fired for one evaluation and
+        # resolved a minute later (homerun2-test1, 2026-09-15).
+        #
         # A server-side dry-run is counted too, and no label tells it apart.
         # A real pod leaves a PolicyReport in its namespace; a dry-run does not.
         - alert: SchmetterpauseUnsignedImageAdmitted
           expr: |
             sum by (resource_namespace) (
-              increase(kyverno_image_validating_policy_results_total{policy_name="schmetterpause-verify-image-signature", result="fail"}[15m])
+              (increase(kyverno_image_validating_policy_results_total{policy_name="schmetterpause-verify-image-signature", result="fail"}[15m]) > 0)
               or
               (
                 kyverno_image_validating_policy_results_total{policy_name="schmetterpause-verify-image-signature", result="fail"}
