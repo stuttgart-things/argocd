@@ -161,6 +161,23 @@ monitoring:
   # The ScheduledBackup is daily; alert once the newest base backup is older.
   backupMaxAgeHours: 26
 
+# The admission policy that checks the application image carries a keyless
+# signature made by schmetterpause's CI (schmetterpause ADR-0020, #230),
+# rendered as its own Application at sync-wave -5. Its source is
+# policy/verify-image-signature.yaml in the schmetterpause repository at the
+# same tag as `version`, not a copy in this catalog, so the policy on a cluster
+# is the one that release was tested against.
+#
+# Off by default. It needs Kyverno serving policies.kyverno.io/v1 on the target
+# cluster (infra/kyverno/install; 1.19 does), and a `version` of v0.9.0 or
+# later: earlier tags carry a kyverno.io/v1 ClusterPolicy that Kyverno 1.19
+# refuses, or none, and the chart fails to render rather than deploy either.
+#
+# The policy is cluster-scoped. Enable it in one consumer per cluster, or two
+# Applications fight over the same object.
+policy:
+  enabled: false
+
 # Whether deleting the parent Application also prunes what it deployed.
 #
 # ON (the default) puts a `resources-finalizer.argocd.argoproj.io` on every

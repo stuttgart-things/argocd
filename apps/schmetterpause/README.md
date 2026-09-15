@@ -11,6 +11,7 @@ apps/schmetterpause/
 ├── install/        app-of-apps chart (what consumers point at) — renders:
 │                     Application "schmetterpause"     (sync-wave   0) → the published kustomize OCI, environment patched in
 │                     Application "schmetterpause-db"  (sync-wave -10) → apps/schmetterpause/database
+│                     Application "schmetterpause-policy" (sync-wave -5, opt-in) → policy/ of stuttgart-things/schmetterpause at `version`
 │                     Application "schmetterpause-monitoring" (sync-wave 5, opt-in) → apps/schmetterpause/monitoring
 ├── database/       CloudNativePG Cluster
 └── monitoring/     PodMonitors (app, database) and alert rules
@@ -178,3 +179,23 @@ Whether the site answers at all stays the blackbox probe's job from outside; the
 ```
 
 **Restore** is a new Cluster bootstrapped from the object store, into an empty namespace — never an in-place overwrite: an `ExternalSecret` and `ObjectStore` like the ones above, then a `Cluster` with `bootstrap.recovery.source` naming an `externalClusters` entry that uses the plugin with `barmanObjectName` and `serverName: schmetterpause-db`. Set `storage.storageClass` explicitly, and give the restored Cluster **no** WAL archiver on the same `serverName` — two clusters archiving into one path corrupt each other's timeline.
+
+## Admission policy
+
+`policy.enabled` renders a fourth Application at sync-wave -5. Its source is `policy/verify-image-signature.yaml` from [`stuttgart-things/schmetterpause`](https://github.com/stuttgart-things/schmetterpause/tree/main/policy), read at the **same tag as `version`**. That file is a Kyverno `ImageValidatingPolicy`: it checks that the application image carries a keyless cosign signature made by schmetterpause's CI workflow (schmetterpause ADR-0020 and ADR-0021).
+
+**The policy is not copied into this catalog.** Read from the release tag, the policy on a cluster is the one that release was tested against, because schmetterpause runs `kyverno test` over `policy/tests` in its pipeline. A bump of `version` moves the app and its policy together. `directory.include` takes the one file, so the test fixtures in `policy/tests`, Pods among them, never reach a cluster.
+
+**Preconditions:**
+
+- **Kyverno serving `policies.kyverno.io/v1`:** `infra/kyverno/install`. 1.19.1 does, on homerun2-test1.
+- **`version` is `v0.9.0` or later.** Earlier tags carry a `kyverno.io/v1` `ClusterPolicy` that Kyverno 1.19 refuses, or no policy at all, and the chart fails to render rather than deploy either. A `version` that is a commit SHA is refused too, because it cannot be compared.
+
+**It ships in `Audit`.** A pod with an unsigned image is still admitted, and the refusal is a `PolicyReport` in its namespace. Moving to `Deny`, and what to check before doing so, is schmetterpause's decision and is written down in its `docs/supply-chain.md`.
+
+**Enable it in one consumer per cluster.** The policy is cluster-scoped and matches `schmetterpause` and every `schmetterpause-pr-*` namespace by name, so a second consumer on the same cluster would make two Applications fight over one object.
+
+```yaml
+        policy:
+          enabled: true
+```
