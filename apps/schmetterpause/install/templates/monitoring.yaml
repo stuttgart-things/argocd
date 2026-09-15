@@ -12,6 +12,8 @@
       "backup" (dict
         "enabled"     (and .Values.database.enabled (dig "backup" "enabled" false .Values.database))
         "maxAgeHours" .Values.monitoring.backupMaxAgeHours)
+      "policy" (dict
+        "enabled" .Values.policy.enabled)
 }}
 ---
 apiVersion: argoproj.io/v1alpha1

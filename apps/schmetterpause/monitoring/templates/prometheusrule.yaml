@@ -75,3 +75,44 @@ spec:
             summary: The last base backup of {{ $db }} failed
             description: A base backup of {{ $db }} failed after the last successful one. kubectl -n {{ $ns }} get backup shows which.
 {{- end }}
+{{- if .Values.policy.enabled }}
+    - name: schmetterpause.policy
+      rules:
+        # The image-signature policy is in Audit: an unsigned image still
+        # starts, and this alert is the only place the refusal reaches a human.
+        #
+        # The `unless ... offset 15m` half is not decoration. Kyverno creates
+        # the counter at its first evaluation, so the first refusal after a
+        # Kyverno restart is a new series already at 1, and increase() over a
+        # series with a single sample is 0. Without it, exactly the first
+        # refusal would be missed.
+        #
+        # A server-side dry-run is counted too, and no label tells it apart.
+        # A real pod leaves a PolicyReport in its namespace; a dry-run does not.
+        - alert: SchmetterpauseUnsignedImageAdmitted
+          expr: |
+            sum by (resource_namespace) (
+              increase(kyverno_image_validating_policy_results_total{policy_name="schmetterpause-verify-image-signature", result="fail"}[15m])
+              or
+              (
+                kyverno_image_validating_policy_results_total{policy_name="schmetterpause-verify-image-signature", result="fail"}
+                unless
+                kyverno_image_validating_policy_results_total{policy_name="schmetterpause-verify-image-signature", result="fail"} offset 15m
+              )
+            ) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: An image not signed by the schmetterpause CI workflow was admitted
+            description: 'The Kyverno policy schmetterpause-verify-image-signature (Audit) found no signature from the schmetterpause CI workflow on an image admitted in the last 15 minutes. The resource_namespace label says where; kubectl -n that-namespace get policyreport names the pod. A server-side dry-run counts too.'
+        # Without the scrape the alert above cannot fire, and a silent alert
+        # looks exactly like nothing being wrong.
+        - alert: SchmetterpauseKyvernoMetricsDown
+          expr: absent(up{namespace="kyverno", job="kyverno-svc-metrics"} == 1)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: Kyverno admission metrics are not scraped
+            description: No healthy kyverno-svc-metrics target for 10 minutes, so SchmetterpauseUnsignedImageAdmitted cannot fire.
+{{- end }}

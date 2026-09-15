@@ -1,0 +1,35 @@
+{{- if .Values.policy.enabled }}
+---
+# Kyverno's admission controller, scraped for the one series the policy alert
+# in prometheusrule.yaml needs, and nothing else.
+#
+# Here rather than in the Kyverno install. That install comes from the
+# fleet-wide platforms/security AppSet, pinned to one catalog tag for every
+# cluster, where a ServiceMonitor would break Kyverno's sync on each cluster
+# without the Prometheus Operator CRDs. Kept to this policy's series, so a
+# platform-level scrape added later duplicates nothing else.
+#
+# The selector also matches kyverno-svc, the webhook Service. Only
+# kyverno-svc-metrics has a port named metrics-port, so it is the only target.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kyverno-image-signature-policy
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  namespaceSelector:
+    matchNames:
+      # infra/kyverno/install fixes the namespace.
+      - kyverno
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: kyverno
+      app.kubernetes.io/component: admission-controller
+  endpoints:
+    - port: metrics-port
+      interval: {{ .Values.interval | quote }}
+      metricRelabelings:
+        - sourceLabels: [__name__, policy_name]
+          regex: kyverno_image_validating_policy_results_total;schmetterpause-verify-image-signature
+          action: keep
+{{- end }}

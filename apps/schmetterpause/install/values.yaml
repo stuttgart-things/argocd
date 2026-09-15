@@ -175,6 +175,11 @@ monitoring:
 #
 # The policy is cluster-scoped. Enable it in one consumer per cluster, or two
 # Applications fight over the same object.
+#
+# With monitoring.enabled as well, the monitoring Application scrapes Kyverno
+# for this policy's results and alerts on a refusal. The policy runs in Audit,
+# so an unsigned image still starts, and that alert is the only place a refusal
+# reaches a human.
 policy:
   enabled: false
 
