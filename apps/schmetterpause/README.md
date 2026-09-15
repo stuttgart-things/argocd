@@ -14,7 +14,7 @@ apps/schmetterpause/
 │                     Application "schmetterpause-policy" (sync-wave -5, opt-in) → policy/ of stuttgart-things/schmetterpause at `version`
 │                     Application "schmetterpause-monitoring" (sync-wave 5, opt-in) → apps/schmetterpause/monitoring
 ├── database/       CloudNativePG Cluster
-└── monitoring/     PodMonitors (app, database) and alert rules
+└── monitoring/     PodMonitors (app, database), a ServiceMonitor on Kyverno (with policy), and alert rules
 ```
 
 ## Why the database is a separate chart
@@ -147,12 +147,13 @@ kubectl -n schmetterpause get backups.postgresql.cnpg.io                        
 
 ## Monitoring
 
-`monitoring.enabled` renders `apps/schmetterpause/monitoring` as its own Application at sync-wave 5. Off by default: its `PodMonitor`s and `PrometheusRule` need the Prometheus Operator CRDs on the target cluster — `infra/kube-prometheus-stack`, or on clusterbook clusters the `observability-platform` label — and without them the Application does not sync.
+`monitoring.enabled` renders `apps/schmetterpause/monitoring` as its own Application at sync-wave 5. Off by default: its `PodMonitor`s, `ServiceMonitor` and `PrometheusRule` need the Prometheus Operator CRDs on the target cluster — `infra/kube-prometheus-stack`, or on clusterbook clusters the `observability-platform` label — and without them the Application does not sync.
 
 | Object | Selects / watches |
 |---|---|
 | `PodMonitor schmetterpause` | pods labelled `app.kubernetes.io/name: schmetterpause`, port `metrics`, `/metrics` |
 | `PodMonitor <database.name>` | CNPG instances (`cnpg.io/cluster`, `cnpg.io/podRole: instance`), port `metrics` (9187). Our own monitor rather than `spec.monitoring.enablePodMonitor`, which CNPG 1.30 deprecates |
+| `ServiceMonitor kyverno-image-signature-policy` | with `policy.enabled`: Kyverno's admission controller in `kyverno` (`kyverno-svc-metrics`, port `metrics-port`), keeping only `kyverno_image_validating_policy_results_total` for `schmetterpause-verify-image-signature` |
 | `PrometheusRule schmetterpause` | the alerts below |
 
 **Precondition: schmetterpause ≥ v0.8.0.** The container port `metrics` (`SP_METRICS_ADDR`, 9090) exists from that release on. The Service does not name it, so neither HTTPRoute can reach `/metrics`; the PodMonitor scrapes the pod directly. Enabled against an older `version`, the app monitor finds no port and `SchmetterpauseMetricsDown` fires.
@@ -165,11 +166,15 @@ kubectl -n schmetterpause get backups.postgresql.cnpg.io                        
 | `SchmetterpauseWALArchiveBacklog` | warning | more than 10 WAL segments `ready` for 30 min |
 | `SchmetterpauseBackupTooOld` | warning | newest base backup older than `monitoring.backupMaxAgeHours` (26) |
 | `SchmetterpauseBackupFailed` | warning | a failed base backup newer than the last successful one |
+| `SchmetterpauseUnsignedImageAdmitted` | warning | the image-signature policy failed a verification in the last 15 min; the `resource_namespace` label says where |
+| `SchmetterpauseKyvernoMetricsDown` | warning | no healthy `kyverno-svc-metrics` target for 10 min, so the alert above cannot fire |
 
-The last four only exist with `database.backup.enabled`. Two choices in them are deliberate:
+The four WAL and backup alerts only exist with `database.backup.enabled`, and the two policy alerts only with `policy.enabled`. Four choices in them are deliberate:
 
 - **Not "seconds since last archival".** With nobody writing, no WAL segment fills, and that number grows all night while everything is fine. A failure newer than the last success is the signal.
 - **The backup timestamps are the plugin's**, `barman_cloud_cloudnative_pg_io_*`. `cnpg_collector_last_available_backup_timestamp` stays 0 for plugin backups — an alert on it would fire forever.
+- **The first refusal is not missed.** Kyverno creates its result counter at the first evaluation, so the first refusal after a Kyverno restart is a new series already at 1, and `increase()` over a series with one sample is 0. The rule adds `x unless x offset 15m` for exactly that case.
+- **Kyverno is scraped here, not in the Kyverno install.** That install comes from the fleet-wide `platforms/security` AppSet at one catalog tag, where a `ServiceMonitor` would break Kyverno's sync on every cluster without the Prometheus Operator CRDs. This one keeps only the policy's series, so a platform-level scrape added later duplicates nothing else.
 
 Whether the site answers at all stays the blackbox probe's job from outside; these rules are the inside view.
 
@@ -192,6 +197,8 @@ Whether the site answers at all stays the blackbox probe's job from outside; the
 - **`version` is `v0.9.0` or later.** Earlier tags carry a `kyverno.io/v1` `ClusterPolicy` that Kyverno 1.19 refuses, or no policy at all, and the chart fails to render rather than deploy either. A `version` that is a commit SHA is refused too, because it cannot be compared.
 
 **It ships in `Audit`.** A pod with an unsigned image is still admitted, and the refusal is a `PolicyReport` in its namespace. Moving to `Deny`, and what to check before doing so, is schmetterpause's decision and is written down in its `docs/supply-chain.md`.
+
+**A refusal reaches a human through monitoring.** With `monitoring.enabled` as well, the monitoring Application scrapes Kyverno for this policy's results and raises `SchmetterpauseUnsignedImageAdmitted` (see [Monitoring](#monitoring)). Under `Audit` that alert is the only place a refusal shows. A server-side dry-run counts as a refusal too; no Kyverno label tells the two apart.
 
 **Enable it in one consumer per cluster.** The policy is cluster-scoped and matches `schmetterpause` and every `schmetterpause-pr-*` namespace by name, so a second consumer on the same cluster would make two Applications fight over one object.
 

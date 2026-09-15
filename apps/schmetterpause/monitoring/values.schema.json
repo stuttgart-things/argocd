@@ -3,7 +3,7 @@
   "title": "schmetterpause monitoring",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespace", "interval", "app", "database", "backup"],
+  "required": ["namespace", "interval", "app", "database", "backup", "policy"],
   "properties": {
     "destination": {
       "type": "object",
@@ -42,6 +42,15 @@
         "maxAgeHours": { "type": "integer", "minimum": 1 }
       },
       "required": ["enabled", "maxAgeHours"]
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The image-signature policy's refusals: a ServiceMonitor on Kyverno's admission controller keeping only this policy's result counter, and two alerts. Passed from apps/schmetterpause/install policy.enabled.",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      },
+      "required": ["enabled"]
     }
   }
 }

@@ -28,5 +28,13 @@ backup:
   # The schedule is daily; 26 h leaves room for one slow run before it alerts.
   maxAgeHours: 26
 
+# The image-signature policy's refusals (apps/schmetterpause/install
+# policy.enabled). The policy runs in Audit, so an unsigned image still starts,
+# and this is the only place a refusal reaches a human: a ServiceMonitor on
+# Kyverno's admission controller that keeps nothing but this policy's result
+# counter, and two alerts.
+policy:
+  enabled: false
+
 # Inert pass-through so the catalog verifier's probe values validate.
 destination: {}
