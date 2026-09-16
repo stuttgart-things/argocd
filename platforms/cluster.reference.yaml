@@ -123,6 +123,11 @@ spec:
     # ---- profile: security-platform ----
     security-platform: 'true'           # umbrella
     security-platform/external-secrets: 'true'  # → appset-external-secrets-install
+    # Opt-IN, not opt-out: a store whose Vault role cannot read the mount
+    # reports Valid / Ready=True while every ExternalSecret under it fails with
+    # a 400. Set this only once the auth mount <cluster>-eso exists AND its role
+    # carries a read policy for every mount in the kv-mounts annotation below.
+    security-platform/external-secrets-stores: 'true'  # → appset-external-secrets-stores
     security-platform/kyverno: 'true'           # → appset-kyverno-install
 
     # ---- profile: observability-platform ----
@@ -187,6 +192,14 @@ spec:
     # clusterbook.stuttgart-things.com/fqdn: '*.<cluster>.<zone>'   (cilium-gateway, cert-manager-cluster-ca)
     # clusterbook.stuttgart-things.com/fqdn-secondary: ...          (cilium-gateway-secondary)
     # clusterbook.stuttgart-things.com/lb-range-start / lb-range-stop: ...  (kind gateway/lb)
+
+    # ---- [user] security: the KV mounts this cluster opens ----
+    # One ClusterSecretStore per mount, named vault-<mount>, rendered by
+    # appset-external-secrets-stores. Comma-separated: a label could not carry
+    # this (no commas allowed), and the AppSet passes the string straight to the
+    # chart, which splits it. The login is shared — server below, auth mount
+    # <cluster>-eso, ServiceAccount external-secrets/eso.
+    external-secrets.stuttgart-things.com/kv-mounts: homerun2-pr,schmetterpause,observability
 
     # ---- [user] network: cert-manager Vault-PKI ClusterIssuer ----
     clusterbook.stuttgart-things.com/vault-server: https://vault.infra.sthings-vsphere.labul.sva.de
