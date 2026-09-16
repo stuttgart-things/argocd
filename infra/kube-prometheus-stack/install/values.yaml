@@ -79,6 +79,9 @@ externalSecrets:
   grafanaAdminUserProperty: grafana-admin-user
   grafanaAdminPasswordProperty: grafana-admin-password
   webhookTokenProperty: alertmanager-webhook-token
+  # Entry the webhook token is read from; empty = remoteKey. Point it at the
+  # shared entry holding the omni-pitcher AUTH_TOKEN — see the secrets chart.
+  webhookRemoteKey: ""
 
 # Gateway API HTTPRoute for Grafana (opt-in). Also sets Grafana's root_url.
 httpRoute:
