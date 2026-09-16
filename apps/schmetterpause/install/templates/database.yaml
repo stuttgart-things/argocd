@@ -16,6 +16,7 @@
       "enableSuperuserAccess" .Values.database.enableSuperuserAccess
       "protect"               .Values.database.protect
       "backup"                $backup
+      "recovery"              (.Values.database.recovery | default dict)
 }}
 ---
 apiVersion: argoproj.io/v1alpha1
