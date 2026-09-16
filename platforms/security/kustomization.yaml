@@ -3,4 +3,5 @@ kind: Kustomization
 namespace: argocd
 resources:
   - appset-external-secrets-install.yaml
+  - appset-external-secrets-stores.yaml
   - appset-kyverno-install.yaml
