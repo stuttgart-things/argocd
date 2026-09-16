@@ -118,6 +118,9 @@ spec:
               name: schmetterpause-config
             data:
               SP_PUBLIC_BASE_URL: {{ printf "https://%s" .Values.hostname | quote }}
+              {{- with .Values.bootstrapAdmin }}
+              SP_BOOTSTRAP_ADMIN: {{ . | quote }}
+              {{- end }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}

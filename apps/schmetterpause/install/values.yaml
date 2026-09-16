@@ -61,6 +61,12 @@ version: v0.9.0
 # ships schmetterpause.cluster.example.com in all three places.
 hostname: schmetterpause.cluster.example.com
 
+# Display name of the player who gets the admin flag at every start
+# (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing. The player
+# has to have joined first; a name nobody has is a warning in the log, not a
+# failed start. Not a secret: it grants nothing without that player's own PIN.
+bootstrapAdmin: ""
+
 # Gateway the HTTPRoutes attach to. The base names a Gateway called `gateway`
 # in `default`.
 #

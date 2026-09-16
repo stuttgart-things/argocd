@@ -37,6 +37,11 @@ Five patches, all of them places where the base names a placeholder:
 | `schmetterpause.cluster.example.com` (2 routes + `SP_PUBLIC_BASE_URL`) | `.Values.hostname` |
 | `secretStoreRef.name: vault-cluster` on both ExternalSecrets | `.Values.secretStore.name` / `.kind` |
 
+One addition rather than a replacement: `.Values.bootstrapAdmin`, when set, adds
+`SP_BOOTSTRAP_ADMIN` to the ConfigMap. The base has no such key, since the first admin is a
+per-office decision (schmetterpause ADR-0008). It names a player who has already joined, and
+it grants nothing without that player's own PIN.
+
 The listener names come from `gateway.sectionNameHTTPS` / `sectionNameHTTP`. The patches
 replace `parentRefs` wholesale, so they have to be repeated — and getting them wrong is the
 quiet kind of wrong: both routes attach to *every* listener and the redirect sends HTTPS
