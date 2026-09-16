@@ -31,7 +31,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.37.1
+        targetRevision: v0.38.0
         path: infra/trust-manager/bundle
         helm:
           valuesObject:
@@ -67,14 +67,23 @@ spec:
             # string" and the AppSet then generates NOTHING, for every
             # cluster. Both cases verified against Go template + sprig.
             includeVaultPkiCa: '{{ if or (eq (toString (index .metadata.labels "network-platform/cert-manager-vault-pki")) "true") (hasPrefix "vault-pki" (toString (index (default (dict) .metadata.annotations) "clusterbook.stuttgart-things.com/wildcard-issuer-name"))) }}true{{ else }}false{{ end }}'
+            # The cluster CA, on the same terms. It only exists where
+            # cert-manager-cluster-ca ran, and this AppSet's selector does not
+            # check that label — so hardcoding the source below handed every
+            # opted-out cluster a Bundle whose first source was missing, and
+            # trust-manager then stops syncing the WHOLE bundle: no default CAs,
+            # no vault-pki-ca either. Measured on rancher-join-test4
+            # (stuttgart-things/crossplane-configurations#422), fixed by #451.
+            #
+            # Opt-OUT, like the component selectors: anything but an explicit
+            # 'false' means the cluster has the CA. Same `default (dict)` +
+            # `toString` coercions as above.
+            includeClusterCa: '{{ if eq (toString (index (default (dict) .metadata.labels) "network-platform/cert-manager-cluster-ca")) "false" }}false{{ else }}true{{ end }}'
             bundles:
               - name: cluster-trust-bundle
                 spec:
                   sources:
                     - useDefaultCAs: true
-                    - secret:
-                        name: cluster-ca-secret
-                        key: ca.crt
                   target:
                     configMap:
                       key: trust-bundle.pem
