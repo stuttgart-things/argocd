@@ -116,6 +116,51 @@
       "type": "string",
       "description": "Browser origins allowed to read the live match stream. Empty = none; upstream refuses the `*` wildcard."
     },
+    "schmetterpause": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Handover to schmetterpause. Off while url is empty. Needs zaehlwerk >= v0.4.1: in v0.4.0 the token reached the Secret but no container.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Base URL of schmetterpause; in-cluster where possible."
+        },
+        "vaultPath": {
+          "type": "string"
+        },
+        "vaultProperty": {
+          "type": "string"
+        }
+      },
+      "if": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "then": {
+        "required": [
+          "vaultPath",
+          "vaultProperty"
+        ],
+        "properties": {
+          "url": {
+            "pattern": "^https?://"
+          },
+          "vaultPath": {
+            "minLength": 1
+          },
+          "vaultProperty": {
+            "minLength": 1
+          }
+        }
+      }
+    },
     "panel": {
       "type": "object",
       "additionalProperties": false,

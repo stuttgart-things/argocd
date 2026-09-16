@@ -116,6 +116,21 @@ allowedOrigins: ""
 # the match still scores and the log carries one `panel pitch failed, point not
 # shown` per point, with a DNS error naming omni-pitcher.example.com — which is
 # the signal that this value was never set.
+# The handover to schmetterpause: a won match goes to its POST /api/results, and
+# the scoring page offers its real players (zaehlwerk ADR-0004). Off while url
+# is empty -- and then zaehlwerk scores and shows a match exactly as before,
+# reported nowhere, which ADR-0004 keeps as a first-class way to run.
+schmetterpause:
+  # Base URL of the schmetterpause instance. In-cluster where both run on one
+  # cluster -- http://schmetterpause.schmetterpause.svc -- so the token never
+  # crosses the gateway.
+  url: ""
+  # Its OWN Vault entry, holding the same value as schmetterpause's
+  # scoreboard token. Required once url is set; the chart refuses to render
+  # without it rather than addressing an entry that happens to exist.
+  vaultPath: zaehlwerk-schmetterpause
+  vaultProperty: token
+
 panel:
   # Shortcut for the common case: homerun2 on the SAME cluster. Set the
   # namespace it runs in and both URLs below are derived —

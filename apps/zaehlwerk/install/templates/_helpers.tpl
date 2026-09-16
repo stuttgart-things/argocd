@@ -62,6 +62,7 @@ the empty string forever.
 {{- with $p.idleStreams }}{{ $_ := set $data "CATCHER_IDLE_STREAMS" . }}{{ end -}}
 {{- with $p.idleTimeout }}{{ $_ := set $data "CATCHER_IDLE_TIMEOUT" . }}{{ end -}}
 {{- with .Values.allowedOrigins }}{{ $_ := set $data "ALLOWED_ORIGINS" . }}{{ end -}}
+{{- with (.Values.schmetterpause | default dict).url }}{{ $_ := set $data "SCHMETTERPAUSE_URL" . }}{{ end -}}
 {{- /* Empty renders as nothing rather than `{}`, so the caller can skip the
        patch entirely instead of emitting one that changes no key. */ -}}
 {{- if $data }}{{ toYaml $data }}{{ end -}}
