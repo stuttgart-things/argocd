@@ -89,7 +89,7 @@ spec:
               value:
                 secretKey: SP_SCOREBOARD_TOKEN
                 remoteRef:
-                  key: {{ .Values.scoreboard.vaultPath | default "schmetterpause" | quote }}
+                  key: {{ required "scoreboard.vaultPath is required when scoreboard.enabled" .Values.scoreboard.vaultPath | quote }}
                   property: {{ .Values.scoreboard.vaultProperty | quote }}
         {{- end }}
         {{- /* Both ExternalSecrets read from the same store. */}}
