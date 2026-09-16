@@ -79,7 +79,7 @@ schmetterpause:
   namespace: schmetterpause
   hostname: ""                       # empty = schmetterpause.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-  version: v0.9.0
+  version: v0.11.0
   # Anything else from apps/schmetterpause/install's values, merged on top of
   # what this chart computes (and winning over it). Its own schema validates the
   # result, so the knobs are documented there rather than repeated here.
