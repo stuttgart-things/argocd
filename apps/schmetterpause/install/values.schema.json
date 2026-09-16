@@ -357,7 +357,7 @@
         },
         "vaultPath": {
           "type": "string",
-          "description": "Entry under the store's mount. Empty means the same one the app already reads."
+          "description": "Entry under the store's mount. Its own entry, never the one the app reads: vault-base-setup rewrites an entry whole, so sharing it risks resetting session-key."
         },
         "vaultProperty": {
           "type": "string",
@@ -376,8 +376,17 @@
       },
       "then": {
         "required": [
+          "vaultPath",
           "vaultProperty"
-        ]
+        ],
+        "properties": {
+          "vaultPath": {
+            "minLength": 1
+          },
+          "vaultProperty": {
+            "minLength": 1
+          }
+        }
       }
     },
     "cascadingDelete": {

@@ -195,10 +195,21 @@ database:
 # half-on state: unset means the surface does not exist.
 scoreboard:
   enabled: false
-  # Entry under the store's mount. Empty uses the same one the app already
-  # reads, which is what a consumer normally wants.
-  vaultPath: ""
-  vaultProperty: scoreboard-token
+  # Entry under the store's mount, and its OWN entry rather than the one the
+  # app already reads. That is not a preference:
+  #
+  # vault-base-setup writes an entry with data_json, which rewrites it WHOLE.
+  # Putting this token on the `schmetterpause` entry means restating
+  # session-key, username and password in the same JSON, and getting session-key
+  # wrong signs every player out at once. The backup key pair is a separate
+  # entry for exactly this reason, and says so in
+  # apps/schmetterpause/database/values.yaml.
+  #
+  # There is deliberately no fallback to the app's entry: the template fails to
+  # render without a value here rather than quietly addressing the dangerous
+  # one.
+  vaultPath: schmetterpause-scoreboard
+  vaultProperty: token
 
 monitoring:
   enabled: false

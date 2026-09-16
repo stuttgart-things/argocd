@@ -199,11 +199,15 @@ Then take a Backup by hand and wait for phase `completed`: a rebuilt database th
 ```yaml
         scoreboard:
           enabled: true
-          # vaultPath empty = the entry the app already reads
-          vaultProperty: scoreboard-token
+          vaultPath: schmetterpause-scoreboard   # its own entry — see below
+          vaultProperty: token
 ```
 
-**The Vault property has to exist before this is switched on.** ESO fails an `ExternalSecret` over one missing property and takes the whole secret with it — session key and database URL included, not just the new routes. That is also why this is an append here rather than a field in the published base: rendered there, *every* environment would need the property.
+**The Vault entry has to exist before this is switched on.** ESO fails an `ExternalSecret` over one missing property and takes the whole secret with it — session key and database URL included, not just the new routes. That is also why this is an append here rather than a field in the published base: rendered there, *every* environment would need the property.
+
+**And it is its own entry, never the one the app already reads.** `vault-base-setup` writes an entry with `data_json`, which rewrites it whole — putting this token on the `schmetterpause` entry means restating `session-key` in the same JSON, and getting that wrong signs every player out at once. The backup key pair is separate for the same reason. There is no fallback to the app's entry: the chart refuses to render without a `vaultPath`, rather than quietly addressing the dangerous one.
+
+If the entry is managed by `vault-base-setup`, remember the policy as well — `read-schmetterpause` lists paths explicitly, so a new entry is unreadable until it is named there. ESO then logs in, reports the store `Valid`, and reads nothing.
 
 ```bash
 kubectl -n schmetterpause get externalsecret schmetterpause-app   # SecretSynced
