@@ -64,6 +64,34 @@ spec:
               path: /spec/hostnames
               value:
                 - {{ .Values.hostname | quote }}
+        {{- /* The Zählwerk's token (schmetterpause ADR-0015). An append
+               rather than a value in the published base, because the base is
+               shared: rendered there, EVERY environment's ExternalSecret would
+               demand a scoreboard-token property, and ESO fails the whole
+               secret when one property is missing -- taking the session key
+               and the database URL with it, not just the new routes.
+
+               So the base renders one data entry and an environment that wants
+               the surface appends a second. `-` appends, so this survives the
+               base gaining entries of its own.
+
+               Without the variable the application does not register
+               /api/players or /api/results at all, which is why this is the
+               only switch: there is no "enabled but locked" state to reach. */}}
+        {{- if .Values.scoreboard.enabled }}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: schmetterpause-app
+          patch: |-
+            - op: add
+              path: /spec/data/-
+              value:
+                secretKey: SP_SCOREBOARD_TOKEN
+                remoteRef:
+                  key: {{ .Values.scoreboard.vaultPath | default "schmetterpause" | quote }}
+                  property: {{ .Values.scoreboard.vaultProperty | quote }}
+        {{- end }}
         {{- /* Both ExternalSecrets read from the same store. */}}
         {{- range $es := list "schmetterpause-app" "schmetterpause-db" }}
         - target:
