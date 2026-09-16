@@ -107,7 +107,8 @@
         "remoteKey":                    { "type": "string" },
         "grafanaAdminUserProperty":     { "type": "string", "minLength": 1 },
         "grafanaAdminPasswordProperty": { "type": "string", "minLength": 1 },
-        "webhookTokenProperty":         { "type": "string", "minLength": 1 }
+        "webhookTokenProperty":         { "type": "string", "minLength": 1 },
+        "webhookRemoteKey":             { "type": "string" }
       },
       "required": ["enabled"],
       "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
