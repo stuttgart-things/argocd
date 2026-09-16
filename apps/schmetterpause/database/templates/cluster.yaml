@@ -5,7 +5,7 @@
 {{- fail "recovery.enabled needs backup.enabled: the object store to recover from is configured under backup.*" }}
 {{- end }}
 {{- if eq $serverName ($recovery.sourceServerName | default "") }}
-{{- fail (printf "backup.serverName (%q) must differ from recovery.sourceServerName: a rebuilt Cluster archiving into its source's path corrupts both timelines" $serverName) }}
+{{- fail (printf "backup.serverName (%q) must differ from recovery.sourceServerName: the plugin refuses a non-empty archive, so the rebuilt Cluster would run healthy and never back itself up" $serverName) }}
 {{- end }}
 {{- end }}
 ---

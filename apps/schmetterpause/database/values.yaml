@@ -68,8 +68,13 @@ backup:
   # It exists for the rebuild: a Cluster recovered from another server's
   # backups keeps the old Cluster name (the app's SP_DATABASE_URL points at
   # <name>-rw), so without this it would archive into the very path it is
-  # replaying from, and the two timelines would corrupt each other. Setting it
-  # gives the rebuilt server a directory of its own inside the same bucket.
+  # replaying from. Measured on homerun2-test1 on 2026-09-16, the plugin does
+  # not let that corrupt anything -- barman-cloud-check-wal-archive refuses a
+  # non-empty archive ("Expected empty archive") before the first segment
+  # goes. The failure is quieter and slower: the rebuilt database comes up
+  # healthy, serves the office, and never archives a byte, while unarchivable
+  # WAL piles up on its volume. Setting this gives it a directory of its own
+  # inside the same bucket, and archiving simply works.
   #
   # Required, and required to differ from recovery.sourceServerName, whenever
   # recovery is on. Changing it on a running Cluster starts a new path, and
