@@ -30,3 +30,14 @@ bundles: []
 # The Secret must exist in the trust namespace: a source pointing at a missing
 # Secret makes trust-manager stop syncing the whole Bundle.
 includeVaultPkiCa: "false"
+
+# When set to the string "true" (or boolean true), every Bundle rendered by this
+# chart gets an additional `secret: { name: cluster-ca-secret, key: ca.crt }`
+# source appended — the CA that `cert-manager-cluster-ca` issues.
+#
+# Same reasoning as includeVaultPkiCa, and the same trap: a source pointing at a
+# Secret that does not exist makes trust-manager stop syncing the ENTIRE bundle
+# (`SourceNotFound`), so the default CAs and the Vault PKI CA stop being
+# distributed too. Callers gate this on the cluster actually running
+# cert-manager-cluster-ca. Default off.
+includeClusterCa: "false"

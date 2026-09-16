@@ -10,6 +10,17 @@ spec:
         secret source pointing at vault-pki-ca/ca.crt (lives in the chart's
         target namespace — typically cert-manager). */ -}}
   {{- $spec := $bundle.spec | deepCopy }}
+  {{- /* The cluster CA is a source like any other, and it only exists where
+        cert-manager-cluster-ca ran. Hardcoding it in the caller meant a
+        cluster with that component off got a Bundle whose FIRST source was
+        missing, and trust-manager then stops syncing the WHOLE bundle —
+        vault-pki-ca and the default CAs included. See
+        stuttgart-things/argocd#451. */ -}}
+  {{- if eq ($.Values.includeClusterCa | default "false" | toString) "true" }}
+    {{- $sources := $spec.sources | default list }}
+    {{- $sources = append $sources (dict "secret" (dict "name" "cluster-ca-secret" "key" "ca.crt")) }}
+    {{- $_ := set $spec "sources" $sources }}
+  {{- end }}
   {{- if eq ($.Values.includeVaultPkiCa | default "false" | toString) "true" }}
     {{- $sources := $spec.sources | default list }}
     {{- $sources = append $sources (dict "secret" (dict "name" "vault-pki-ca" "key" "ca.crt")) }}
