@@ -274,7 +274,7 @@
             },
             "serverName": {
               "type": "string",
-              "description": "Server directory inside destinationPath. Empty means the Cluster name."
+              "description": "Server directory inside destinationPath. Empty means the Cluster name; that effective name must differ from recovery.sourceServerName."
             },
             "retentionPolicy": {
               "type": "string",
@@ -328,7 +328,7 @@
         "recovery": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Passed to apps/schmetterpause/database, which validates it. Bootstraps the Cluster from another server's backups instead of initdb; needs backup.enabled and a backup.serverName that differs from sourceServerName.",
+          "description": "Passed to apps/schmetterpause/database, which validates it. Bootstraps the Cluster from another server's backups instead of initdb. Needs the object store coordinates under backup.* but not backup.enabled; with backup off the Cluster recovers and archives nowhere.",
           "properties": {
             "enabled": {
               "type": "boolean"

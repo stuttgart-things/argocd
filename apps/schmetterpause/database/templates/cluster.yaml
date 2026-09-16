@@ -1,11 +1,11 @@
 {{- $recovery := .Values.recovery | default dict }}
 {{- $serverName := .Values.backup.serverName | default "" }}
-{{- if $recovery.enabled }}
-{{- if not .Values.backup.enabled }}
-{{- fail "recovery.enabled needs backup.enabled: the object store to recover from is configured under backup.*" }}
-{{- end }}
-{{- if eq $serverName ($recovery.sourceServerName | default "") }}
-{{- fail (printf "backup.serverName (%q) must differ from recovery.sourceServerName: the plugin refuses a non-empty archive, so the rebuilt Cluster would run healthy and never back itself up" $serverName) }}
+{{- if and $recovery.enabled .Values.backup.enabled }}
+{{- /* Unset, the plugin archives under the Cluster name -- so that is what
+       has to differ from the source, not the value of backup.serverName. */}}
+{{- $archivesAs := $serverName | default .Values.name }}
+{{- if eq $archivesAs ($recovery.sourceServerName | default "") }}
+{{- fail (printf "this Cluster would archive as %q, the server it recovers from: set backup.serverName to something else. The plugin refuses a non-empty archive, so it would come up healthy and never back itself up" $archivesAs) }}
 {{- end }}
 {{- end }}
 ---

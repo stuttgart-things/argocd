@@ -166,11 +166,20 @@ kubectl -n schmetterpause get backups.postgresql.cnpg.io                        
 
 That renders `bootstrap.recovery` against a second, read-only `ObjectStore` (`<name>-origin`) on the same bucket and key pair, and puts `serverName` on the Cluster's archiver so the rebuilt server writes somewhere new.
 
-**The two names must differ, and the chart refuses to render if they do not.** A Cluster recovered under the old name would otherwise archive into the very path it replays from. That does not corrupt the archive — measured on `homerun2-test1` on 2026-09-16, `barman-cloud-check-wal-archive` refuses a non-empty path outright (`Expected empty archive`) and `ContinuousArchiving` goes `False` before a single segment is written. It fails the other way instead, and more quietly: the rebuilt database is `Cluster in healthy state`, serves the office, and never backs itself up, while WAL PostgreSQL may not recycle accumulates on the volume. `SchmetterpauseWALArchivingFailing` catches it after 15 minutes — its expression holds because `cnpg_pg_stat_archiver_last_archived_time` reports `-1` rather than going absent on a server that has never archived. `recovery.enabled` also requires `backup.enabled` — the bucket, endpoint and key pair are configured there — and both rules are checked: the schema catches the missing pieces, `templates/cluster.yaml` catches the collision.
+**The name it archives under must differ from the one it recovers from, and the chart refuses to render if it does not.** That is `backup.serverName` when set and the Cluster name otherwise — so a rebuild that renames the Cluster needs no `serverName` at all, and one that keeps the name needs one. A Cluster recovered under the old name would otherwise archive into the very path it replays from. That does not corrupt the archive — measured on `homerun2-test1` on 2026-09-16, `barman-cloud-check-wal-archive` refuses a non-empty path outright (`Expected empty archive`) and `ContinuousArchiving` goes `False` before a single segment is written. It fails the other way instead, and more quietly: the rebuilt database is `Cluster in healthy state`, serves the office, and never backs itself up, while WAL PostgreSQL may not recycle accumulates on the volume. `SchmetterpauseWALArchivingFailing` catches it after 15 minutes — its expression holds because `cnpg_pg_stat_archiver_last_archived_time` reports `-1` rather than going absent on a server that has never archived. `recovery.enabled` needs the object store coordinates under `backup.*` — `endpointURL`, `destinationPath`, `remoteKey`, `secretStore` — because it reads that bucket; it does not need `backup.enabled`. The schema catches missing coordinates, `templates/cluster.yaml` catches the collision.
 
 **`spec.bootstrap` is read only when the Cluster is created.** Switching this on for a Cluster that already exists does nothing, and neither does leaving it on after the rebuild — which is why it is safe in a consumer file. The catch is the next rebuild: its source is then the *current* `backup.serverName`, not the one before it.
 
-**A restore probe that must archive nowhere at all is not this.** This chart always archives when `backup.enabled`, and `recovery` needs it. For a throwaway Cluster that reads the office's backups and writes nothing — the shape to reach for when checking that a backup is still good — use the hand-written manifest in schmetterpause's `docs/backup-restore.md`, which has no `spec.plugins` at all.
+**The two switches answer different questions**, and `backup` off with `recovery` on is the second one:
+
+| `backup` | `recovery` | What you get |
+| --- | --- | --- |
+| off | off | an empty database |
+| on | off | an empty database that backs itself up |
+| on | on | **the rebuild** — the data back, still backing itself up, under its own `serverName` |
+| off | on | **a restore probe** — the data back, archiving nowhere: no `spec.plugins`, no `ScheduledBackup`, nothing that can write to the source's path |
+
+The probe is the shape for asking *is the backup still good*, as opposed to rebuilding onto it. It renders what schmetterpause's `docs/backup-restore.md` used to require by hand. Destroy it when the counts have been compared; its namespace takes the volume with it.
 
 **It worked when the Cluster is `Cluster in healthy state` and archiving under the new name:**
 

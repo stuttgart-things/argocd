@@ -76,9 +76,14 @@ backup:
   # WAL piles up on its volume. Setting this gives it a directory of its own
   # inside the same bucket, and archiving simply works.
   #
-  # Required, and required to differ from recovery.sourceServerName, whenever
-  # recovery is on. Changing it on a running Cluster starts a new path, and
-  # the old one keeps whatever it already holds until its retention expires it.
+  # Unset, the plugin archives under the Cluster NAME -- so what has to differ
+  # from recovery.sourceServerName is the name actually archived under, which
+  # is this when set and the Cluster name otherwise. The chart refuses to
+  # render a Cluster that would archive as the server it recovers from, and
+  # a rebuild that renames the Cluster needs nothing here at all.
+  #
+  # Changing it on a running Cluster starts a new path, and the old one keeps
+  # whatever it already holds until its retention expires it.
   serverName: ""
   retentionPolicy: 30d
   # Six fields, seconds first: CloudNativePG's cron format, not the usual five.
@@ -105,9 +110,18 @@ backup:
 # with it off, a cluster rebuilt from git comes back with an empty ranking and
 # the first person who joins starts a second one.
 #
-# It needs backup.enabled -- the bucket, the endpoint and the key pair are all
-# configured there, and this reads the same ones through a second, read-only
-# ObjectStore (<name>-origin).
+# It needs the object store coordinates under backup.* -- endpointURL,
+# destinationPath, remoteKey and secretStore -- because it reads that bucket
+# through a second, read-only ObjectStore (<name>-origin). It does NOT need
+# backup.enabled, and the two switches answer different questions:
+#
+#   backup on,  recovery on   the rebuild: comes back with the data AND keeps
+#                             backing itself up, under its own serverName
+#   backup off, recovery on   a probe: comes back with the data and archives
+#                             NOWHERE -- no spec.plugins, no ScheduledBackup,
+#                             nothing that can write to the source's path.
+#                             This is the shape for asking "is the backup
+#                             still good", as opposed to rebuilding onto it.
 #
 # spec.bootstrap is read ONLY when the Cluster is created. Leaving this on
 # after the rebuild changes nothing on the running Cluster, which is why it is

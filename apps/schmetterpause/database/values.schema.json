@@ -260,15 +260,31 @@
     "properties": {
       "backup": {
         "required": [
-          "enabled",
-          "serverName"
+          "endpointURL",
+          "destinationPath",
+          "remoteKey",
+          "secretStore"
         ],
         "properties": {
-          "enabled": {
-            "const": true
+          "endpointURL": {
+            "pattern": "^https://"
           },
-          "serverName": {
+          "destinationPath": {
+            "pattern": "^s3://"
+          },
+          "remoteKey": {
             "minLength": 1
+          },
+          "secretStore": {
+            "required": [
+              "kind",
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "minLength": 1
+              }
+            }
           }
         }
       }

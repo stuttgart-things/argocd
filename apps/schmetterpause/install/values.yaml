@@ -133,9 +133,9 @@ database:
     enabled: false
     endpointURL: ""
     destinationPath: ""
-    # Server directory inside destinationPath. Empty means the Cluster name.
-    # Required, and required to differ from recovery.sourceServerName, when
-    # recovery is on -- see database.recovery below.
+    # Server directory inside destinationPath. Empty means the Cluster name,
+    # and it is that effective name which must differ from
+    # recovery.sourceServerName -- see database.recovery below.
     serverName: ""
     retentionPolicy: 30d
     schedule: "0 0 3 * * *"
@@ -149,8 +149,11 @@ database:
     caConfigMap: cluster-trust-bundle
     caKey: trust-bundle.pem
   # Rebuild: bring the Cluster up from another server's backups instead of an
-  # empty database. Off by default. Needs database.backup.enabled -- it reads
-  # the same bucket and key pair through a second, read-only ObjectStore.
+  # empty database. Off by default. It reads that bucket through a second,
+  # read-only ObjectStore, so it needs the coordinates under database.backup
+  # (endpointURL, destinationPath, remoteKey, secretStore) -- but NOT
+  # database.backup.enabled. With backup off it recovers and archives nowhere,
+  # which is the restore-probe shape rather than the rebuild one.
   #
   # This is what a cluster lost and rebuilt from git needs. Without it the
   # Application comes back healthy with an empty ranking. spec.bootstrap is
