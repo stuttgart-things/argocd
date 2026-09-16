@@ -1,4 +1,5 @@
-{{- if .Values.backup.enabled }}
+{{- $store := or .Values.backup.enabled .Values.recovery.enabled }}
+{{- if $store }}
 {{- $secret := printf "%s-backup" .Values.name }}
 ---
 # The S3 key pair AND the CA the ObjectStore verifies the endpoint with, in one
@@ -38,6 +39,7 @@ spec:
       remoteRef:
         key: {{ .Values.backup.remoteKey | quote }}
         property: {{ .Values.backup.secretKeyProperty | quote }}
+{{- if .Values.backup.enabled }}
 ---
 apiVersion: barmancloud.cnpg.io/v1
 kind: ObjectStore
@@ -63,6 +65,45 @@ spec:
       compression: gzip
     data:
       compression: gzip
+{{- end }}
+{{- if .Values.recovery.enabled }}
+---
+# The same bucket, read only, for the server this Cluster recovers from.
+# Separate from the archiving store above rather than reusing it with a
+# different serverName parameter: the source's directory is one this
+# deployment must never write to, and an object carrying no retentionPolicy
+# and no archiver cannot. (Retention is in any case enforced only against the
+# serverName the Cluster archives under, never through an externalClusters
+# reference -- but that is an argument to follow, and this is a thing to look
+# at.)
+#
+# It reuses backup.endpointURL, backup.destinationPath and the Secret above:
+# one bucket, one key pair, two server directories inside it.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ printf "%s-origin" .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  configuration:
+    destinationPath: {{ .Values.backup.destinationPath | quote }}
+    endpointURL: {{ .Values.backup.endpointURL | quote }}
+    endpointCA:
+      name: {{ $secret | quote }}
+      key: {{ .Values.backup.caKey | quote }}
+    s3Credentials:
+      accessKeyId:
+        name: {{ $secret | quote }}
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: {{ $secret | quote }}
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+{{- end }}
+{{- if .Values.backup.enabled }}
 ---
 # Owned by the ScheduledBackup, so the Backup objects go when it goes. The data
 # in the bucket does not: the ObjectStore's retentionPolicy decides that.
@@ -80,4 +121,5 @@ spec:
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io
+{{- end }}
 {{- end }}

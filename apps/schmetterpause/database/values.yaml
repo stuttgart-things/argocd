@@ -62,6 +62,29 @@ backup:
   endpointURL: ""
   # s3://<bucket>/ -- the Cluster name becomes the server directory below it.
   destinationPath: ""
+  # Archive under this name instead of the Cluster name. Empty is right for a
+  # Cluster that was created empty and has always owned its path.
+  #
+  # It exists for the rebuild: a Cluster recovered from another server's
+  # backups keeps the old Cluster name (the app's SP_DATABASE_URL points at
+  # <name>-rw), so without this it would archive into the very path it is
+  # replaying from. Measured on homerun2-test1 on 2026-09-16, the plugin does
+  # not let that corrupt anything -- barman-cloud-check-wal-archive refuses a
+  # non-empty archive ("Expected empty archive") before the first segment
+  # goes. The failure is quieter and slower: the rebuilt database comes up
+  # healthy, serves the office, and never archives a byte, while unarchivable
+  # WAL piles up on its volume. Setting this gives it a directory of its own
+  # inside the same bucket, and archiving simply works.
+  #
+  # Unset, the plugin archives under the Cluster NAME -- so what has to differ
+  # from recovery.sourceServerName is the name actually archived under, which
+  # is this when set and the Cluster name otherwise. The chart refuses to
+  # render a Cluster that would archive as the server it recovers from, and
+  # a rebuild that renames the Cluster needs nothing here at all.
+  #
+  # Changing it on a running Cluster starts a new path, and the old one keeps
+  # whatever it already holds until its retention expires it.
+  serverName: ""
   retentionPolicy: 30d
   # Six fields, seconds first: CloudNativePG's cron format, not the usual five.
   schedule: "0 0 3 * * *"
@@ -81,6 +104,40 @@ backup:
   # is a ConfigMap -- the ExternalSecret copies it in and follows rotations.
   caConfigMap: cluster-trust-bundle
   caKey: trust-bundle.pem
+
+# Bring this Cluster up from another server's backups instead of creating an
+# empty database. OFF by default, and it is the switch a rebuild is made of:
+# with it off, a cluster rebuilt from git comes back with an empty ranking and
+# the first person who joins starts a second one.
+#
+# It needs the object store coordinates under backup.* -- endpointURL,
+# destinationPath, remoteKey and secretStore -- because it reads that bucket
+# through a second, read-only ObjectStore (<name>-origin). It does NOT need
+# backup.enabled, and the two switches answer different questions:
+#
+#   backup on,  recovery on   the rebuild: comes back with the data AND keeps
+#                             backing itself up, under its own serverName
+#   backup off, recovery on   a probe: comes back with the data and archives
+#                             NOWHERE -- no spec.plugins, no ScheduledBackup,
+#                             nothing that can write to the source's path.
+#                             This is the shape for asking "is the backup
+#                             still good", as opposed to rebuilding onto it.
+#
+# spec.bootstrap is read ONLY when the Cluster is created. Leaving this on
+# after the rebuild changes nothing on the running Cluster, which is why it is
+# safe to leave in a consumer file -- but the next rebuild then has to name
+# the CURRENT server (backup.serverName) as its source, not the one before it.
+recovery:
+  enabled: false
+  # Which server's backups to replay: the directory inside destinationPath,
+  # i.e. the name the source Cluster archived under. That is the source's
+  # backup.serverName if it set one, and otherwise the source's Cluster name.
+  sourceServerName: schmetterpause-db
+  # Where to stop. Empty replays to the end of the archive and promotes.
+  # To prove one particular backup instead:
+  #   recoveryTarget: {backupID: "20260913T142609", targetImmediate: true}
+  # A moment in time needs targetTime and the WAL to reach it.
+  recoveryTarget: {}
 
 # Inert pass-through so the catalog verifier's probe values validate.
 destination: {}

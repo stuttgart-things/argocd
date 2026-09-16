@@ -133,6 +133,10 @@ database:
     enabled: false
     endpointURL: ""
     destinationPath: ""
+    # Server directory inside destinationPath. Empty means the Cluster name,
+    # and it is that effective name which must differ from
+    # recovery.sourceServerName -- see database.recovery below.
+    serverName: ""
     retentionPolicy: 30d
     schedule: "0 0 3 * * *"
     immediate: false
@@ -144,6 +148,23 @@ database:
     secretKeyProperty: secret_key
     caConfigMap: cluster-trust-bundle
     caKey: trust-bundle.pem
+  # Rebuild: bring the Cluster up from another server's backups instead of an
+  # empty database. Off by default. It reads that bucket through a second,
+  # read-only ObjectStore, so it needs the coordinates under database.backup
+  # (endpointURL, destinationPath, remoteKey, secretStore) -- but NOT
+  # database.backup.enabled. With backup off it recovers and archives nowhere,
+  # which is the restore-probe shape rather than the rebuild one.
+  #
+  # This is what a cluster lost and rebuilt from git needs. Without it the
+  # Application comes back healthy with an empty ranking. spec.bootstrap is
+  # read only at creation, so leaving it on afterwards changes nothing on the
+  # running Cluster -- but the next rebuild has to name the CURRENT
+  # backup.serverName as its source. Every field is explained in
+  # apps/schmetterpause/database/values.yaml.
+  recovery:
+    enabled: false
+    sourceServerName: schmetterpause-db
+    recoveryTarget: {}
 
 # PodMonitors for the app's /metrics and the database's exporter, plus alert
 # rules (app, database, and — with database.backup.enabled — WAL archiving and

@@ -145,6 +145,53 @@ kubectl -n schmetterpause get cluster schmetterpause-db \
 kubectl -n schmetterpause get backups.postgresql.cnpg.io                          # a completed one
 ```
 
+## Rebuilding from the backups
+
+`database.recovery` bootstraps the Cluster from another server's backups instead of creating an empty database. It is what a lost cluster needs: without it a rebuild from git brings the app back healthy, `/readyz` answering, and the ranking empty — and the first person who joins starts a second one. Off by default.
+
+```yaml
+        database:
+          backup:
+            enabled: true
+            endpointURL: https://artifacts.example.com
+            destinationPath: s3://schmetterpause-cnpg/
+            remoteKey: schmetterpause-backup
+            # Where the REBUILT server archives. Anything but the source.
+            serverName: schmetterpause-db-r1
+          recovery:
+            enabled: true
+            # Where it reads from: the directory the lost server archived into.
+            sourceServerName: schmetterpause-db
+```
+
+That renders `bootstrap.recovery` against a second, read-only `ObjectStore` (`<name>-origin`) on the same bucket and key pair, and puts `serverName` on the Cluster's archiver so the rebuilt server writes somewhere new.
+
+**The name it archives under must differ from the one it recovers from, and the chart refuses to render if it does not.** That is `backup.serverName` when set and the Cluster name otherwise — so a rebuild that renames the Cluster needs no `serverName` at all, and one that keeps the name needs one. A Cluster recovered under the old name would otherwise archive into the very path it replays from. That does not corrupt the archive — measured on `homerun2-test1` on 2026-09-16, `barman-cloud-check-wal-archive` refuses a non-empty path outright (`Expected empty archive`) and `ContinuousArchiving` goes `False` before a single segment is written. It fails the other way instead, and more quietly: the rebuilt database is `Cluster in healthy state`, serves the office, and never backs itself up, while WAL PostgreSQL may not recycle accumulates on the volume. `SchmetterpauseWALArchivingFailing` catches it after 15 minutes — its expression holds because `cnpg_pg_stat_archiver_last_archived_time` reports `-1` rather than going absent on a server that has never archived. `recovery.enabled` needs the object store coordinates under `backup.*` — `endpointURL`, `destinationPath`, `remoteKey`, `secretStore` — because it reads that bucket; it does not need `backup.enabled`. The schema catches missing coordinates, `templates/cluster.yaml` catches the collision.
+
+**`spec.bootstrap` is read only when the Cluster is created.** Switching this on for a Cluster that already exists does nothing, and neither does leaving it on after the rebuild — which is why it is safe in a consumer file. The catch is the next rebuild: its source is then the *current* `backup.serverName`, not the one before it.
+
+**The two switches answer different questions**, and `backup` off with `recovery` on is the second one:
+
+| `backup` | `recovery` | What you get |
+| --- | --- | --- |
+| off | off | an empty database |
+| on | off | an empty database that backs itself up |
+| on | on | **the rebuild** — the data back, still backing itself up, under its own `serverName` |
+| off | on | **a restore probe** — the data back, archiving nowhere: no `spec.plugins`, no `ScheduledBackup`, nothing that can write to the source's path |
+
+The probe is the shape for asking *is the backup still good*, as opposed to rebuilding onto it. It renders what schmetterpause's `docs/backup-restore.md` used to require by hand. Destroy it when the counts have been compared; its namespace takes the volume with it.
+
+**It worked when the Cluster is `Cluster in healthy state` and archiving under the new name:**
+
+```bash
+kubectl -n schmetterpause get cluster schmetterpause-db \
+  -o jsonpath='{.spec.plugins[0].parameters.serverName}{"\n"}'          # the NEW name
+kubectl -n schmetterpause exec schmetterpause-db-1 -c postgres -- psql -tAc \
+  "select archived_count, failed_count, last_archived_wal from pg_stat_archiver"
+```
+
+Then take a Backup by hand and wait for phase `completed`: a rebuilt database that cannot back itself up has moved the problem, not solved it.
+
 ## Monitoring
 
 `monitoring.enabled` renders `apps/schmetterpause/monitoring` as its own Application at sync-wave 5. Off by default: its `PodMonitor`s, `ServiceMonitor` and `PrometheusRule` need the Prometheus Operator CRDs on the target cluster — `infra/kube-prometheus-stack`, or on clusterbook clusters the `observability-platform` label — and without them the Application does not sync.

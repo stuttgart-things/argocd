@@ -272,6 +272,10 @@
             "destinationPath": {
               "type": "string"
             },
+            "serverName": {
+              "type": "string",
+              "description": "Server directory inside destinationPath. Empty means the Cluster name; that effective name must differ from recovery.sourceServerName."
+            },
             "retentionPolicy": {
               "type": "string",
               "pattern": "^[1-9][0-9]*[dwm]$"
@@ -318,6 +322,23 @@
             "caKey": {
               "type": "string",
               "minLength": 1
+            }
+          }
+        },
+        "recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Passed to apps/schmetterpause/database, which validates it. Bootstraps the Cluster from another server's backups instead of initdb. Needs the object store coordinates under backup.* but not backup.enabled; with backup off the Cluster recovers and archives nowhere.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "sourceServerName": {
+              "type": "string"
+            },
+            "recoveryTarget": {
+              "type": "object",
+              "additionalProperties": true
             }
           }
         }
