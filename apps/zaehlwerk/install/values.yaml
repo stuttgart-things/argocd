@@ -121,14 +121,24 @@ allowedOrigins: ""
 # is empty -- and then zaehlwerk scores and shows a match exactly as before,
 # reported nowhere, which ADR-0004 keeps as a first-class way to run.
 schmetterpause:
-  # Base URL of the schmetterpause instance. In-cluster where both run on one
-  # cluster -- http://schmetterpause.schmetterpause.svc -- so the token never
-  # crosses the gateway.
+  # Base URL of the schmetterpause instance. The HTTPRoute is the default way
+  # to reach it -- https://schmetterpause.<cluster domain> -- which is the path a
+  # browser takes, TLS end to end. The in-cluster Service
+  # (http://schmetterpause.schmetterpause.svc) works as well where both run on
+  # one cluster.
+  #
+  # The HTTPRoute needs zaehlwerk >= v0.4.2. Its gateway certificate is signed
+  # by the cluster's internal CA, and only from v0.4.2 on does zaehlwerk mount
+  # the trust-manager bundle and trust it; before that every call fails with
+  # "x509: certificate signed by unknown authority" while the pod looks healthy.
   url: ""
-  # Its OWN Vault entry, holding the same value as schmetterpause's
-  # scoreboard token. Required once url is set; the chart refuses to render
-  # without it rather than addressing an entry that happens to exist.
-  vaultPath: zaehlwerk-schmetterpause
+  # The token is the one schmetterpause already holds for its /api
+  # (schmetterpause-scoreboard), read directly rather than copied: one secret
+  # shared by both sides has one copy, and rotating it updates both. That
+  # assumes secretStore reaches schmetterpause's mount, as vault-schmetterpause
+  # does on homerun2-test1. Required once url is set; the chart refuses to
+  # render without it rather than addressing an entry that happens to exist.
+  vaultPath: schmetterpause-scoreboard
   vaultProperty: token
 
 panel:
