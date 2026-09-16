@@ -134,14 +134,24 @@ Two things on the homerun2 side have to agree with it, and neither fails loudly:
 
 ```yaml
         schmetterpause:
-          url: http://schmetterpause.schmetterpause.svc   # in-cluster: the token never crosses the gateway
-          vaultPath: zaehlwerk-schmetterpause              # its own entry
+          url: https://schmetterpause.<cluster domain>   # the HTTPRoute, the default way
+          vaultPath: schmetterpause-scoreboard           # the one shared copy
           vaultProperty: token
 ```
 
+**Both addresses work; the HTTPRoute is the default.** It is the path a browser
+takes, TLS end to end. The in-cluster Service,
+`http://schmetterpause.schmetterpause.svc`, works too where both run on one
+cluster.
+
 **One switch, on the URL.** A URL without the token is a `401` on every call, and a token without the URL is never read, so the chart does not offer them separately.
 
-**Needs zaehlwerk v0.4.1 or newer.** v0.4.0 fetched the token into the Secret and no container read it — `deploy.k` names secret keys one at a time and the token was missing from that list. Against v0.4.0's base this switch produces a Secret holding the token and a pod that sends none, and nothing goes red. Move the pin with the switch.
+**Needs zaehlwerk v0.5.0 or newer for the HTTPRoute, v0.4.1 for in-cluster.** Two releases each fixed a way this fails silently, with a healthy pod and a coupling that logs itself enabled:
+
+- **v0.4.0** fetched the token into the Secret and no container read it — `deploy.k` names secret keys one at a time and the token was missing from that list.
+- **v0.4.1** reads the token but cannot verify the gateway: its certificate is signed by the cluster's internal CA, the image carries only public roots, and every call over the HTTPRoute fails with `x509: certificate signed by unknown authority`. v0.5.0 mounts trust-manager's `cluster-trust-bundle` and trusts it.
+
+Move the pin with the switch.
 
 **The token is appended, not rendered in the published base.** The base is shared, and ESO fails a whole `ExternalSecret` over one missing property: rendered there, every environment would lose its panel token over a Vault key it never asked for.
 
