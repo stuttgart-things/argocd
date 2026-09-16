@@ -25,7 +25,11 @@ spec:
         ACCESS_KEY_ID: {{ "{{ .access_key }}" | quote }}
         ACCESS_SECRET_KEY: {{ "{{ .secret_key }}" | quote }}
       templateFrom:
-        - configMap:
+        {{- /* `target: Data` is the CRD default, written out: templateFrom is
+               an atomic list, and a defaulted field inside an item keeps Argo
+               OutOfSync forever (see `enabled` in cluster.yaml). */}}
+        - target: Data
+          configMap:
             name: {{ .Values.backup.caConfigMap | quote }}
             items:
               - key: {{ .Values.backup.caKey | quote }}
