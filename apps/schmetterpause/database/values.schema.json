@@ -103,6 +103,10 @@
         "destinationPath": {
           "type": "string"
         },
+        "serverName": {
+          "type": "string",
+          "description": "Server directory inside destinationPath. Empty means the Cluster name. Required, and required to differ from recovery.sourceServerName, when recovery is on."
+        },
         "retentionPolicy": {
           "type": "string",
           "pattern": "^[1-9][0-9]*[dwm]$"
@@ -188,6 +192,83 @@
                 "minLength": 1
               }
             }
+          }
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Bootstrap this Cluster from another server's backups instead of initdb. Needs backup.enabled; spec.bootstrap is read only at creation.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "sourceServerName": {
+          "type": "string",
+          "description": "The server directory to replay from: the source's backup.serverName, or its Cluster name if it set none."
+        },
+        "recoveryTarget": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "CNPG recoveryTarget, passed through. Empty replays to the end of the archive."
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "sourceServerName"
+        ],
+        "properties": {
+          "sourceServerName": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "if": {
+    "properties": {
+      "recovery": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      }
+    },
+    "required": [
+      "recovery"
+    ]
+  },
+  "then": {
+    "required": [
+      "backup"
+    ],
+    "properties": {
+      "backup": {
+        "required": [
+          "enabled",
+          "serverName"
+        ],
+        "properties": {
+          "enabled": {
+            "const": true
+          },
+          "serverName": {
+            "minLength": 1
           }
         }
       }

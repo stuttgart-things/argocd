@@ -1,3 +1,13 @@
+{{- $recovery := .Values.recovery | default dict }}
+{{- $serverName := .Values.backup.serverName | default "" }}
+{{- if $recovery.enabled }}
+{{- if not .Values.backup.enabled }}
+{{- fail "recovery.enabled needs backup.enabled: the object store to recover from is configured under backup.*" }}
+{{- end }}
+{{- if eq $serverName ($recovery.sourceServerName | default "") }}
+{{- fail (printf "backup.serverName (%q) must differ from recovery.sourceServerName: a rebuilt Cluster archiving into its source's path corrupts both timelines" $serverName) }}
+{{- end }}
+{{- end }}
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -36,8 +46,25 @@ spec:
       isWALArchiver: true
       parameters:
         barmanObjectName: {{ .Values.name | quote }}
+        {{- with $serverName }}
+        # The directory inside the bucket this Cluster archives into. Unset,
+        # the plugin uses the Cluster name — which is why a Cluster rebuilt
+        # under the old name would write into the old server's WAL. Set here,
+        # archiving starts a path of its own.
+        serverName: {{ . | quote }}
+        {{- end }}
   {{- end }}
   bootstrap:
+  {{- if $recovery.enabled }}
+    # Read only at creation. On a Cluster that already exists this changes
+    # nothing — including after the rebuild it was switched on for.
+    recovery:
+      source: origin
+      {{- with $recovery.recoveryTarget }}
+      recoveryTarget:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- else }}
     initdb:
       database: {{ .Values.bootstrap.database | quote }}
       owner: {{ .Values.bootstrap.owner | quote }}
@@ -46,3 +73,15 @@ spec:
       localeCType: {{ .Values.bootstrap.localeCType | quote }}
       secret:
         name: {{ .Values.bootstrap.secretName | quote }}
+  {{- end }}
+  {{- if $recovery.enabled }}
+  # The server to replay from, through the read-only ObjectStore in
+  # templates/backup.yaml. Reading only: nothing here can write to that path.
+  externalClusters:
+    - name: origin
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: {{ printf "%s-origin" .Values.name | quote }}
+          serverName: {{ $recovery.sourceServerName | quote }}
+  {{- end }}

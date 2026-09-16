@@ -62,6 +62,19 @@ backup:
   endpointURL: ""
   # s3://<bucket>/ -- the Cluster name becomes the server directory below it.
   destinationPath: ""
+  # Archive under this name instead of the Cluster name. Empty is right for a
+  # Cluster that was created empty and has always owned its path.
+  #
+  # It exists for the rebuild: a Cluster recovered from another server's
+  # backups keeps the old Cluster name (the app's SP_DATABASE_URL points at
+  # <name>-rw), so without this it would archive into the very path it is
+  # replaying from, and the two timelines would corrupt each other. Setting it
+  # gives the rebuilt server a directory of its own inside the same bucket.
+  #
+  # Required, and required to differ from recovery.sourceServerName, whenever
+  # recovery is on. Changing it on a running Cluster starts a new path, and
+  # the old one keeps whatever it already holds until its retention expires it.
+  serverName: ""
   retentionPolicy: 30d
   # Six fields, seconds first: CloudNativePG's cron format, not the usual five.
   schedule: "0 0 3 * * *"
@@ -81,6 +94,31 @@ backup:
   # is a ConfigMap -- the ExternalSecret copies it in and follows rotations.
   caConfigMap: cluster-trust-bundle
   caKey: trust-bundle.pem
+
+# Bring this Cluster up from another server's backups instead of creating an
+# empty database. OFF by default, and it is the switch a rebuild is made of:
+# with it off, a cluster rebuilt from git comes back with an empty ranking and
+# the first person who joins starts a second one.
+#
+# It needs backup.enabled -- the bucket, the endpoint and the key pair are all
+# configured there, and this reads the same ones through a second, read-only
+# ObjectStore (<name>-origin).
+#
+# spec.bootstrap is read ONLY when the Cluster is created. Leaving this on
+# after the rebuild changes nothing on the running Cluster, which is why it is
+# safe to leave in a consumer file -- but the next rebuild then has to name
+# the CURRENT server (backup.serverName) as its source, not the one before it.
+recovery:
+  enabled: false
+  # Which server's backups to replay: the directory inside destinationPath,
+  # i.e. the name the source Cluster archived under. That is the source's
+  # backup.serverName if it set one, and otherwise the source's Cluster name.
+  sourceServerName: schmetterpause-db
+  # Where to stop. Empty replays to the end of the archive and promotes.
+  # To prove one particular backup instead:
+  #   recoveryTarget: {backupID: "20260913T142609", targetImmediate: true}
+  # A moment in time needs targetTime and the WAL to reach it.
+  recoveryTarget: {}
 
 # Inert pass-through so the catalog verifier's probe values validate.
 destination: {}

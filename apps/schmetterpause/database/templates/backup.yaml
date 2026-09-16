@@ -63,6 +63,43 @@ spec:
       compression: gzip
     data:
       compression: gzip
+{{- if .Values.recovery.enabled }}
+---
+# The same bucket, read only, for the server this Cluster recovers from.
+# Separate from the archiving store above rather than reusing it with a
+# different serverName parameter: the source's directory is one this
+# deployment must never write to, and an object carrying no retentionPolicy
+# and no archiver cannot. (Retention is in any case enforced only against the
+# serverName the Cluster archives under, never through an externalClusters
+# reference -- but that is an argument to follow, and this is a thing to look
+# at.)
+#
+# It reuses backup.endpointURL, backup.destinationPath and the Secret above:
+# one bucket, one key pair, two server directories inside it.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ printf "%s-origin" .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  configuration:
+    destinationPath: {{ .Values.backup.destinationPath | quote }}
+    endpointURL: {{ .Values.backup.endpointURL | quote }}
+    endpointCA:
+      name: {{ $secret | quote }}
+      key: {{ .Values.backup.caKey | quote }}
+    s3Credentials:
+      accessKeyId:
+        name: {{ $secret | quote }}
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: {{ $secret | quote }}
+        key: ACCESS_SECRET_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+{{- end }}
 ---
 # Owned by the ScheduledBackup, so the Backup objects go when it goes. The data
 # in the bucket does not: the ObjectStore's retentionPolicy decides that.
