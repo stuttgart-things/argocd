@@ -214,13 +214,15 @@ Then take a Backup by hand and wait for phase `completed`: a rebuilt database th
 | `SchmetterpauseBackupTooOld` | warning | newest base backup older than `monitoring.backupMaxAgeHours` (26) |
 | `SchmetterpauseBackupFailed` | warning | a failed base backup newer than the last successful one |
 | `SchmetterpauseUnsignedImageAdmitted` | warning | the image-signature policy failed a verification in the last 15 min; the `resource_namespace` label says where |
-| `SchmetterpauseKyvernoMetricsDown` | warning | no healthy `kyverno-svc-metrics` target for 10 min, so the alert above cannot fire |
+| `SchmetterpauseSignatureCheckSkipped` | warning | the image-signature webhook failed and `failurePolicy: Ignore` admitted a pod **unchecked** in the last 15 min — not a refusal; the policy never ran |
+| `SchmetterpauseKyvernoMetricsDown` | warning | no healthy `kyverno-svc-metrics` target for 10 min, so `SchmetterpauseUnsignedImageAdmitted` cannot fire |
 
-The four WAL and backup alerts only exist with `database.backup.enabled`, and the two policy alerts only with `policy.enabled`. Four choices in them are deliberate:
+The four WAL and backup alerts only exist with `database.backup.enabled`, and the three policy alerts only with `policy.enabled`. Five choices in them are deliberate:
 
 - **Not "seconds since last archival".** With nobody writing, no WAL segment fills, and that number grows all night while everything is fine. A failure newer than the last success is the signal.
 - **The backup timestamps are the plugin's**, `barman_cloud_cloudnative_pg_io_*`. `cnpg_collector_last_available_backup_timestamp` stays 0 for plugin backups — an alert on it would fire forever.
 - **The first refusal is not missed.** Kyverno creates its result counter at the first evaluation, so the first refusal after a Kyverno restart is a new series already at 1, and `increase()` over a series with one sample is 0. The rule adds `x unless x offset 15m` for exactly that case, and filters the `increase()` half with `> 0`. `or` keeps a right-hand element only when no left-hand element has the same labels, so an `increase()` of 0 would hide it, and the alert would fire for one evaluation and resolve a minute later. It did exactly that on homerun2-test1 before the filter.
+- **A webhook that does not answer is its own alert.** `failurePolicy: Ignore` means that when Kyverno cannot be reached, the API server admits the pod without the signature being checked and the policy's own counters gain no sample — so the refusal alerts stay silent through exactly the window where nothing is being verified. `SchmetterpauseSignatureCheckSkipped` reads the API server's `apiserver_admission_webhook_fail_open_count` instead. `Ignore` is deliberate (stuttgart-things/schmetterpause#262): `Fail` would make a GHCR outage stop every schmetterpause pod, a rebuilt cluster's first pod included. This alert is what pays for that choice. Its name says what happened rather than what the policy did, so it survives the `Audit` → `Deny` flip; `SchmetterpauseUnsignedImageAdmitted` does not and has to be reworded with it.
 - **Kyverno is scraped here, not in the Kyverno install.** That install comes from the fleet-wide `platforms/security` AppSet at one catalog tag, where a `ServiceMonitor` would break Kyverno's sync on every cluster without the Prometheus Operator CRDs. This one keeps only the policy's series, so a platform-level scrape added later duplicates nothing else.
 
 Whether the site answers at all stays the blackbox probe's job from outside; these rules are the inside view.
@@ -230,7 +232,7 @@ Whether the site answers at all stays the blackbox probe's job from outside; the
           enabled: true
 ```
 
-**Restore** is a new Cluster bootstrapped from the object store, into an empty namespace — never an in-place overwrite: an `ExternalSecret` and `ObjectStore` like the ones above, then a `Cluster` with `bootstrap.recovery.source` naming an `externalClusters` entry that uses the plugin with `barmanObjectName` and `serverName: schmetterpause-db`. Set `storage.storageClass` explicitly, and give the restored Cluster **no** WAL archiver on the same `serverName` — two clusters archiving into one path corrupt each other's timeline.
+**Restore** is a new Cluster bootstrapped from the object store, into an empty namespace — never an in-place overwrite: an `ExternalSecret` and `ObjectStore` like the ones above, then a `Cluster` with `bootstrap.recovery.source` naming an `externalClusters` entry that uses the plugin with `barmanObjectName` and `serverName: schmetterpause-db`. Set `storage.storageClass` explicitly, and give the restored Cluster **no** WAL archiver on the same `serverName`. Not because the two would corrupt each other — measured on homerun2-test1 on 2026-09-16, the plugin refuses a non-empty archive outright — but because the restored Cluster would then never archive at all while reporting itself healthy. [Rebuilding from the backups](#rebuilding-from-the-backups) is the chart-rendered version of this.
 
 ## Admission policy
 

@@ -111,6 +111,59 @@ spec:
           annotations:
             summary: An image not signed by the schmetterpause CI workflow was admitted
             description: 'The Kyverno policy schmetterpause-verify-image-signature (Audit) found no signature from the schmetterpause CI workflow on an image admitted in the last 15 minutes. The resource_namespace label says where; kubectl -n that-namespace get policyreport names the pod. A server-side dry-run counts too.'
+        # The other way an unverified image gets in, and the one the policy's
+        # own results cannot show: the webhook did not answer at all.
+        #
+        # failurePolicy is Ignore, so when Kyverno cannot be reached -- it is
+        # restarting, its certificate expired, the registry holding the
+        # signature is unreachable, the 30s timeout elapses -- the API server
+        # admits the pod without the signature having been checked, and
+        # kyverno_image_validating_policy_results_total gains no sample at all.
+        # Nothing else here would say so.
+        #
+        # That hole is the price of Ignore, and Ignore is deliberate
+        # (schmetterpause#262, decided 2026-09-16): Fail would make a GHCR
+        # outage stop every schmetterpause pod, a rebuilt cluster's first pod
+        # included, which is a worse failure than the hole on a cluster the
+        # office plays on. This alert is what pays for it -- the hole is loud
+        # rather than silent.
+        #
+        # The name says what happened rather than what the policy did, so it
+        # stays true through the Audit -> Deny flip: a fail-open means admitted
+        # without a check in either mode. SchmetterpauseUnsignedImageAdmitted
+        # above does not have that property and has to be reworded with the
+        # flip.
+        #
+        # name is matched loosely on purpose. Kyverno composes the webhook as
+        # ivpol.validate.kyverno.svc-<failurePolicy>-finegrained-<policy>, so
+        # the exact string encodes the very setting this alert exists to cover
+        # and would stop matching if it ever changed.
+        #
+        # The counter comes from the API server. Whether it is scraped at all
+        # is the platform's KubeAPIDown and TargetDown, so there is no guard
+        # for it here -- unlike the Kyverno scrape below, which nothing else
+        # watches.
+        #
+        # Same first-sample handling as SchmetterpauseUnsignedImageAdmitted
+        # above, for the same reason and with the same reasoning: the series
+        # does not exist until the first fail-open, and increase() over a
+        # single sample is 0.
+        - alert: SchmetterpauseSignatureCheckSkipped
+          expr: |
+            sum(
+              (increase(apiserver_admission_webhook_fail_open_count{job="apiserver", name=~".*schmetterpause-verify-image-signature"}[15m]) > 0)
+              or
+              (
+                apiserver_admission_webhook_fail_open_count{job="apiserver", name=~".*schmetterpause-verify-image-signature"}
+                unless
+                apiserver_admission_webhook_fail_open_count{job="apiserver", name=~".*schmetterpause-verify-image-signature"} offset 15m
+              )
+            ) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: A pod was admitted without its image signature being checked
+            description: 'The image-signature admission webhook failed and failurePolicy is Ignore, so the API server admitted the pod unchecked in the last 15 minutes. This is not a refusal - the policy never ran. Start with Kyverno: kubectl -n kyverno get pods, and its logs for registry or certificate errors. kubectl -n schmetterpause get pods -o jsonpath to see which images are running.'
         # Without the scrape the alert above cannot fire, and a silent alert
         # looks exactly like nothing being wrong.
         - alert: SchmetterpauseKyvernoMetricsDown
