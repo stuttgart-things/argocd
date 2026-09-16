@@ -347,6 +347,39 @@
         "enabled"
       ]
     },
+    "scoreboard": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Appends SP_SCOREBOARD_TOKEN to the app's ExternalSecret so the Zaehlwerk's /api routes exist (schmetterpause ADR-0015). The Vault property must exist before this is enabled, or the whole app secret stops syncing.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "vaultPath": {
+          "type": "string",
+          "description": "Entry under the store's mount. Empty means the same one the app already reads."
+        },
+        "vaultProperty": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "vaultProperty"
+        ]
+      }
+    },
     "cascadingDelete": {
       "type": "boolean",
       "description": "Put a resources-finalizer on every rendered child Application, so deleting the parent prunes the workloads. True (the default) for preview environments; the platforms/ AppSets set it false, because for a long-lived install an opt-out should stop managing the stack rather than delete it, and a prune against a deregistered cluster hangs the children in Terminating (argocd#324)."

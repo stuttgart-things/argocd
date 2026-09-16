@@ -192,6 +192,23 @@ kubectl -n schmetterpause exec schmetterpause-db-1 -c postgres -- psql -tAc \
 
 Then take a Backup by hand and wait for phase `completed`: a rebuilt database that cannot back itself up has moved the problem, not solved it.
 
+## The Zählwerk's surface
+
+`scoreboard.enabled` appends `SP_SCOREBOARD_TOKEN` to the app's `ExternalSecret`, which is what makes `GET /api/players` and `POST /api/results` exist at all — without the variable the application registers neither route, so there is no half-on state to reach (schmetterpause ADR-0015).
+
+```yaml
+        scoreboard:
+          enabled: true
+          # vaultPath empty = the entry the app already reads
+          vaultProperty: scoreboard-token
+```
+
+**The Vault property has to exist before this is switched on.** ESO fails an `ExternalSecret` over one missing property and takes the whole secret with it — session key and database URL included, not just the new routes. That is also why this is an append here rather than a field in the published base: rendered there, *every* environment would need the property.
+
+```bash
+kubectl -n schmetterpause get externalsecret schmetterpause-app   # SecretSynced
+```
+
 ## Monitoring
 
 `monitoring.enabled` renders `apps/schmetterpause/monitoring` as its own Application at sync-wave 5. Off by default: its `PodMonitor`s, `ServiceMonitor` and `PrometheusRule` need the Prometheus Operator CRDs on the target cluster — `infra/kube-prometheus-stack`, or on clusterbook clusters the `observability-platform` label — and without them the Application does not sync.

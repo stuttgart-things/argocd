@@ -176,6 +176,30 @@ database:
 # It also needs a `version` of v0.8.0 or later — the release that added the
 # container port `metrics`; against an older one the app monitor finds nothing
 # and SchmetterpauseMetricsDown fires.
+# The Zählwerk's JSON surface: GET /api/players and POST /api/results, which a
+# counter at the table uses to hand a finished match over (schmetterpause
+# ADR-0015). Off by default.
+#
+# On means one more entry in the app's ExternalSecret, read from the same Vault
+# path as the session key. It is NOT in the published base: rendered there,
+# every environment would need a scoreboard-token property, and ESO fails the
+# whole secret over one missing property -- session key and database URL
+# included. So it is appended here by the environments that want it.
+#
+# The property has to exist in Vault BEFORE this is switched on, or the app's
+# secret stops syncing. Check with:
+#
+#   kubectl -n schmetterpause get externalsecret schmetterpause-app
+#
+# Without the variable the application registers neither route, so there is no
+# half-on state: unset means the surface does not exist.
+scoreboard:
+  enabled: false
+  # Entry under the store's mount. Empty uses the same one the app already
+  # reads, which is what a consumer normally wants.
+  vaultPath: ""
+  vaultProperty: scoreboard-token
+
 monitoring:
   enabled: false
   interval: 60s
