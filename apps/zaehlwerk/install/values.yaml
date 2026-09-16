@@ -52,7 +52,7 @@ syncPolicy:
 # shared images group and off auto-merge for exactly that reason.
 #
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
-version: v0.3.0
+version: v0.5.0
 
 # FQDN the scoreboard is served on, patched into the HTTPRoute. The base ships
 # zaehlwerk.cluster.example.com.
