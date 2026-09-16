@@ -3,9 +3,31 @@
 # placeholders — the rendered manifest is non-functional until a consumer
 # overrides them. Real values are cluster- and KV-path-specific.
 
-# Name of the rendered ClusterSecretStore. ExternalSecrets reference this name
-# via spec.secretStoreRef.name. Pick a stable name per (cluster, Vault KV path)
-# pair — e.g. "vault-homerun2-pr".
+# The KV mounts this cluster opens — one ClusterSecretStore each, named
+# `<namePrefix><mount>`. This is the form the ApplicationSet in
+# platforms/security uses: it reads the mounts off the cluster Secret's
+# `external-secrets.stuttgart-things.com/kv-mounts` annotation, which is a
+# comma-separated string, so a string is accepted here as well as a list:
+#
+#   mounts: [homerun2-pr, schmetterpause, observability]
+#   mounts: "homerun2-pr,schmetterpause,observability"
+#
+# An entry may also be `{mount: <kv-mount>, name: <store name>}` when the store
+# has to be called something else.
+#
+# Empty keeps the single-store behaviour below, which the hand-written
+# per-cluster Applications still use.
+mounts: []
+
+# Prefix for the generated store names. `observability` becomes
+# `vault-observability` — the name the cluster's
+# `observability-platform.stuttgart-things.com/secret-store` annotation already
+# points at, so the AppSet-rendered store replaces the hand-written one under
+# the same name.
+namePrefix: vault-
+
+# Single-store mode: name and mount of ONE store, used only when `mounts` is
+# empty. ExternalSecrets reference this name via spec.secretStoreRef.name.
 name: example-vault-store
 
 # Vault server URL.

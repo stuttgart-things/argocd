@@ -3,42 +3,140 @@
   "title": "external-secrets-cluster-secret-store-vault chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "server", "path", "auth"],
+  "required": [
+    "server",
+    "auth"
+  ],
   "properties": {
-    "name":    { "type": "string", "minLength": 1 },
-    "server":  { "type": "string", "format": "uri" },
-    "path":    { "type": "string", "minLength": 1 },
-    "version": { "type": "string", "enum": ["v1", "v2"] },
+    "mounts": {
+      "description": "KV mounts to render a store for; a list, or the comma-separated string the cluster annotation carries. Empty falls back to name+path.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mount"
+                ],
+                "properties": {
+                  "mount": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "namePrefix": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "server": {
+      "type": "string",
+      "format": "uri"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "enum": [
+        "v1",
+        "v2"
+      ]
+    },
     "caProvider": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "name", "namespace", "key"],
+      "required": [
+        "type",
+        "name",
+        "namespace",
+        "key"
+      ],
       "properties": {
-        "type":      { "type": "string", "enum": ["Secret", "ConfigMap"] },
-        "name":      { "type": "string", "minLength": 1 },
-        "namespace": { "type": "string", "minLength": 1 },
-        "key":       { "type": "string", "minLength": 1 }
+        "type": {
+          "type": "string",
+          "enum": [
+            "Secret",
+            "ConfigMap"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "auth": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kubernetes"],
+      "required": [
+        "kubernetes"
+      ],
       "properties": {
         "kubernetes": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["mountPath", "role", "serviceAccountRef"],
+          "required": [
+            "mountPath",
+            "role",
+            "serviceAccountRef"
+          ],
           "properties": {
-            "mountPath": { "type": "string", "minLength": 1 },
-            "role":      { "type": "string", "minLength": 1 },
+            "mountPath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1
+            },
             "serviceAccountRef": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name", "namespace"],
+              "required": [
+                "name",
+                "namespace"
+              ],
               "properties": {
-                "name":      { "type": "string", "minLength": 1 },
-                "namespace": { "type": "string", "minLength": 1 }
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1
+                }
               }
             }
           }
