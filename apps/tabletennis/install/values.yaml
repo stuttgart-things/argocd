@@ -79,7 +79,39 @@ schmetterpause:
   namespace: schmetterpause
   hostname: ""                       # empty = schmetterpause.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-  version: v0.9.0
+  version: v0.11.0
+  # Display name of the player who gets the admin flag at every start
+  # (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing, which is
+  # the normal state after the first pass: the person has to have joined
+  # already, so a name nobody carries is a warning in the log rather than a
+  # failed start. Not a secret — it grants nothing without that player's PIN.
+  bootstrapAdmin: ""
+  # schmetterpause's JSON surface for a counter at the table: GET /api/players
+  # and POST /api/results (schmetterpause ADR-0015). Off by default.
+  #
+  # THIS IS ALSO THE SWITCH FOR THE HANDOVER. With `zaehlwerk.handover` left on,
+  # turning this on wires zaehlwerk's SCHMETTERPAUSE_URL at the same time, so the
+  # two sides of one feature cannot be half-configured — see `zaehlwerk.handover`
+  # below.
+  #
+  # The property has to exist in Vault BEFORE this goes on: ESO fails the app's
+  # WHOLE ExternalSecret over one missing property, session key included.
+  # Its own entry rather than the app's, because vault-base-setup rewrites an
+  # entry whole — apps/schmetterpause/install's values.yaml has the long form.
+  scoreboard:
+    enabled: false
+    vaultPath: schmetterpause-scoreboard
+    vaultProperty: token
+  # Kyverno admission policy: the app image must carry a keyless signature from
+  # schmetterpause's CI (ADR-0020/0021), read from the schmetterpause repository
+  # at the same tag as `version`. Audit mode — an unsigned image still starts and
+  # the refusal is a PolicyReport. Off by default: it needs Kyverno serving
+  # policies.kyverno.io/v1 on the target cluster.
+  #
+  # The policy is CLUSTER-SCOPED. Enable it in one consumer per cluster, or two
+  # Applications fight over the same object.
+  policy:
+    enabled: false
   # Anything else from apps/schmetterpause/install's values, merged on top of
   # what this chart computes (and winning over it). Its own schema validates the
   # result, so the knobs are documented there rather than repeated here.
@@ -98,7 +130,31 @@ zaehlwerk:
   namespace: zaehlwerk
   hostname: ""                       # empty = zaehlwerk.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
-  version: v0.3.0
+  version: v0.5.0
+  # The handover to schmetterpause: a won match goes to its POST /api/results and
+  # the scoring page offers its real players (zaehlwerk ADR-0004,
+  # schmetterpause ADR-0015).
+  #
+  # ON BY DEFAULT, AND THAT DOES NOTHING ON ITS OWN. It only has an effect once
+  # `schmetterpause.scoreboard.enabled` is true, because that is what makes the
+  # receiving surface exist — without it every call would come back 404. So this
+  # is a way to say "wire the two together when both are here", and one switch
+  # above turns the feature on end to end.
+  #
+  # What it derives: the URL from schmetterpause's own hostname over the
+  # HTTPRoute (https://schmetterpause.<domain>, or `schmetterpause.hostname`),
+  # and the SAME Vault entry the scoreboard token comes from — one credential
+  # read by both sides rather than a copy that has to be rotated twice.
+  #
+  # NEEDS zaehlwerk >= v0.5.0. The gateway certificate is signed by the cluster's
+  # internal CA, and only from v0.5.0 does zaehlwerk mount the trust-manager
+  # bundle and trust it; before that every call fails with "x509: certificate
+  # signed by unknown authority" while the pod looks healthy.
+  #
+  # Set it to false to keep zaehlwerk scoring and reporting nowhere on a cluster
+  # whose schmetterpause serves other tables — ADR-0004 keeps that a first-class
+  # way to run.
+  handover: true
   # Browser origins allowed to read the live match stream. schmetterpause's
   # origin belongs here once its live tab exists; upstream refuses the `*`
   # wildcard, and empty means none.

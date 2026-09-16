@@ -11,6 +11,24 @@
 {{- if and .Values.zaehlwerk.panel .Values.homerun2.namespace }}
 {{- $panel = dict "homerun2Namespace" .Values.homerun2.namespace }}
 {{- end }}
+{{- /* The handover to schmetterpause (zaehlwerk ADR-0004, schmetterpause
+       ADR-0015). Derived rather than configured, because this chart already
+       knows both halves and they have to agree:
+
+         url   schmetterpause's own hostname, the one its HTTPRoute serves
+         token the SAME Vault entry the scoreboard token comes from
+
+       Gated on `schmetterpause.scoreboard.enabled` and not on `handover` alone:
+       the URL without the receiving surface is a 404 per finished match, and
+       upstream reads the URL as the on-switch. So a platform turns the feature
+       on in ONE place and both sides move together. */}}
+{{- $handover := dict }}
+{{- if and .Values.zaehlwerk.handover .Values.schmetterpause.enabled .Values.schmetterpause.scoreboard.enabled }}
+{{- $handover = dict
+      "url"           (printf "https://%s" (include "tabletennis.hostname" (dict "root" . "name" "schmetterpause")))
+      "vaultPath"     .Values.schmetterpause.scoreboard.vaultPath
+      "vaultProperty" .Values.schmetterpause.scoreboard.vaultProperty }}
+{{- end }}
 {{- /* `cascadingDelete` is threaded into the sub-chart too: an opt-out at
        the platform level has to reach the leaves, or the children this
        sub-chart renders keep their finalizers and hang in Terminating
@@ -30,6 +48,7 @@
       "secretStore"     (dict "kind" .Values.secretStore.kind "name" .Values.secretStore.name)
       "allowedOrigins"  .Values.zaehlwerk.allowedOrigins
       "panel"           $panel
+      "schmetterpause"  $handover
 }}
 {{- if .Values.destination.name }}
 {{- $_ := set (index $computed "destination") "name" .Values.destination.name }}

@@ -152,6 +152,39 @@
           "type": "string",
           "minLength": 1
         },
+        "bootstrapAdmin": {
+          "type": "string",
+          "description": "Display name that gets the admin flag at every start (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing; the player has to have joined already."
+        },
+        "scoreboard": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "schmetterpause's JSON surface for a counter at the table (GET /api/players, POST /api/results, ADR-0015). Also the switch for zaehlwerk.handover. The Vault property must exist before this goes on: ESO fails the whole app secret over one missing property.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "vaultPath": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Entry under the store's mount. Its OWN entry, not the app's \u2014 vault-base-setup rewrites an entry whole."
+            },
+            "vaultProperty": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Kyverno admission policy checking the app image's keyless signature (ADR-0020/0021), read from the schmetterpause repository at the same tag as `version`. Audit mode. Needs Kyverno serving policies.kyverno.io/v1; the policy is cluster-scoped, so enable it in one consumer per cluster.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
         "values": {
           "type": "object",
           "additionalProperties": true,
@@ -189,6 +222,10 @@
         "panel": {
           "type": "boolean",
           "description": "Wire the scoreboard panel from homerun2.namespace. False runs zaehlwerk without one even where homerun2 is present."
+        },
+        "handover": {
+          "type": "boolean",
+          "description": "Wire zaehlwerk's SCHMETTERPAUSE_URL and token when schmetterpause.scoreboard.enabled is on. No effect on its own \u2014 the scoreboard switch is what makes the receiving surface exist. Needs zaehlwerk >= v0.5.0, which is the first tag that trusts the cluster CA over the HTTPRoute."
         },
         "values": {
           "type": "object",

@@ -159,14 +159,18 @@ replaces the whole file.
           namespace: homerun2
         schmetterpause:
           enabled: true
-          version: v0.8.0
+          version: v0.11.0
+          bootstrapAdmin: timoboll
+          # Turns on schmetterpause's /api AND wires zaehlwerk to it — see below.
+          scoreboard:
+            enabled: true
           values:
             database:
               storage: { size: 8Gi, storageClass: openebs-hostpath }
               protect: true
         zaehlwerk:
           enabled: true
-          version: v0.3.0
+          version: v0.5.0
         lightCatcher:
           enabled: true
           wledEndpoint: http://wled-tt.lan
@@ -185,9 +189,18 @@ Hostnames come out as `schmetterpause.tabletennis.sthings.lab` and
 | The pair | `apps/tabletennis/profiles/base` (a kustomize component list) | one app-of-apps chart delegating to two catalog entries |
 | Panel on/off | two components (`zaehlwerk-panel-homerun2` / `-off`), because an empty Flux substitution renders as YAML `null` and fails the whole apps layer | `zaehlwerk.panel` + `homerun2.namespace` — Helm can express "absent" |
 | The tabletennis light-catcher | a homerun2 platform component (`apps/platform/components/homerun2-light-catcher-tabletennis`) | part of this platform, since it exists for the table |
-| DB backups | a component of its own (`schmetterpause-db-backup`) | `schmetterpause.values.database.backup` |
-| Monitoring | not present | `schmetterpause.values.monitoring` |
+| DB backups | a component of its own (`schmetterpause-db-backup`), selected as the alternative bundle `tabletennis-backup` | `schmetterpause.values.database.backup` |
+| Monitoring | three components (`schmetterpause-monitoring-off` / `-on` / `-backup`) | `schmetterpause.values.monitoring` |
+| The scoreboard token | a component pair (`schmetterpause-scoreboard-off` / `-on`), because ESO fails the whole app secret over one missing Vault property | `schmetterpause.scoreboard.enabled` |
+| The handover | a component pair (`zaehlwerk-handover-off` / `-on`), wired from the same variables | derived from `schmetterpause.scoreboard.enabled` + `zaehlwerk.handover` |
+| The image-signature policy | a component pair (`schmetterpause-policy-off` / `-on`) reading the schmetterpause repo through a `GitRepository` | `schmetterpause.policy.enabled`, a git Application at the same tag |
+| The bootstrap admin | `TABLETENNIS_SCHMETTERPAUSE_BOOTSTRAP_ADMIN` — a plain substitution, since empty means "none" to the app | `schmetterpause.bootstrapAdmin` |
 | omni-pitcher routing | a default `routes.yaml` in the homerun2 base | set on homerun2's `routesContent` — see above |
+
+Both paths reach the same end state: schmetterpause at the pinned tag with its database,
+zaehlwerk beside it, the handover between them, and homerun2 carrying the panel. What
+differs is only how an on/off switch is spelled — a kustomize component there, a value
+here — because an empty Flux substitution cannot express "absent".
 
 ## Related
 

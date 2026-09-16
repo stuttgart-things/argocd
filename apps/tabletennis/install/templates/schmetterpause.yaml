@@ -21,6 +21,12 @@
                           "sectionNameHTTPS" .Values.gateway.sectionNameHTTPS
                           "sectionNameHTTP"  .Values.gateway.sectionNameHTTP)
       "secretStore"     (dict "kind" .Values.secretStore.kind "name" .Values.secretStore.name)
+      "bootstrapAdmin"  .Values.schmetterpause.bootstrapAdmin
+      "scoreboard"      (dict
+                          "enabled"       .Values.schmetterpause.scoreboard.enabled
+                          "vaultPath"     .Values.schmetterpause.scoreboard.vaultPath
+                          "vaultProperty" .Values.schmetterpause.scoreboard.vaultProperty)
+      "policy"          (dict "enabled" .Values.schmetterpause.policy.enabled)
 }}
 {{- /* The sub-chart's destination takes `server` or `name`, same as ours. */}}
 {{- if .Values.destination.name }}
