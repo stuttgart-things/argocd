@@ -127,8 +127,8 @@ schmetterpause:
   # (http://schmetterpause.schmetterpause.svc) works as well where both run on
   # one cluster.
   #
-  # The HTTPRoute needs zaehlwerk >= v0.4.2. Its gateway certificate is signed
-  # by the cluster's internal CA, and only from v0.4.2 on does zaehlwerk mount
+  # The HTTPRoute needs zaehlwerk >= v0.5.0. Its gateway certificate is signed
+  # by the cluster's internal CA, and only from v0.5.0 on does zaehlwerk mount
   # the trust-manager bundle and trust it; before that every call fails with
   # "x509: certificate signed by unknown authority" while the pod looks healthy.
   url: ""

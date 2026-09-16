@@ -146,10 +146,10 @@ cluster.
 
 **One switch, on the URL.** A URL without the token is a `401` on every call, and a token without the URL is never read, so the chart does not offer them separately.
 
-**Needs zaehlwerk v0.4.2 or newer for the HTTPRoute, v0.4.1 for in-cluster.** Two releases each fixed a way this fails silently, with a healthy pod and a coupling that logs itself enabled:
+**Needs zaehlwerk v0.5.0 or newer for the HTTPRoute, v0.4.1 for in-cluster.** Two releases each fixed a way this fails silently, with a healthy pod and a coupling that logs itself enabled:
 
 - **v0.4.0** fetched the token into the Secret and no container read it — `deploy.k` names secret keys one at a time and the token was missing from that list.
-- **v0.4.1** reads the token but cannot verify the gateway: its certificate is signed by the cluster's internal CA, the image carries only public roots, and every call over the HTTPRoute fails with `x509: certificate signed by unknown authority`. v0.4.2 mounts trust-manager's `cluster-trust-bundle` and trusts it.
+- **v0.4.1** reads the token but cannot verify the gateway: its certificate is signed by the cluster's internal CA, the image carries only public roots, and every call over the HTTPRoute fails with `x509: certificate signed by unknown authority`. v0.5.0 mounts trust-manager's `cluster-trust-bundle` and trusts it.
 
 Move the pin with the switch.
 
