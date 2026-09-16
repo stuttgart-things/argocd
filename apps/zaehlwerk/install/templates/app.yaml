@@ -69,6 +69,35 @@ spec:
             - op: replace
               path: /spec/secretStoreRef/name
               value: {{ .Values.secretStore.name }}
+        {{- $sp := .Values.schmetterpause | default dict }}
+        {{- if $sp.url }}
+        {{- /* The handover to schmetterpause (zaehlwerk ADR-0004, schmetterpause
+               ADR-0015). One switch, on the URL: a URL without the token is a
+               401 on every call, and a token without the URL is never read.
+
+               APPENDED rather than rendered in the published base, for the
+               same reason as schmetterpause's scoreboard token
+               (apps/schmetterpause/install): the base is shared, and ESO fails
+               a whole ExternalSecret over one missing property. Rendered there,
+               every environment would lose the panel token over a Vault key it
+               never asked for.
+
+               The container reads this key only from zaehlwerk v0.4.1 on. In
+               v0.4.0 the Secret carried it and no container did, so the pin has
+               to move with this switch. */}}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: zaehlwerk-panel
+          patch: |-
+            - op: add
+              path: /spec/data/-
+              value:
+                secretKey: SCHMETTERPAUSE_TOKEN
+                remoteRef:
+                  key: {{ required "schmetterpause.vaultPath is required when schmetterpause.url is set" $sp.vaultPath | quote }}
+                  property: {{ required "schmetterpause.vaultProperty is required when schmetterpause.url is set" $sp.vaultProperty | quote }}
+        {{- end }}
         {{- if not $omniPitcherURL }}
         {{- /* NO PANEL. The key is REMOVED, not blanked: zaehlwerk asks whether
                OMNI_PITCHER_URL is set, so an empty string is a URL it dials

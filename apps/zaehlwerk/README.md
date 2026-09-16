@@ -128,6 +128,25 @@ Two things on the homerun2 side have to agree with it, and neither fails loudly:
    `secrets.vaultSecretName`/`authToken` names. Put the same token in both, or `/pitch`
    answers 401 — which shows up as the same `panel pitch failed` line above.
 
+## Handing a result to schmetterpause
+
+`schmetterpause.url` turns the handover on: a match won on the scoring page is posted to schmetterpause's `POST /api/results`, and the page offers schmetterpause's real players instead of two free-text names (zaehlwerk ADR-0004, schmetterpause ADR-0015). Empty, zaehlwerk scores and shows a match exactly as before and reports it nowhere.
+
+```yaml
+        schmetterpause:
+          url: http://schmetterpause.schmetterpause.svc   # in-cluster: the token never crosses the gateway
+          vaultPath: zaehlwerk-schmetterpause              # its own entry
+          vaultProperty: token
+```
+
+**One switch, on the URL.** A URL without the token is a `401` on every call, and a token without the URL is never read, so the chart does not offer them separately.
+
+**Needs zaehlwerk v0.4.1 or newer.** v0.4.0 fetched the token into the Secret and no container read it — `deploy.k` names secret keys one at a time and the token was missing from that list. Against v0.4.0's base this switch produces a Secret holding the token and a pod that sends none, and nothing goes red. Move the pin with the switch.
+
+**The token is appended, not rendered in the published base.** The base is shared, and ESO fails a whole `ExternalSecret` over one missing property: rendered there, every environment would lose its panel token over a Vault key it never asked for.
+
+**The same value as schmetterpause's scoreboard token**, which is the only thing the two sides share. Its own Vault entry, for the reason schmetterpause keeps its own separate: an entry written with `data_json` is rewritten whole.
+
 ## Application name
 
 `applicationName` defaults to empty, which derives `zaehlwerk-<sha1(destination)[:8]>`. The
