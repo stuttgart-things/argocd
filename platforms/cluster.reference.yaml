@@ -238,6 +238,7 @@ spec:
     # ---- [user] observability: kube-prometheus-stack (needs the secrets-config gate label above) ----
     # observability-platform.stuttgart-things.com/secret-store: vault-observability   # [req] ClusterSecretStore
     # observability-platform.stuttgart-things.com/secret-key: <cluster>               # default = cluster name
+    # observability-platform.stuttgart-things.com/alert-webhook-secret-key: _omni-pitcher  # entry holding the webhook token; default = secret-key. Shared by every ClusterStack-built cluster
     #   the entry needs: grafana-admin-user, grafana-admin-password, alertmanager-webhook-token
     # observability-platform.stuttgart-things.com/alert-webhook-url: https://omni.platform.sthings-vsphere.labul.sva.de/pitch/grafana  # [req]
     # observability-platform.stuttgart-things.com/storage-class: openebs-hostpath    # default = cluster default SC

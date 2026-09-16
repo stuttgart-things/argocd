@@ -44,7 +44,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.37.1
+        targetRevision: v0.46.0
         path: infra/kube-prometheus-stack/install
         helm:
           # Fixed, not derived. Argo passes the Application name to `helm
@@ -69,7 +69,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.37.1
+              targetRevision: v0.46.0
             destination:
               server: '{{ .server }}'
               namespace: monitoring
@@ -95,6 +95,12 @@ spec:
                 kind: ClusterSecretStore
                 name: '{{ index .metadata.annotations "observability-platform.stuttgart-things.com/secret-store" }}'
               remoteKey: '{{ default .name (index .metadata.annotations "observability-platform.stuttgart-things.com/secret-key") }}'
+              # The webhook token is the omni-pitcher's AUTH_TOKEN, identical on
+              # every cluster — so a cluster built from a ClusterStack reads it
+              # from the shared entry (_omni-pitcher) instead of its own, which
+              # would hold nothing or a generated value and 401 every alert.
+              # Unset keeps reading remoteKey: homerun2-test1 is unchanged.
+              webhookRemoteKey: '{{ default "" (index .metadata.annotations "observability-platform.stuttgart-things.com/alert-webhook-secret-key") }}'
             httpRoute:
               enabled: true
               hostname: 'grafana.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
