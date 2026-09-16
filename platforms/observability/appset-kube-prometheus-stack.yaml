@@ -47,6 +47,14 @@ spec:
         targetRevision: v0.37.1
         path: infra/kube-prometheus-stack/install
         helm:
+          # Fixed, not derived. Argo passes the Application name to `helm
+          # template` as the release name when none is set, and Helm caps that
+          # at 53 characters — so this AppSet only worked for cluster names of
+          # at most 17 characters. rancher-join-test5 (18) was the first to
+          # exceed it on kube-prometheus-stack ("invalid release name"). The
+          # chart does not use .Release.Name, and Argo keeps no Helm release,
+          # so one constant is safe for every cluster.
+          releaseName: kube-prometheus-stack
           valuesObject:
             project: '{{ .name }}'
             # MUST differ from this template's own metadata.name above. Both
