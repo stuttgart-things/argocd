@@ -98,7 +98,7 @@ zaehlwerk:
   namespace: zaehlwerk
   hostname: ""                       # empty = zaehlwerk.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
-  version: v0.3.0
+  version: v0.5.0
   # Browser origins allowed to read the live match stream. schmetterpause's
   # origin belongs here once its live tab exists; upstream refuses the `*`
   # wildcard, and empty means none.
