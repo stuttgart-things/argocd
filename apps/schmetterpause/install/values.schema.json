@@ -134,6 +134,10 @@
       "minLength": 1,
       "description": "FQDN patched into both HTTPRoutes and into SP_PUBLIC_BASE_URL."
     },
+    "bootstrapAdmin": {
+      "type": "string",
+      "description": "Display name that gets the admin flag at every start (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing."
+    },
     "gateway": {
       "type": "object",
       "additionalProperties": false,
