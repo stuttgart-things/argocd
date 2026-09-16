@@ -42,7 +42,13 @@ spec:
   # WAL goes through the Barman Cloud plugin into the ObjectStore of the same
   # name (templates/backup.yaml). Adding this to a running Cluster restarts it.
   plugins:
+    {{- /* `enabled` is the CRD default, written out. `plugins` is an atomic
+           list, so Argo compares each item whole: a default the API server
+           fills in inside an item is a diff on every comparison, and
+           selfHeal re-applies the Cluster in a loop that changes nothing.
+           Same for `target` in backup.yaml. */}}
     - name: barman-cloud.cloudnative-pg.io
+      enabled: true
       isWALArchiver: true
       parameters:
         barmanObjectName: {{ .Values.name | quote }}
