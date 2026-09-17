@@ -2,6 +2,13 @@
 {{- $appName := include "tabletennis.appName" . }}
 {{- $name := printf "%s-zaehlwerk" $appName }}
 {{- $ns := .Values.zaehlwerk.namespace }}
+{{- /* Per-cluster secrets (#464): the panel reads homerun2's own entry
+       through homerun2's store; the handover token stays schmetterpause's,
+       through schmetterpause's store when that differs. */}}
+{{- $srcs := .Values.secretSources | default dict }}
+{{- $hrSrc := $srcs.homerun2 | default dict }}
+{{- $spSrc := $srcs.schmetterpause | default dict }}
+{{- $panelStore := $hrSrc.store | default .Values.secretStore.name }}
 {{- /* The panel: on when this platform asks for one AND homerun2 is on this
        cluster to receive it. One namespace derives both URLs — where the scores
        go, and the led-catcher zaehlwerk takes over for the duration of a match.
@@ -26,8 +33,11 @@
 {{- if and .Values.zaehlwerk.handover .Values.schmetterpause.enabled .Values.schmetterpause.scoreboard.enabled }}
 {{- $handover = dict
       "url"           (printf "https://%s" (include "tabletennis.hostname" (dict "root" . "name" "schmetterpause")))
-      "vaultPath"     .Values.schmetterpause.scoreboard.vaultPath
+      "vaultPath"     (ternary (printf "%s-scoreboard" ($spSrc.entry | default "")) .Values.schmetterpause.scoreboard.vaultPath (not (empty $spSrc.entry)))
       "vaultProperty" .Values.schmetterpause.scoreboard.vaultProperty }}
+{{- if and $spSrc.store (ne $spSrc.store $panelStore) }}
+{{- $_ := set $handover "secretStore" (dict "kind" .Values.secretStore.kind "name" $spSrc.store) }}
+{{- end }}
 {{- end }}
 {{- /* `cascadingDelete` is threaded into the sub-chart too: an opt-out at
        the platform level has to reach the leaves, or the children this
@@ -45,11 +55,14 @@
                           "name"        .Values.gateway.name
                           "namespace"   .Values.gateway.namespace
                           "sectionName" .Values.gateway.sectionNameHTTPS)
-      "secretStore"     (dict "kind" .Values.secretStore.kind "name" .Values.secretStore.name)
+      "secretStore"     (dict "kind" .Values.secretStore.kind "name" $panelStore)
       "allowedOrigins"  .Values.zaehlwerk.allowedOrigins
       "panel"           $panel
       "schmetterpause"  $handover
 }}
+{{- if $hrSrc.entry }}
+{{- $_ := set $computed "homerun2Secrets" (dict "vaultEntry" $hrSrc.entry) }}
+{{- end }}
 {{- if .Values.destination.name }}
 {{- $_ := set (index $computed "destination") "name" .Values.destination.name }}
 {{- else }}

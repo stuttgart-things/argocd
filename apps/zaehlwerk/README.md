@@ -47,9 +47,15 @@ Four places where the published base names a placeholder:
 The image is **not** patched. CI tags the artifact and the container image with the same
 release version and bakes that reference into the Deployment, so `version` pins both.
 
-The Vault entry name is not patched either: the ClusterSecretStore carries the KV mount and
-the base asks for the entry `zaehlwerk` under it, with the properties `omni-pitcher-token` and
-`redis-password`.
+The Vault entry name is patched only on request. The base asks for the COPY entry `zaehlwerk`
+with the properties `omni-pitcher-token` and `redis-password` — homerun2's values seeded a
+second time, which drift the moment homerun2's are rotated.
+
+**`homerun2Secrets.vaultEntry`** reads both from homerun2's OWN entry instead (`authToken`,
+`redisPassword`), through `secretStore`, which then has to reach homerun2's mount. The handover
+token keeps coming from schmetterpause's mount: **`schmetterpause.secretStore`** puts a second
+store on that one key (`data[].sourceRef.storeRef`). A ClusterStack sets both
+(crossplane-configurations#464); each replace tests the base's key and property first.
 
 ## The panel key is removed, not blanked
 

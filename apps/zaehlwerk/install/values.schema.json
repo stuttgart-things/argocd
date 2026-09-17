@@ -112,6 +112,18 @@
         "name"
       ]
     },
+    "homerun2Secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Read OMNI_PITCHER_TOKEN/REDIS_PASSWORD from homerun2's own entry (authToken, redisPassword) instead of the base's copy entry `zaehlwerk`.",
+      "properties": {
+        "vaultEntry": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9_][a-zA-Z0-9._-]*)?$",
+          "description": "homerun2's entry under secretStore's mount. Empty keeps the base copy entry."
+        }
+      }
+    },
     "allowedOrigins": {
       "type": "string",
       "description": "Browser origins allowed to read the live match stream. Empty = none; upstream refuses the `*` wildcard."
@@ -130,6 +142,23 @@
         },
         "vaultProperty": {
           "type": "string"
+        },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Store for the handover token when it differs from secretStore. Empty name reads through secretStore.",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ]
+            },
+            "name": {
+              "type": "string"
+            }
+          }
         }
       },
       "if": {

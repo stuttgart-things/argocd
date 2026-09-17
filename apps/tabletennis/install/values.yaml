@@ -61,6 +61,27 @@ secretStore:
   kind: ClusterSecretStore
   name: vault-cluster
 
+# Per-cluster secrets, addressed by the app that OWNS them
+# (crossplane-configurations#464). A ClusterStack derives both fields for each
+# owner from its AppSecretProfiles and publishes them on the Argo CD cluster;
+# the platforms/tabletennis ApplicationSet passes them in.
+#
+#   schmetterpause  its own entries: `<entry>` (session key, database owner) and
+#                   `<entry>-scoreboard` (the handover token zaehlwerk reads too)
+#   homerun2        homerun2's entry: authToken + redisPassword, read by
+#                   zaehlwerk's panel and the light-catcher
+#
+# Empty keeps today's single-store, fleet-wide setup: `secretStore` above and
+# the entries `schmetterpause`, `schmetterpause-scoreboard`, `zaehlwerk`, and
+# `secrets.vaultSecretName`.
+secretSources:
+  schmetterpause:
+    store: ""
+    entry: ""
+  homerun2:
+    store: ""
+    entry: ""
+
 # What this platform knows about homerun2: the namespace it runs in, and
 # nothing else. That one value derives zaehlwerk's panel URLs and the
 # light-catcher's Redis address.

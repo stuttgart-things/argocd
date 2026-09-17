@@ -2,6 +2,14 @@
 {{- $appName := include "tabletennis.appName" . }}
 {{- $name := printf "%s-schmetterpause" $appName }}
 {{- $ns := .Values.schmetterpause.namespace }}
+{{- /* Per-cluster secrets (#464): schmetterpause's own store and entry, and
+       the scoreboard token as `<entry>-scoreboard` next to it. */}}
+{{- $spSrc := (.Values.secretSources | default dict).schmetterpause | default dict }}
+{{- $spStore := $spSrc.store | default .Values.secretStore.name }}
+{{- $spScoreboardPath := .Values.schmetterpause.scoreboard.vaultPath }}
+{{- if $spSrc.entry }}
+{{- $spScoreboardPath = printf "%s-scoreboard" $spSrc.entry }}
+{{- end }}
 {{- /* `cascadingDelete` is threaded into the sub-chart too: an opt-out at
        the platform level has to reach the leaves, or the children this
        sub-chart renders keep their finalizers and hang in Terminating
@@ -20,14 +28,17 @@
                           "namespace"        .Values.gateway.namespace
                           "sectionNameHTTPS" .Values.gateway.sectionNameHTTPS
                           "sectionNameHTTP"  .Values.gateway.sectionNameHTTP)
-      "secretStore"     (dict "kind" .Values.secretStore.kind "name" .Values.secretStore.name)
+      "secretStore"     (dict "kind" .Values.secretStore.kind "name" $spStore)
       "bootstrapAdmin"  .Values.schmetterpause.bootstrapAdmin
       "scoreboard"      (dict
                           "enabled"       .Values.schmetterpause.scoreboard.enabled
-                          "vaultPath"     .Values.schmetterpause.scoreboard.vaultPath
+                          "vaultPath"     $spScoreboardPath
                           "vaultProperty" .Values.schmetterpause.scoreboard.vaultProperty)
       "policy"          (dict "enabled" .Values.schmetterpause.policy.enabled)
 }}
+{{- if $spSrc.entry }}
+{{- $_ := set $computed "vaultEntry" $spSrc.entry }}
+{{- end }}
 {{- /* The sub-chart's destination takes `server` or `name`, same as ours. */}}
 {{- if .Values.destination.name }}
 {{- $_ := set (index $computed "destination") "name" .Values.destination.name }}

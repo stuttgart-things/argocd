@@ -187,6 +187,11 @@
         "name"
       ]
     },
+    "vaultEntry": {
+      "type": "string",
+      "pattern": "^([a-zA-Z0-9_][a-zA-Z0-9._-]*)?$",
+      "description": "Entry the app and database ExternalSecrets read instead of the base's `schmetterpause`. Empty keeps the base. Per-cluster entries from a ClusterStack set it to the cluster name (crossplane-configurations#464)."
+    },
     "database": {
       "type": "object",
       "additionalProperties": false,

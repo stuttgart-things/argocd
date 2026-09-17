@@ -122,6 +122,7 @@ other field is documented in `apps/schmetterpause/database/values.yaml`.
 | `tabletennis-platform.stuttgart-things.com/homerun2-namespace` | **[user]** optional, default `homerun2`; blank it where homerun2 is absent |
 | `tabletennis-platform.stuttgart-things.com/wled-endpoint` | **[user]** optional — the real strip's address; empty uses homerun2's wled-mock |
 | `homerun2-platform.stuttgart-things.com/secret-key` | **[user]** optional — reused, so the light-catcher reads the *same* Vault entry as every other homerun2 component |
+| `tabletennis-platform.stuttgart-things.com/{schmetterpause,homerun2}-secret-{store,key}` | *[auto]* a ClusterStack (xplane-cluster >= 0.18.0) publishes a store and an entry per owning app instead of one `secret-store`; set, they win (`secretSources`) and `secret-store` may be absent |
 
 The database **bootstraps** from the Secret its ExternalSecret produces, so
 without the store the CNPG Cluster never initialises at all — which is why the

@@ -96,6 +96,19 @@ secretStore:
   kind: ClusterSecretStore
   name: vault-cluster
 
+# Where the panel's OMNI_PITCHER_TOKEN and REDIS_PASSWORD come from. Empty keeps
+# the base: properties `omni-pitcher-token` / `redis-password` of the COPY entry
+# `zaehlwerk`, which has to be seeded with homerun2's values by hand and drifts
+# the moment homerun2's are rotated.
+#
+# Set, both are read DIRECTLY from homerun2's own entry — `authToken` and
+# `redisPassword`, the same values homerun2 itself runs with — through
+# `secretStore` above, which then has to reach homerun2's mount. A ClusterStack
+# sets this to the cluster name (crossplane-configurations#464). Each patch
+# tests the base's key and property first, so a changed base fails the sync.
+homerun2Secrets:
+  vaultEntry: ""
+
 # Browser origins allowed to read the live match stream (ALLOWED_ORIGINS).
 # Empty — the default — means none, and the base leaves the key out entirely
 # rather than setting it to "*"; upstream refuses the wildcard on purpose
@@ -140,6 +153,12 @@ schmetterpause:
   # render without it rather than addressing an entry that happens to exist.
   vaultPath: schmetterpause-scoreboard
   vaultProperty: token
+  # Store the token is read through when it is NOT the panel's `secretStore` —
+  # e.g. panel values from vault-homerun2, token from vault-schmetterpause.
+  # Empty name reads it through `secretStore`, as before.
+  secretStore:
+    kind: ClusterSecretStore
+    name: ""
 
 panel:
   # Shortcut for the common case: homerun2 on the SAME cluster. Set the

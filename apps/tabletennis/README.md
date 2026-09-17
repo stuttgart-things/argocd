@@ -125,6 +125,20 @@ each pointed at `wledEndpoint`. They match on the tags zaehlwerk v0.3.0+ emits, 
 first rule takes every set *and* match and side a's colour every point. `profileContent`
 replaces the whole file.
 
+## Per-cluster secrets
+
+`secretSources` addresses secrets by the app that owns them, as a ClusterStack publishes them
+(crossplane-configurations#464, xplane-cluster >= 0.18.0):
+
+| owner | store / entry go to |
+|---|---|
+| `schmetterpause` | schmetterpause's `secretStore` + `vaultEntry`; scoreboard token `<entry>-scoreboard`; zaehlwerk's handover token through that store |
+| `homerun2` | zaehlwerk's panel store + `homerun2Secrets.vaultEntry` (authToken, redisPassword from homerun2's own entry); the light-catcher's store and entry |
+
+Empty keeps the single `secretStore` and the fleet-wide entries (`schmetterpause`,
+`schmetterpause-scoreboard`, `zaehlwerk`, `secrets.vaultSecretName`) — the rendered output is
+byte-identical to before.
+
 ## Cluster preconditions
 
 - **A Gateway** with an `http` and an `https` listener whose hostname covers `*.<domain>` —
