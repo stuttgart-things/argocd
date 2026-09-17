@@ -67,8 +67,18 @@ spec:
       releaseName: {{ $name | quote }}
       valuesObject:
         {{- include "tabletennis.subValues" (dict "computed" $computed "override" .Values.schmetterpause.values) | nindent 8 }}
+  {{- /* THIS Application renders Applications (the sub-chart's app,
+         database, monitoring, policy), so it belongs to the Argo CD that runs
+         it — never to the target cluster, which has no argoproj.io API. The
+         target reaches the sub-chart as `destination` in its values and is
+         used there, by the Applications that deploy workloads. Pointing this
+         one at the target failed every sync on a centrally managed cluster
+         with "failed to discover server resources for group version
+         argoproj.io/v1alpha1" (rancher-join-test8, crossplane-configurations
+         #464). */}}
   destination:
-    {{- include "tabletennis.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+    server: https://kubernetes.default.svc
+    namespace: argocd
   {{- /* This Application's own desired state is three Applications, so its sync
          is cheap; the database's own wave (-10) orders things inside it. */}}
   syncPolicy:
