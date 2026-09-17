@@ -118,9 +118,21 @@ spec:
               sectionNameHTTPS: https
               sectionNameHTTP: http
 
+            # A hand-registered cluster names ONE store for everything. A
+            # ClusterStack names a store and an entry per owning app instead
+            # (crossplane-configurations#464, xplane-cluster >= 0.18.0) and no
+            # single store; the chart then reads secretSources, and this falls
+            # back to homerun2's store only to satisfy the schema.
             secretStore:
               kind: ClusterSecretStore
-              name: '{{ index .metadata.annotations "tabletennis-platform.stuttgart-things.com/secret-store" }}'
+              name: '{{ default (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/homerun2-secret-store") (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/secret-store") }}'
+            secretSources:
+              schmetterpause:
+                store: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-store") }}'
+                entry: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-key") }}'
+              homerun2:
+                store: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/homerun2-secret-store") }}'
+                entry: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/homerun2-secret-key") }}'
 
             # Everything this platform knows about homerun2. Derives zaehlwerk's
             # two panel URLs and the light-catcher's Redis address. Blank it on a
@@ -182,7 +194,9 @@ spec:
 
             secrets:
               enabled: true
-              clusterSecretStoreName: '{{ index .metadata.annotations "tabletennis-platform.stuttgart-things.com/secret-store" }}'
+              # Empty on a ClusterStack cluster: the chart takes homerun2's
+              # store from secretSources.
+              clusterSecretStoreName: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/secret-store") }}'
               # The Vault entry holding homerun2's credentials -- the
               # light-catcher reads the SAME redis password as every other
               # homerun2 component, because it is the same Redis. Keep this in

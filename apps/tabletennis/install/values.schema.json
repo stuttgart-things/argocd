@@ -122,6 +122,43 @@
         "name"
       ]
     },
+    "secretSources": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-cluster store and entry per owning app (crossplane-configurations#464). Empty fields keep the single secretStore and the fleet-wide entries.",
+      "properties": {
+        "schmetterpause": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "store": {
+              "type": "string",
+              "description": "ClusterSecretStore reaching this owner's mount. Empty = secretStore.name."
+            },
+            "entry": {
+              "type": "string",
+              "pattern": "^([a-zA-Z0-9_][a-zA-Z0-9._-]*)?$",
+              "description": "This owner's entry for this cluster. Empty = the fleet-wide default entry."
+            }
+          }
+        },
+        "homerun2": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "store": {
+              "type": "string",
+              "description": "ClusterSecretStore reaching this owner's mount. Empty = secretStore.name."
+            },
+            "entry": {
+              "type": "string",
+              "pattern": "^([a-zA-Z0-9_][a-zA-Z0-9._-]*)?$",
+              "description": "This owner's entry for this cluster. Empty = the fleet-wide default entry."
+            }
+          }
+        }
+      }
+    },
     "homerun2": {
       "type": "object",
       "additionalProperties": false,

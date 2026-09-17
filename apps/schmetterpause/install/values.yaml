@@ -83,13 +83,21 @@ gateway:
 
 # ClusterSecretStore the two ExternalSecrets read from. The base points at
 # `vault-cluster`.
-#
-# The Vault entry name is not patched: the store carries the KV mount, and the
-# base already asks for the entry `schmetterpause` under it. An environment
-# that needs a different entry name should say so upstream rather than here.
 secretStore:
   kind: ClusterSecretStore
   name: vault-cluster
+
+# Entry under the store's mount that session-key, username and password come
+# from. Empty keeps the base's `schmetterpause` — one fleet-wide entry, which is
+# what every hand-seeded environment uses.
+#
+# A ClusterStack writes one entry PER CLUSTER instead (crossplane-configurations
+# #464): `<cluster>` in the mount, and `<cluster>-scoreboard` for the token.
+# Setting this patches the key of all three remoteRefs. Each patch first TESTS
+# that the base still asks for `schmetterpause` at that index, so a base that
+# reorders or renames its data fails the sync loudly instead of reading the
+# wrong property from the right entry.
+vaultEntry: ""
 
 # CloudNativePG database, rendered from apps/schmetterpause/database as its own
 # Application at sync-wave -10 — the app's Deployment waits on the Secret the

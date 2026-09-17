@@ -69,6 +69,29 @@ spec:
             - op: replace
               path: /spec/secretStoreRef/name
               value: {{ .Values.secretStore.name }}
+        {{- with (.Values.homerun2Secrets | default dict).vaultEntry }}
+        {{- /* homerun2's own entry instead of the copy entry `zaehlwerk`
+               (crossplane-configurations#464): one value, read by both apps,
+               nothing to keep in step by hand. By INDEX, so each op tests the
+               base's key and property first. */}}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: zaehlwerk-panel
+          patch: |-
+            - op: test
+              path: /spec/data/0/remoteRef
+              value: {key: zaehlwerk, property: omni-pitcher-token}
+            - op: replace
+              path: /spec/data/0/remoteRef
+              value: {key: {{ . | quote }}, property: authToken}
+            - op: test
+              path: /spec/data/1/remoteRef
+              value: {key: zaehlwerk, property: redis-password}
+            - op: replace
+              path: /spec/data/1/remoteRef
+              value: {key: {{ . | quote }}, property: redisPassword}
+        {{- end }}
         {{- $sp := .Values.schmetterpause | default dict }}
         {{- if $sp.url }}
         {{- /* The handover to schmetterpause (zaehlwerk ADR-0004, schmetterpause
@@ -97,6 +120,16 @@ spec:
                 remoteRef:
                   key: {{ required "schmetterpause.vaultPath is required when schmetterpause.url is set" $sp.vaultPath | quote }}
                   property: {{ required "schmetterpause.vaultProperty is required when schmetterpause.url is set" $sp.vaultProperty | quote }}
+                {{- with ($sp.secretStore | default dict) }}
+                {{- if .name }}
+                {{- /* A second store for this one key: the panel values come
+                       from homerun2's mount, the token from schmetterpause's. */}}
+                sourceRef:
+                  storeRef:
+                    kind: {{ .kind | default "ClusterSecretStore" }}
+                    name: {{ .name }}
+                {{- end }}
+                {{- end }}
         {{- end }}
         {{- if not $omniPitcherURL }}
         {{- /* NO PANEL. The key is REMOVED, not blanked: zaehlwerk asks whether

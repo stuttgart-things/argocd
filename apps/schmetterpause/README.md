@@ -50,8 +50,14 @@ back to HTTPS, a loop with nothing red anywhere.
 The image is **not** patched. CI tags the artefact and the container image with the same
 commit SHA and bakes that reference into the Deployment, so `version` pins both.
 
-The Vault entry name is not patched either: the ClusterSecretStore carries the KV mount and
-the base asks for the entry `schmetterpause` under it.
+The Vault entry name is patched only on request. The ClusterSecretStore carries the KV mount
+and the base asks for the entry `schmetterpause` under it — one fleet-wide entry, which is what
+a hand-seeded environment uses. **`vaultEntry`** replaces the key of all three `remoteRef`s
+(`session-key`, `username`, `password`) with a per-cluster entry, which is what a ClusterStack
+writes (`<cluster>`, and `<cluster>-scoreboard` for the token — crossplane-configurations#464).
+Each replace is preceded by a JSON-patch `test` that the base still has `schmetterpause` at that
+index, so a base that reorders its data fails the sync instead of mapping the password onto the
+username.
 
 ## Application names
 

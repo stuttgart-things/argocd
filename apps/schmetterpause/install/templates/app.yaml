@@ -92,6 +92,41 @@ spec:
                   key: {{ required "scoreboard.vaultPath is required when scoreboard.enabled" .Values.scoreboard.vaultPath | quote }}
                   property: {{ .Values.scoreboard.vaultProperty | quote }}
         {{- end }}
+        {{- /* Per-cluster entries (crossplane-configurations#464). `test`
+               before `replace`: the patch addresses data by INDEX, so it first
+               asserts the base still has `schmetterpause` there. A base that
+               reorders its data then fails the sync instead of silently
+               mapping the password onto the username. */}}
+        {{- with .Values.vaultEntry }}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: schmetterpause-app
+          patch: |-
+            - op: test
+              path: /spec/data/0/remoteRef/key
+              value: schmetterpause
+            - op: replace
+              path: /spec/data/0/remoteRef/key
+              value: {{ . | quote }}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: schmetterpause-db
+          patch: |-
+            - op: test
+              path: /spec/data/0/remoteRef/key
+              value: schmetterpause
+            - op: replace
+              path: /spec/data/0/remoteRef/key
+              value: {{ . | quote }}
+            - op: test
+              path: /spec/data/1/remoteRef/key
+              value: schmetterpause
+            - op: replace
+              path: /spec/data/1/remoteRef/key
+              value: {{ . | quote }}
+        {{- end }}
         {{- /* Both ExternalSecrets read from the same store. */}}
         {{- range $es := list "schmetterpause-app" "schmetterpause-db" }}
         - target:
