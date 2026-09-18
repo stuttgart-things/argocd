@@ -556,6 +556,10 @@
         "refreshInterval": {
           "type": "string",
           "pattern": "^[0-9]+(s|m|h)$"
+        },
+        "githubTokenVaultSecretName": {
+          "type": "string",
+          "description": "Entry the git-pitcher's githubToken is read from (same store). Empty = vaultSecretName. A per-cluster entry has no PAT; it lives shared, e.g. `_git-pat`."
         }
       },
       "required": [
