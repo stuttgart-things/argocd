@@ -33,6 +33,12 @@ embedding a literal in valuesObject.
       "persistence" .Values.redisStack.persistence
       "syncPolicy"  .Values.syncPolicy
 }}
+{{- /* Redis reads its password only at start as well; with Reloader on, the
+       StatefulSet rolls when redis-stack-auth changes, together with the
+       clients (they wait up to 120 s for Redis at start). */}}
+{{- if .Values.reloader }}
+{{- $_ := set $rsValues "extraValues" (dict "commonAnnotations" (dict "reloader.stakater.com/auto" "true")) }}
+{{- end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application

@@ -51,7 +51,7 @@ spec:
             kind: Deployment
             name: {{ $name }}
           patch: |
-{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.coreCatcher.version) | indent 12 }}
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.coreCatcher.version "reloader" .Values.reloader) | indent 12 }}
 {{- if .Values.redisPassword }}
         - target:
             kind: Secret

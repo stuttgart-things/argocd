@@ -295,3 +295,7 @@ See [`kargo.md`](./kargo.md) for a full Warehouse + Stage example (dev → stagi
 - core-catcher docs: <https://stuttgart-things.github.io/homerun2-core-catcher/>
 - demo-pitcher docs: <https://stuttgart-things.github.io/homerun2-demo-pitcher/>
 - light-catcher docs: <https://stuttgart-things.github.io/homerun2-light-catcher/>
+
+## Reloader
+
+`reloader: true` (default) annotates every component Deployment and the redis-stack StatefulSet with `reloader.stakater.com/auto: "true"`. All of them read the Redis password and their token only at start, so a rotated Secret now rolls them automatically instead of waiting for a manual restart — which the switch of homerun2-test1 to its own entry needed (crossplane-configurations#464 step 7). A no-op without the Reloader controller (`infra/reloader/install`); `reloader: false` renders exactly as before.

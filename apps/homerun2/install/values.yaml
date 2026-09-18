@@ -479,3 +479,11 @@ smokeTest:
 # are removed immediately and the workloads are left running, unmanaged, which
 # is the intended outcome for an opt-out.
 cascadingDelete: true
+
+# Stakater Reloader annotation (reloader.stakater.com/auto) on every component
+# Deployment and on the redis-stack StatefulSet: roll them when a Secret or
+# ConfigMap they reference changes. All of them read the Redis password and
+# token only at start, so without this a rotated secret sits unused until each
+# one is restarted by hand. A no-op on clusters without the Reloader controller
+# (infra/reloader/install), so it is on by default — same as apps/zaehlwerk.
+reloader: true

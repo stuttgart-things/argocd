@@ -31,7 +31,7 @@ spec:
             kind: Deployment
             name: {{ $name }}
           patch: |
-{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.notificationCatcher.version) | indent 12 }}
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.notificationCatcher.version "reloader" .Values.reloader) | indent 12 }}
         {{- /* Redis connection lives in the env ConfigMap here, not in the
                container env, so the usual redisAddrPatch does not apply. */}}
         - target:

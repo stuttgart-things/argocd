@@ -50,7 +50,7 @@ spec:
             kind: Deployment
             name: {{ $name }}
           patch: |
-{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.configViewer.version) | indent 12 }}
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.configViewer.version "reloader" .Values.reloader) | indent 12 }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}
