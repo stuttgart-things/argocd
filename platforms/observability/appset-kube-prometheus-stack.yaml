@@ -44,7 +44,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.48.1
+        targetRevision: v0.52.0
         path: infra/kube-prometheus-stack/install
         helm:
           # Fixed, not derived. Argo passes the Application name to `helm
@@ -69,7 +69,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.48.1
+              targetRevision: v0.52.0
             destination:
               server: '{{ .server }}'
               namespace: monitoring
