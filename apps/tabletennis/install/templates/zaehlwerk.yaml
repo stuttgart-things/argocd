@@ -94,7 +94,7 @@ spec:
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
     path: apps/zaehlwerk/install
     helm:
-      releaseName: {{ $name | quote }}
+      releaseName: {{ include "tabletennis.releaseName" ($name) | quote }}
       valuesObject:
         {{- include "tabletennis.subValues" (dict "computed" $computed "override" .Values.zaehlwerk.values) | nindent 8 }}
   {{- /* THIS Application renders Applications (the sub-chart's app,

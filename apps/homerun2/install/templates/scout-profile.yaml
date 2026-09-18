@@ -32,7 +32,7 @@ spec:
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
     path: apps/homerun2/scout-profile
     helm:
-      releaseName: {{ printf "%s-scout-profile" $appName | quote }}
+      releaseName: {{ include "homerun2.releaseName" (printf "%s-scout-profile" $appName) | quote }}
       valuesObject:
         name: {{ .Values.scout.profile.name | quote }}
         spec:

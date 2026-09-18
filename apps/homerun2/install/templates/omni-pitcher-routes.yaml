@@ -29,7 +29,7 @@ spec:
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
     path: apps/homerun2/omni-pitcher-routes
     helm:
-      releaseName: {{ printf "%s-omni-pitcher-routes" $appName | quote }}
+      releaseName: {{ include "homerun2.releaseName" (printf "%s-omni-pitcher-routes" $appName) | quote }}
       valuesObject:
         name: {{ .Values.omniPitcherRoutesConfigMap | quote }}
         content: {{ .Values.omniPitcher.routesContent | quote }}

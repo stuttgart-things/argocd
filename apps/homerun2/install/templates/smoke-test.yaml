@@ -106,7 +106,7 @@ spec:
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
     path: apps/homerun2/smoke-test
     helm:
-      releaseName: {{ printf "%s-smoke-test" $appName | quote }}
+      releaseName: {{ include "homerun2.releaseName" (printf "%s-smoke-test" $appName) | quote }}
       valuesObject:
         {{- toYaml $stValues | nindent 8 }}
   destination:
