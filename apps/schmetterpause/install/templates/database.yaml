@@ -39,7 +39,7 @@ spec:
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
     path: apps/schmetterpause/database
     helm:
-      releaseName: {{ printf "%s-db" $name | quote }}
+      releaseName: {{ include "schmetterpause.releaseName" (printf "%s-db" $name) | quote }}
       valuesObject:
         {{- toYaml $dbValues | nindent 8 }}
   destination:

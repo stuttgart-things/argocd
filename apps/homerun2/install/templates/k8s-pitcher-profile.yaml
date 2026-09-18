@@ -31,7 +31,7 @@ spec:
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
     path: apps/homerun2/k8s-pitcher-profile
     helm:
-      releaseName: {{ printf "%s-k8s-pitcher-profile" $appName | quote }}
+      releaseName: {{ include "homerun2.releaseName" (printf "%s-k8s-pitcher-profile" $appName) | quote }}
       valuesObject:
         name: {{ .Values.k8sPitcherProfileConfigMap | quote }}
         content: {{ .Values.k8sPitcher.profileContent | quote }}

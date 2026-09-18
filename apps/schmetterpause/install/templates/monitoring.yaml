@@ -35,7 +35,7 @@ spec:
     targetRevision: {{ .Values.catalog.targetRevision | quote }}
     path: apps/schmetterpause/monitoring
     helm:
-      releaseName: {{ printf "%s-monitoring" $name | quote }}
+      releaseName: {{ include "schmetterpause.releaseName" (printf "%s-monitoring" $name) | quote }}
       valuesObject:
         {{- toYaml $monValues | nindent 8 }}
   destination:

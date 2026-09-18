@@ -75,3 +75,19 @@ Same treatment as infra/trust-manager/bundle's includeVaultPkiCa.
 {{- define "tabletennis.lightCatcherEnabled" -}}
 {{- if eq (.Values.lightCatcher.enabled | default false | toString) "true" }}true{{ end -}}
 {{- end -}}
+
+{{/*
+tabletennis.releaseName -- a Helm release name for an Application this chart renders.
+Helm refuses names longer than 53 characters, and these are derived from the
+cluster name, so a long cluster broke the sync with "invalid release name"
+(tabletennis-rancher-join-test9-schmetterpause-delegate-db, 57, #464). A name
+that fits is returned UNCHANGED; a longer one keeps its first 44 characters and
+gets an 8-character hash of the full name, so two long names cannot collide.
+*/}}
+{{- define "tabletennis.releaseName" -}}
+{{- if le (len .) 53 -}}
+{{- . -}}
+{{- else -}}
+{{- printf "%s-%s" (trunc 44 . | trimSuffix "-") (sha1sum . | trunc 8) -}}
+{{- end -}}
+{{- end -}}
