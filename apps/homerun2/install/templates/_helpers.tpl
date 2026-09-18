@@ -21,13 +21,23 @@ oci://ghcr.io/stuttgart-things/homerun2-{{ . }}-kustomize
 
 {{/*
 homerun2.imagePatch -- emits a Deployment patch that overrides the container image.
-Usage: include "homerun2.imagePatch" (dict "name" "homerun2-omni-pitcher" "tag" "v1.6.2")
+Usage: include "homerun2.imagePatch" (dict "name" "homerun2-omni-pitcher" "tag" "v1.6.2" "reloader" true)
 */}}
 {{- define "homerun2.imagePatch" -}}
+{{- $meta := dict "name" .name }}
+{{- /* reloader: Stakater Reloader rolls the Deployment when a Secret or
+       ConfigMap it references changes. Every homerun2 component reads its
+       Redis password and token only at start, so a rotated secret otherwise
+       sits unused until someone restarts each Deployment by hand — which is
+       exactly what the switch of homerun2-test1 to its own entry needed
+       (crossplane-configurations#464 step 7). */}}
+{{- if .reloader }}
+{{- $_ := set $meta "annotations" (dict "reloader.stakater.com/auto" "true") }}
+{{- end }}
 {{- $patch := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"
-      "metadata" (dict "name" .name)
+      "metadata" $meta
       "spec" (dict "template" (dict "spec" (dict "containers" (list
         (dict "name" .name "image" (printf "ghcr.io/stuttgart-things/%s:%s" .name .tag))
       ))))

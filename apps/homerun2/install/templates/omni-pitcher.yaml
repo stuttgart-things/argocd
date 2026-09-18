@@ -32,7 +32,7 @@ spec:
             kind: Deployment
             name: {{ $name }}
           patch: |
-{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.omniPitcher.version) | indent 12 }}
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.omniPitcher.version "reloader" .Values.reloader) | indent 12 }}
 {{- if .Values.omniPitcher.routesContent }}
         # Config-driven stream routing (homerun2-omni-pitcher#105). ROUTES_CONFIG
         # names a file, so it needs the ConfigMap from

@@ -61,7 +61,7 @@ spec:
             kind: Deployment
             name: {{ $name }}
           patch: |
-{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.scout.version) | indent 12 }}
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.scout.version "reloader" .Values.reloader) | indent 12 }}
 {{- /* The base ships homerun2-scout-token with a literal `changeme`, and
        scout's /analytics/* endpoints are the only thing that Secret guards.
        Patch it from .Values.authToken, or delete it so an ESO-managed Secret

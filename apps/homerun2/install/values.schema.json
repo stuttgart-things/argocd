@@ -761,6 +761,10 @@
     "cascadingDelete": {
       "type": "boolean",
       "description": "Put a resources-finalizer on every rendered child Application, so deleting the parent prunes the workloads. True (the default) for preview environments; the platforms/ AppSets set it false, because for a long-lived install an opt-out should stop managing the stack rather than delete it, and a prune against a deregistered cluster hangs the children in Terminating (argocd#324)."
+    },
+    "reloader": {
+      "type": "boolean",
+      "description": "Annotate every component Deployment and the redis-stack StatefulSet with reloader.stakater.com/auto, so a changed Secret or ConfigMap rolls them. No-op without the Reloader controller."
     }
   }
 }
