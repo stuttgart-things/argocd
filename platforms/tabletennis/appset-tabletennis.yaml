@@ -84,7 +84,7 @@ spec:
         # `cascadingDelete` it passes -- see the same note in
         # platforms/homerun2/appset-homerun2.yaml.
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.50.2
+        targetRevision: v0.50.3
         path: apps/tabletennis/install
         helm:
           releaseName: 'tabletennis-{{ .name }}'
@@ -95,7 +95,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.50.2
+              targetRevision: v0.50.3
             # No namespace: schmetterpause, zaehlwerk and the light-catcher each
             # land in one of their own.
             destination:
