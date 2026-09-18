@@ -207,6 +207,10 @@ spec:
               # `redisPassword`. Defaults to the cluster name so a fleet can use
               # one entry per cluster without an annotation per cluster.
               vaultSecretName: '{{ default .name (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/secret-key") }}'
+              # The shared GitHub PAT for the git-pitcher. A ClusterStack
+              # (xplane-cluster >= 0.18.0) publishes its entry; empty keeps it
+              # on vaultSecretName.
+              githubTokenVaultSecretName: '{{ default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/shared-git-pat-secret-key") }}'
               refreshInterval: 1h
       syncPolicy:
         automated:

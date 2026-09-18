@@ -383,6 +383,11 @@ secrets:
   enabled: false
   clusterSecretStoreName: vault-homerun2-pr
   vaultSecretName: preview-env
+  # Entry the git-pitcher's `githubToken` comes from, when it is not the
+  # installation's own: a per-cluster entry holds authToken + redisPassword
+  # only, the PAT is shared (e.g. `_git-pat` in the homerun2 mount). Same store.
+  # Empty reads it from vaultSecretName, as before.
+  githubTokenVaultSecretName: ""
   refreshInterval: 1h
 
 # Optional smoke-test sub-Application (apps/homerun2/smoke-test in this
