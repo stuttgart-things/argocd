@@ -39,10 +39,17 @@ kind: Application
 metadata:
   name: {{ printf "%s-redis-stack" $appName | quote }}
   namespace: argocd
-  {{- if $.Values.cascadingDelete }}
+  {{- /* ALWAYS a resources-finalizer on this middle layer, whatever
+         cascadingDelete says: everything it renders is an Application in
+         `argocd` here, never a workload. Without it, deleting this Application
+         (the ApplicationSet does, when a cluster leaves the platform) left the
+         sub-chart's Applications behind, pointing at a gone cluster and
+         blocking its AppProject (rancher-join-test8,
+         crossplane-configurations#464). The workloads stay protected by the LEAVES: with
+         cascadingDelete false they carry no finalizer, so removing them
+         removes only Argo's record, never the running resources. */}}
   finalizers:
     - resources-finalizer.argocd.argoproj.io
-  {{- end }}
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
 spec:

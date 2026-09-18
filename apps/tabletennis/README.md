@@ -139,6 +139,13 @@ Empty keeps the single `secretStore` and the fleet-wide entries (`schmetterpause
 `schmetterpause-scoreboard`, `zaehlwerk`, `secrets.vaultSecretName`) — the rendered output is
 byte-identical to before.
 
+## Middle layer and deletion
+
+`schmetterpause` and `zaehlwerk` are each ONE middle-layer Application here, rendering the sub-chart's own Applications (app, database, monitoring, policy). Two rules follow:
+
+- **Its own name, never the leaf's.** The sub-chart names its leaves after `applicationName`; this chart passes `<app>-schmetterpause-delegate` / `<app>-zaehlwerk-delegate` unless `values.applicationName` overrides it. A leaf carrying the middle layer's name is the same object — it applied its spec over itself and never settled (the pattern homerun2's `redis-stack` → `redis-stack-delegate` already avoids).
+- **Always a `resources-finalizer` on the middle layer**, whatever `cascadingDelete` says. It renders only Applications in `argocd`, so deleting it removes Argo records, nothing on the cluster; without it the leaves were orphaned when the ApplicationSet removed a cluster, and blocked its AppProject. The workloads stay protected by the leaves, which follow `cascadingDelete` (no finalizer when `false`).
+
 ## Cluster preconditions
 
 - **A Gateway** with an `http` and an `https` listener whose hostname covers `*.<domain>` —
