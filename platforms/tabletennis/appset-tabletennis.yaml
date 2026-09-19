@@ -84,7 +84,7 @@ spec:
         # `cascadingDelete` it passes -- see the same note in
         # platforms/homerun2/appset-homerun2.yaml.
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.50.3
+        targetRevision: v0.53.0
         path: apps/tabletennis/install
         helm:
           releaseName: 'tabletennis-{{ .name }}'
@@ -95,7 +95,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.50.3
+              targetRevision: v0.53.0
             # No namespace: schmetterpause, zaehlwerk and the light-catcher each
             # land in one of their own.
             destination:
@@ -162,6 +162,41 @@ spec:
                     # `<no value>` and leave the PVC Pending. Every optional
                     # annotation below gets the same treatment.
                     storageClass: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/storage-class") }}'
+                  # Backups and the rebuild path (stuttgart-things#2989), off unless
+                  # a cluster asks. With no annotation every value below is the
+                  # chart's own default, so a cluster that sets none renders exactly
+                  # what it did before.
+                  #
+                  # The two `enabled` flags reach the chart as the STRINGS "true" /
+                  # "false" -- an AppSet cannot produce a boolean -- and
+                  # apps/tabletennis/install turns them into booleans before the
+                  # schema sees them (tabletennis.schmetterpauseOverride, v0.53.0).
+                  # Anything but "true" is off.
+                  #
+                  # Key and store default to the SHARED backup entry a ClusterStack
+                  # already names (`shared-object-store-backup-secret-*`, derived
+                  # by the tabletennis profile): no cluster gets a backup entry of
+                  # its own, and the rebuild reads the same bucket the office writes.
+                  # Setting either db-backup-* annotation wins. Both are read only
+                  # when a flag is on -- the database chart renders nothing from
+                  # them otherwise.
+                  backup:
+                    enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-backup-enabled") }}'
+                    endpointURL: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-backup-endpoint-url") }}'
+                    destinationPath: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-backup-destination-path") }}'
+                    # Empty = the Cluster name. NEVER the office's schmetterpause-db
+                    # on another cluster: a rebuild archives under a name of its own.
+                    serverName: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-backup-server-name") }}'
+                    remoteKey: '{{ default (default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/shared-object-store-backup-secret-key")) (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-backup-remote-key") }}'
+                    secretStore:
+                      name: '{{ default (default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/shared-object-store-backup-secret-store")) (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-backup-secret-store") }}'
+                  # Bring the Cluster up from another server's backups instead of
+                  # initdb. Read ONCE, at creation: a cluster that comes up without
+                  # this annotation has an empty ranking, and setting it afterwards
+                  # changes nothing.
+                  recovery:
+                    enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-recovery-enabled") }}'
+                    sourceServerName: '{{ default "schmetterpause-db" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-recovery-source-server-name") }}'
                 # Monitoring stays off: it needs the Prometheus Operator CRDs,
                 # which come from observability-platform, and its `enabled` is a
                 # boolean an AppSet cannot template from a label. Turn it on
