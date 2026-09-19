@@ -60,6 +60,39 @@ Usage: include "tabletennis.subValues" (dict "computed" $computed "override" .Va
 {{- end -}}
 
 {{/*
+tabletennis.schmetterpauseOverride -- schmetterpause's pass-through `values`,
+with `database.backup.enabled` and `database.recovery.enabled` turned into real
+booleans when they are present.
+
+A platform AppSet templates them from cluster annotations
+(`tabletennis-platform.stuttgart-things.com/db-backup-enabled` and
+`…/db-recovery-enabled`) and can only hand over strings, while
+apps/schmetterpause/install's schema wants booleans: a string there fails the
+render. The same string "false" would be TRUTHY in any Go-template `if` further
+down -- the light-catcher lesson below. So they are compared as strings here,
+once, and everything downstream sees true or false.
+
+A hand-written boolean passes through unchanged: toString true is "true".
+Anything that is not "true" is false, so a typo switches a backup OFF rather
+than on -- the safe way round for a flag that writes into a shared bucket.
+
+Returns JSON; callers fromJson it.
+*/}}
+{{- define "tabletennis.schmetterpauseOverride" -}}
+{{- $v := deepCopy (. | default dict) -}}
+{{- $db := get $v "database" -}}
+{{- if kindIs "map" $db -}}
+{{- range $block := list "backup" "recovery" -}}
+{{- $b := get $db $block -}}
+{{- if and (kindIs "map" $b) (hasKey $b "enabled") -}}
+{{- $_ := set $b "enabled" (eq (toString (get $b "enabled")) "true") -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $v -}}
+{{- end -}}
+
+{{/*
 tabletennis.lightCatcherEnabled -- "true" when the LED strip is on, empty
 otherwise, so callers can use a plain `if`.
 
