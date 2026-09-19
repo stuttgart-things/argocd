@@ -40,6 +40,12 @@ schmetterpause:
 A consumer's `values` wins over the computed defaults, and the sub-chart's own schema validates
 the result — so the knobs are documented where they belong rather than duplicated here.
 
+One exception to "straight through": `database.backup.enabled` and `database.recovery.enabled`
+may arrive as the strings `"true"` / `"false"`, because a platform AppSet templates them from
+cluster annotations and cannot produce a boolean. This chart turns them into booleans before
+handing over (`tabletennis.schmetterpauseOverride`), because the sub-chart's schema refuses a
+string, and in a Go-template `if` the string `"false"` is truthy. Anything but `"true"` is off.
+
 ## Three namespaces, no shared one
 
 There is no top-level `destination.namespace`. schmetterpause, zaehlwerk and the light-catcher

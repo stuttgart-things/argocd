@@ -73,7 +73,7 @@ spec:
     helm:
       releaseName: {{ include "tabletennis.releaseName" ($name) | quote }}
       valuesObject:
-        {{- include "tabletennis.subValues" (dict "computed" $computed "override" .Values.schmetterpause.values) | nindent 8 }}
+        {{- include "tabletennis.subValues" (dict "computed" $computed "override" (include "tabletennis.schmetterpauseOverride" .Values.schmetterpause.values | fromJson)) | nindent 8 }}
   {{- /* THIS Application renders Applications (the sub-chart's app,
          database, monitoring, policy), so it belongs to the Argo CD that runs
          it — never to the target cluster, which has no argoproj.io API. The
