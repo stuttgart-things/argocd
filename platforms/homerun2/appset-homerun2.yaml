@@ -97,7 +97,7 @@ spec:
         # on -- deliberately never auto-merged, so rolling a catalog release out
         # to every labelled cluster stays a human decision.
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.50.3
+        targetRevision: v0.53.0
         path: apps/homerun2/install
         helm:
           releaseName: 'homerun2-{{ .name }}'
@@ -109,7 +109,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.50.3
+              targetRevision: v0.53.0
             # Target the labelled remote cluster, not the management one.
             destination:
               server: '{{ .server }}'
