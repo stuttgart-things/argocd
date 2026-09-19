@@ -300,7 +300,7 @@ demoPitcher:
 ledCatcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-led-catcher
-  version: v0.7.1
+  version: v0.11.0
   hostname: led-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the led-catcher kustomize OCI (parentRef +
