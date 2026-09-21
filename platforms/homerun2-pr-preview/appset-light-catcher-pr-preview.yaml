@@ -24,13 +24,10 @@
 #     * `wled-light-pr-<num>` — co-tenanted wled-mock dashboard so the
 #                                 effects light-catcher emits are
 #                                 visually verifiable per PR
-#   - omni-pitcher pinned to v1.11.1 (latest released, Option-B-enabled)
-#   - demo-pitcher pinned to v1.8.1 (latest released)
-#   - wled-mock pinned to v0.7.1 — its kustomize OCI ships from the
-#     homerun2-light-catcher repo's kcl-wled-mock module and is tagged
-#     with the *repo* release version, so it shares light-catcher's
-#     version line (v0.7.1 is the current release; the OCI was never
-#     published below v0.4.1)
+#   - omni-pitcher / demo-pitcher at the install chart's defaults (see README: no pins)
+#   - wled-mock built from this PR, like light-catcher itself: it ships
+#     from the homerun2-light-catcher repo (cmd/wled-mock, kcl-wled-mock),
+#     whose PR CI publishes it as `pr-<n>-<head sha>` next to the catcher
 #   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
 #     stuttgart-things repo
 apiVersion: argoproj.io/v1alpha1
@@ -92,16 +89,15 @@ spec:
             lightCatcher:
               enabled: true
               version: 'pr-{{ .number }}-{{ .head_sha }}'
-              hostname: 'light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'light-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
-            # Co-tenanted: omni-pitcher pinned to v1.11.1 (latest released,
-            # Option-B-enabled). Receives /pitch POSTs from demo-pitcher (UI
+            # Co-tenanted: omni-pitcher at the install chart's default version.
+            # Receives /pitch POSTs from demo-pitcher (UI
             # or direct curl), writes to redis-stack.
             omniPitcher:
               enabled: true
-              version: v1.11.1
-              hostname: 'omni-light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'omni-light-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
             # Co-tenanted: demo-pitcher UI. omniPitcherUrl flips the
@@ -113,8 +109,7 @@ spec:
             # redis-stack stream → light-catcher → wled-mock dashboard.
             demoPitcher:
               enabled: true
-              version: v1.8.1
-              hostname: 'demo-light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'demo-light-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
               omniPitcherUrl: 'http://homerun2-omni-pitcher.homerun2-light-catcher-pr-{{ .number }}.svc.cluster.local'
 
@@ -122,14 +117,15 @@ spec:
             # effects land visibly per PR. The kustomize OCI ships from
             # the homerun2-light-catcher repo's kcl-wled-mock module and
             # exposes Service `homerun2-wled-mock` (port 80) — the same
-            # endpoint baked into light-catcher's default profile. The OCI
-            # is tagged with the light-catcher repo release version, so
-            # v0.7.1 here (not the chart default v0.3.0, which was never
-            # published as a kustomize-OCI tag and 404s on resolve).
+            # endpoint baked into light-catcher's default profile. Built from
+            # the PR rather than taken from a release: the mock lives in the
+            # light-catcher repository, so a PR there may change it, and the
+            # preview has to show that change. The chart uses one version
+            # string for image and kustomize base; the PR CI publishes both.
             wledMock:
               enabled: true
-              version: v0.7.1
-              hostname: 'wled-light-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              hostname: 'wled-light-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
 
             # Co-tenanted: redis-stack. Same ESO-managed password Secret
             # the preview-secrets policy materializes per namespace.
@@ -150,7 +146,7 @@ spec:
             httpRoute:
               enabled: true
               gateway:
-                name: homerun2-dev-gateway
+                name: '{{ .name }}-gateway'
                 namespace: default
       syncPolicy:
         automated:

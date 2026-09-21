@@ -20,8 +20,7 @@
 #     * `demo-led-pr-<num>`    — co-tenanted demo-pitcher UI so reviewers
 #                                 can compose + send custom messages and
 #                                 see them surface on the LED simulator
-#   - omni-pitcher pinned to v1.11.1 (latest released, Option-B-enabled)
-#   - demo-pitcher pinned to v1.4.0 (chart default)
+#   - omni-pitcher / demo-pitcher at the install chart's defaults (see README: no pins)
 #   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
 #     stuttgart-things repo
 apiVersion: argoproj.io/v1alpha1
@@ -83,23 +82,19 @@ spec:
             ledCatcher:
               enabled: true
               version: 'pr-{{ .number }}-{{ .head_sha }}'
-              hostname: 'led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'led-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
-            # Co-tenanted: omni-pitcher pinned to v1.11.1 (latest released,
-            # Option-B-enabled). Receives /pitch POSTs from the seed Job and
+            # Co-tenanted: omni-pitcher at the install chart's default version.
+            # Receives /pitch POSTs from the seed Job and
             # any manual reviewer pitches (via demo-pitcher UI or direct
             # curl), writes to redis-stack.
             omniPitcher:
               enabled: true
-              version: v1.11.1
-              hostname: 'omni-led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'omni-led-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
-            # Co-tenanted: demo-pitcher UI. Pinned to v1.8.1 — the chart's
-            # default of v1.4.0 predates demo-pitcher's kustomize OCI
-            # publishing, so it 404s on the ghcr.io lookup. v1.8.1 is the
-            # current latest release with both image + kustomize OCI.
+            # Co-tenanted: demo-pitcher UI at the install chart's default version.
             # omniPitcherUrl flips the Deployment env to PITCH_TARGET=omni-pitcher +
             # OMNI_PITCHER_URL=<in-cluster service> so the UI's "Pitch"
             # button POSTs to the co-tenanted omni-pitcher (instead of the
@@ -108,8 +103,7 @@ spec:
             # redis-stack stream → led-catcher web simulator.
             demoPitcher:
               enabled: true
-              version: v1.8.1
-              hostname: 'demo-led-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'demo-led-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
               omniPitcherUrl: 'http://homerun2-omni-pitcher.homerun2-led-catcher-pr-{{ .number }}.svc.cluster.local'
 
@@ -133,7 +127,7 @@ spec:
             httpRoute:
               enabled: true
               gateway:
-                name: homerun2-dev-gateway
+                name: '{{ .name }}-gateway'
                 namespace: default
       syncPolicy:
         automated:

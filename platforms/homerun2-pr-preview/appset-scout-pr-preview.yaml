@@ -11,7 +11,7 @@
 #   - namespace: `homerun2-scout-pr-<num>` (image-name-mirrored)
 #   - hostnames: `scout-pr-<num>` for scout, `omni-scout-pr-<num>` for
 #     the co-tenanted omni-pitcher
-#   - omni-pitcher version pinned to v1.8.1 (latest released)
+#   - omni-pitcher at the install chart's default version (see README: no pins)
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -70,16 +70,15 @@ spec:
             scout:
               enabled: true
               version: 'pr-{{ .number }}-{{ .head_sha }}'
-              hostname: 'scout-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'scout-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
-            # Co-tenanted: omni-pitcher pinned to latest released.
+            # Co-tenanted: omni-pitcher at the install chart's default version.
             # inlineHttpRoute requires v1.11.0+ (Option B landed in
             # stuttgart-things/homerun2-omni-pitcher#125).
             omniPitcher:
               enabled: true
-              version: v1.11.1
-              hostname: 'omni-scout-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'omni-scout-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
             redisStack:
@@ -100,7 +99,7 @@ spec:
             httpRoute:
               enabled: true
               gateway:
-                name: homerun2-dev-gateway
+                name: '{{ .name }}-gateway'
                 namespace: default
       syncPolicy:
         automated:
