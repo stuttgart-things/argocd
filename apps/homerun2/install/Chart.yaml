@@ -3,5 +3,5 @@ apiVersion: v2
 name: homerun2-install
 description: App-of-apps chart packaging the homerun2 stack — redis-stack + 10 microservices (pitchers, catchers, scout, wled-mock, config-viewer) plus optional Gateway API HTTPRoutes and dev-only secrets.
 type: application
-version: 0.1.0
+version: 0.1.1
 appVersion: "v1.6.2"
