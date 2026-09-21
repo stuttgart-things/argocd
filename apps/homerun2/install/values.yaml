@@ -343,7 +343,7 @@ notificationCatcher:
 gitPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-git-pitcher
-  version: v1.0.3
+  version: v1.0.5
   hostname: git-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the git-pitcher kustomize OCI (parentRef +
