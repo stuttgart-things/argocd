@@ -158,6 +158,10 @@ kind: Application
 metadata:
   name: {{ $appName | quote }}
   namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:

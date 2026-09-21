@@ -3,82 +3,179 @@
   "title": "redis-stack app-of-apps chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["project", "destination", "chartVersion", "image"],
+  "required": [
+    "project",
+    "destination",
+    "chartVersion",
+    "image"
+  ],
   "properties": {
     "applicationName": {
       "type": "string",
       "minLength": 1,
       "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
     },
-    "project": { "type": "string", "minLength": 1 },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
     "destination": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Argo destination for the rendered Application. Provide `server` (cluster URL) or `name` (registered cluster name) — at least one required. Template prefers `name` when both are set (so consumers can override the chart's default `server` with a `name` without nulling).",
+      "description": "Argo destination for the rendered Application. Provide `server` (cluster URL) or `name` (registered cluster name) \u2014 at least one required. Template prefers `name` when both are set (so consumers can override the chart's default `server` with a `name` without nulling).",
       "properties": {
-        "server":    { "type": "string", "format": "uri" },
-        "name":      { "type": "string", "minLength": 1 },
-        "namespace": { "type": "string", "minLength": 1 }
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["namespace"],
+      "required": [
+        "namespace"
+      ],
       "anyOf": [
-        { "required": ["server"] },
-        { "required": ["name"] }
+        {
+          "required": [
+            "server"
+          ]
+        },
+        {
+          "required": [
+            "name"
+          ]
+        }
       ]
     },
-    "chartVersion": { "type": "string", "minLength": 1 },
+    "chartVersion": {
+      "type": "string",
+      "minLength": 1
+    },
     "auth": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "password":                  { "type": "string" },
-        "existingSecret":            { "type": "string" },
-        "existingSecretPasswordKey": { "type": "string", "minLength": 1 }
+        "password": {
+          "type": "string"
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "existingSecretPasswordKey": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "image": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "registry":   { "type": "string", "minLength": 1 },
-        "repository": { "type": "string", "minLength": 1 },
-        "tag":        { "type": "string", "minLength": 1 }
+        "registry": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["registry", "repository", "tag"]
+      "required": [
+        "registry",
+        "repository",
+        "tag"
+      ]
     },
     "sentinel": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":       { "type": "boolean" },
-        "masterSet":     { "type": "string", "minLength": 1 },
-        "quorum":        { "type": "integer", "minimum": 1 },
-        "parallelSyncs": { "type": "integer", "minimum": 1 },
-        "serviceType":   { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "enabled": {
+          "type": "boolean"
+        },
+        "masterSet": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quorum": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parallelSyncs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "serviceType": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
         "image": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "registry":   { "type": "string", "minLength": 1 },
-            "repository": { "type": "string", "minLength": 1 },
-            "tag":        { "type": "string", "minLength": 1 }
+            "registry": {
+              "type": "string",
+              "minLength": 1
+            },
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "required": ["registry", "repository", "tag"]
+          "required": [
+            "registry",
+            "repository",
+            "tag"
+          ]
         }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "persistence": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled":      { "type": "boolean" },
-        "storageClass": { "type": "string", "minLength": 1 },
-        "size":         { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "storageClass": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$"
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
-    "replicaCount": { "type": "integer", "minimum": 0 },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0
+    },
     "extraValues": {
       "type": "object",
       "description": "Deep-merged on top of the computed valuesObject passed to the upstream chart.",
@@ -87,6 +184,10 @@
     "syncPolicy": {
       "type": "object",
       "additionalProperties": true
+    },
+    "cascadingDelete": {
+      "type": "boolean",
+      "description": "Put resources-finalizer.argocd.argoproj.io on the rendered Application, so deleting it deletes Redis too. Default false: deleting the Application leaves Redis running."
     }
   }
 }

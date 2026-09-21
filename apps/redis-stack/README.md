@@ -82,6 +82,7 @@ spec:
 | `replicaCount` | `1` | Replica StatefulSet size |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
 | `syncPolicy` | automated + retry | Applied to the rendered Application |
+| `cascadingDelete` | `false` | Put `resources-finalizer.argocd.argoproj.io` on the rendered Application, so deleting it deletes Redis too. A parent chart that tears this Application down (e.g. `apps/homerun2/install`) must pass its own value through |
 
 ## Secret management
 
