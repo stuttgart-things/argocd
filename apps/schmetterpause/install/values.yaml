@@ -225,6 +225,27 @@ scoreboard:
   vaultPath: schmetterpause-scoreboard
   vaultProperty: token
 
+# The kiosk: one browser at the table that may enter results for anyone and
+# issue a recovery code for somebody STANDING NEXT TO IT (schmetterpause
+# ADR-0006, ADR-0008). That second power is the reason to switch it on outside a
+# tournament evening: a player who lost both their PIN and their recovery code
+# has no other way back in, because nobody — not even an admin — may set a PIN
+# for someone else (ADR-0007, ADR-0008).
+#
+# Same shape as `scoreboard` above, and for the same reasons: its own Vault
+# entry, appended to the app's ExternalSecret only where an environment wants
+# it, and the property has to exist in Vault BEFORE this goes on or the whole
+# app secret stops syncing. Without the variable /kiosk is a 404, so there is no
+# half-on state.
+#
+# Unlocking is per browser and lasts twelve hours; an admin sees every unlocked
+# machine on /admin and can take one or all of them back. Switch it off again by
+# setting enabled to false — the routes disappear with the variable.
+kiosk:
+  enabled: false
+  vaultPath: schmetterpause-kiosk
+  vaultProperty: token
+
 monitoring:
   enabled: false
   interval: 60s
