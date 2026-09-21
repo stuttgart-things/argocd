@@ -256,7 +256,7 @@ lightCatcher:
 wledMock:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-wled-mock
-  version: v1.1.4
+  version: v1.2.0
   hostname: wled-mock.example.com
 
 # config-viewer (read-only view of which alert triggers what in which catcher,
