@@ -237,7 +237,7 @@ k8sPitcher:
 lightCatcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-light-catcher
-  version: v1.1.4
+  version: v1.2.0
   hostname: light-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the light-catcher kustomize OCI (parentRef +
