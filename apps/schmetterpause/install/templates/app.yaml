@@ -92,6 +92,24 @@ spec:
                   key: {{ required "scoreboard.vaultPath is required when scoreboard.enabled" .Values.scoreboard.vaultPath | quote }}
                   property: {{ .Values.scoreboard.vaultProperty | quote }}
         {{- end }}
+        {{- /* The kiosk's token, appended the same way and for the same
+               reason as the scoreboard's above: a property in the shared base
+               would make every environment's secret demand it. Without the
+               variable /kiosk does not exist at all. */}}
+        {{- if .Values.kiosk.enabled }}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: schmetterpause-app
+          patch: |-
+            - op: add
+              path: /spec/data/-
+              value:
+                secretKey: SP_KIOSK_TOKEN
+                remoteRef:
+                  key: {{ required "kiosk.vaultPath is required when kiosk.enabled" .Values.kiosk.vaultPath | quote }}
+                  property: {{ .Values.kiosk.vaultProperty | quote }}
+        {{- end }}
         {{- /* Per-cluster entries (crossplane-configurations#464). `test`
                before `replace`: the patch addresses data by INDEX, so it first
                asserts the base still has `schmetterpause` there. A base that

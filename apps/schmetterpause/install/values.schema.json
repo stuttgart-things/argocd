@@ -401,6 +401,48 @@
     "cascadingDelete": {
       "type": "boolean",
       "description": "Put a resources-finalizer on every rendered child Application, so deleting the parent prunes the workloads. True (the default) for preview environments; the platforms/ AppSets set it false, because for a long-lived install an opt-out should stop managing the stack rather than delete it, and a prune against a deregistered cluster hangs the children in Terminating (argocd#324)."
+    },
+    "kiosk": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Appends SP_KIOSK_TOKEN to the app's ExternalSecret so /kiosk exists (schmetterpause ADR-0006, ADR-0008): results for anyone, and a recovery code for somebody standing at the machine. The Vault property must exist before this is enabled, or the whole app secret stops syncing.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "vaultPath": {
+          "type": "string",
+          "description": "Entry under the store's mount. Its own entry, never the one the app reads: vault-base-setup rewrites an entry whole, so sharing it risks resetting session-key."
+        },
+        "vaultProperty": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "vaultPath",
+          "vaultProperty"
+        ],
+        "properties": {
+          "vaultPath": {
+            "minLength": 1
+          },
+          "vaultProperty": {
+            "minLength": 1
+          }
+        }
+      }
     }
   }
 }
