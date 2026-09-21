@@ -56,12 +56,25 @@ That's it. Argo syncs the Application, which renders the platform directory, whi
 2. Add it to `kustomization.yaml` resources.
 3. Append rows to `appset-policies.yaml`'s list generator: one per policy (quota, secrets, seed-data, sweep) plus any component-specific extras (e.g. scout's `preview-scout-verify`).
 
-## Cluster-specific values (currently hardcoded)
+## Cluster identity comes from the cluster Secret
 
-These are baked into the AppSets from the days when only `homerun2-dev` consumed the platform. That is no longer true: `homerun2-test1` carries the `homerun2-pr-preview: "true"` label since 2026-08-18, and `appset-policies.yaml` now fans out to both. The per-component AppSets below have **not** caught up — their hostnames and gateway still point at `homerun2-dev`, so a second cluster gets correct policies but wrong ingress. Lifting to per-cluster overrides requires moving them onto cluster Secret annotations and templating via `{{ index .metadata.annotations "..." }}`:
+Hostnames and the Gateway are templated per cluster, the same way `platforms/homerun2` does it — nothing in the AppSets names a cluster:
 
-| Value | Where used |
-|-------|------------|
-| `homerun2-dev.sthings-vsphere.labul.sva.de` | hostname suffix in all three AppSets |
-| `homerun2-dev-gateway` / `default` | `httpRoute.gateway` block in all three AppSets |
-| `vault-homerun2-pr` / `preview-env` | `clusterSecretStoreName` / `vaultSecretName` in `appset-policies.yaml` |
+| Value | Source |
+|-------|--------|
+| hostname suffix | `clusterbook.stuttgart-things.com/fqdn` annotation (Clusterbook sets it on every cluster it registers), `*.` trimmed |
+| Gateway | `<cluster name>-gateway` in `default` |
+
+Moving the platform to another cluster is therefore: register the cluster through Clusterbook, add the `homerun2-pr-preview: "true"` label, provide the `AppProject` and the `vault-homerun2-pr` `ClusterSecretStore`. No edit here.
+
+Until 2026-09-20 both were literals naming `homerun2-dev` — a cluster that was deregistered on 2026-08-20 (stuttgart-things/stuttgart-things#2537). Every cluster carrying the label rendered hostnames on a domain and a Gateway it did not have.
+
+Still per-cluster in `appset-policies.yaml`: `vault-homerun2-pr` / `preview-env` (`clusterSecretStoreName` / `vaultSecretName`).
+
+The **preview-URL bot** in each component repo cannot read cluster annotations; its `hostname-domain` input is still a literal there and has to follow when the preview cluster changes.
+
+## No version pins for co-tenants
+
+A preview runs the component under test at `pr-<n>-<head sha>` and its co-tenants (omni-pitcher, core-catcher, demo-pitcher) at the **install chart's default version**, which Renovate keeps current in `apps/homerun2/install/values.yaml`. Pins in these AppSets are out of Renovate's reach: the ones that stood here until 2026-09-20 had drifted to omni-pitcher `v1.11.1` against a current `v2.3.0` and core-catcher `v0.13.0` against `v1.0.3`, across major versions. If a preview needs a co-tenant at a specific version, pin it with a `# renovate:` comment so it does not go stale again.
+
+The exception is **wled-mock** in the light-catcher preview: it ships from the light-catcher repository and is built per PR like the catcher itself.

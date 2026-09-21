@@ -22,7 +22,7 @@
 #     collide across concurrent previews. The preview kustomize OCI is built
 #     from tests/kcl-deploy-profile-preview.yaml; inlineProfile keeps that
 #     OCI's profile ConfigMap (no out-of-band ConfigMap in a PR namespace).
-#   - omni-pitcher / core-catcher pinned to latest released
+#   - omni-pitcher / core-catcher at the install chart's defaults (see README: no pins)
 #   - no seed-data Job — k8s-pitcher's own watch of the co-tenants spinning
 #     up populates the dashboard (same reasoning as git-pitcher)
 #   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
@@ -89,22 +89,19 @@ spec:
               namespace: 'homerun2-k8s-pitcher-pr-{{ .number }}'
               inlineProfile: true
 
-            # Co-tenanted: omni-pitcher pinned to latest released — receives
+            # Co-tenanted: omni-pitcher at the chart default — receives
             # k8s-pitcher's pitches and writes them to redis-stack.
             omniPitcher:
               enabled: true
-              version: v1.11.1
-              hostname: 'omni-k8s-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'omni-k8s-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
-            # Co-tenanted: core-catcher in web mode at latest released —
+            # Co-tenanted: core-catcher in web mode at the chart default —
             # consumes the redis stream and renders the dashboard, which is
             # the review surface for this preview.
             coreCatcher:
               enabled: true
-              version: v0.13.0
-              kustomizeVersion: v0.13.0
-              hostname: 'cc-k8s-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'cc-k8s-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
             redisStack:
@@ -125,7 +122,7 @@ spec:
             httpRoute:
               enabled: true
               gateway:
-                name: homerun2-dev-gateway
+                name: '{{ .name }}-gateway'
                 namespace: default
       syncPolicy:
         automated:

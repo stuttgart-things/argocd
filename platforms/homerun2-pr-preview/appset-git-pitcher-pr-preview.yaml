@@ -21,7 +21,7 @@
 #   - hostnames:
 #     * `git-pr-<num>`    — git-pitcher (only /health + /metrics)
 #     * `cc-git-pr-<num>` — core-catcher dashboard
-#   - core-catcher pinned to v0.13.0 (latest released)
+#   - core-catcher at the install chart's default version (see README: no pins)
 #   - GitHub PAT reused — homerun2-omni-pitcher-pat covers any public
 #     stuttgart-things repo
 apiVersion: argoproj.io/v1alpha1
@@ -84,11 +84,11 @@ spec:
             gitPitcher:
               enabled: true
               version: 'pr-{{ .number }}-{{ .head_sha }}'
-              hostname: 'git-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'git-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
-            # Co-tenanted: core-catcher in web mode at the latest released
-            # build (v0.13.0). Consumes the redis stream + renders the
+            # Co-tenanted: core-catcher in web mode at the install chart's
+            # default version. Consumes the redis stream + renders the
             # dashboard so reviewers can see what git-pitcher produced.
             #
             # No redisStream override: git-pitcher now defaults to the
@@ -97,9 +97,7 @@ spec:
             # sides align without a pin.
             coreCatcher:
               enabled: true
-              version: v0.13.0
-              kustomizeVersion: v0.13.0
-              hostname: 'cc-git-pr-{{ .number }}.homerun2-dev.sthings-vsphere.labul.sva.de'
+              hostname: 'cc-git-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               inlineHttpRoute: true
 
             redisStack:
@@ -121,7 +119,7 @@ spec:
             httpRoute:
               enabled: true
               gateway:
-                name: homerun2-dev-gateway
+                name: '{{ .name }}-gateway'
                 namespace: default
       syncPolicy:
         automated:
