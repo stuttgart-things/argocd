@@ -469,7 +469,9 @@ smokeTest:
 # ON (the default) puts a `resources-finalizer.argocd.argoproj.io` on every
 # child Application this chart renders, so Argo prunes the workloads before
 # removing the child. A per-PR preview wants that: a closed PR must take its
-# namespace with it.
+# namespace with it. The value is passed on to apps/redis-stack/install, whose
+# Application sits one level further down; it has to be, or Redis is the one
+# workload a teardown leaves behind.
 #
 # OFF is what a long-lived PLATFORM install wants, and the platforms/ AppSets
 # set it. There an opt-out should stop Argo CD managing the stack, not delete

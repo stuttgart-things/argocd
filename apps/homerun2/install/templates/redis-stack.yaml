@@ -32,7 +32,15 @@ embedding a literal in valuesObject.
       )
       "persistence" .Values.redisStack.persistence
       "syncPolicy"  .Values.syncPolicy
+      "cascadingDelete" .Values.cascadingDelete
 }}
+{{- /* cascadingDelete goes through to the leaf, like apps/tabletennis does for
+       its sub-charts. Without it the leaf never carried a finalizer, so this
+       chart's teardown stopped one level short of Redis: every closed PR
+       preview left its redis-stack running in the preview namespace, and the
+       preview sweep never reaps it because it only deletes namespaces without
+       pods (homerun2-omni-pitcher#202). Needs apps/redis-stack/install 0.2.0,
+       whose schema knows the value. */}}
 {{- /* Redis reads its password only at start as well; with Reloader on, the
        StatefulSet rolls when redis-stack-auth changes, together with the
        clients (they wait up to 120 s for Redis at start). */}}
