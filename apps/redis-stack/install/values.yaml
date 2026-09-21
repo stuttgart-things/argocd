@@ -54,6 +54,18 @@ replicaCount: 1
 # Use for any upstream key not exposed as a first-class value above.
 extraValues: {}
 
+# Whether the rendered Application carries resources-finalizer.argocd.argoproj.io.
+# With it, deleting the Application deletes Redis with it; without it, deleting
+# the Application removes only Argo's record and Redis keeps running, unmanaged.
+#
+# false by default so nothing changes for a consumer that does not set it. A
+# parent that removes this chart's Application as part of its own teardown has
+# to pass its own cascadingDelete through, or the teardown stops one level short
+# of Redis: apps/homerun2/install did not, and every closed homerun2 PR preview
+# left its redis-stack running in the preview namespace — which the preview
+# sweep never removes, because it only reaps namespaces without pods.
+cascadingDelete: false
+
 # Sync policy applied to the rendered Application.
 syncPolicy:
   automated:
