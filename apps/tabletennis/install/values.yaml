@@ -212,7 +212,7 @@ lightCatcher:
   # v0.3.0+ emits, which an older catcher ignores; the first rule would then
   # take every set AND match, and side a's colour every point.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-light-catcher
-  version: v1.1.4
+  version: v1.2.0
   # Where the effects are sent. The default points at homerun2's wled-mock,
   # which only exists with `wledMock.enabled: true` over there — a real strip is
   # the WLED device's own address.
