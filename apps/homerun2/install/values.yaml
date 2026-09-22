@@ -147,9 +147,9 @@ coreCatcher:
   # v1.0.2 adds the startupProbe covering that wait; v1.0.3 ends the wait
   # on SIGTERM.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-core-catcher
-  version: v1.0.3
+  version: v1.0.6
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-core-catcher-kustomize
-  kustomizeVersion: v1.0.3               # may differ from image tag (e.g. -web suffix on older versions)
+  kustomizeVersion: v1.0.6               # may differ from image tag (e.g. -web suffix on older versions)
   hostname: core-catcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the core-catcher kustomize OCI (parentRef +
