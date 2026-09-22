@@ -175,7 +175,7 @@ scout:
   # the chart no longer rolls scout for a changed profile, so older versions
   # would keep the profile they started with.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-scout
-  version: v0.11.3
+  version: v0.11.6
   hostname: scout.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the scout kustomize OCI (parentRef +
