@@ -209,7 +209,7 @@ scout:
 k8sPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
-  version: v1.0.2
+  version: v1.0.5
   namespace: homerun2
   # When true, keep the K8sPitcherProfile ConfigMap shipped inside the
   # k8s-pitcher kustomize OCI instead of deleting it and remounting an
