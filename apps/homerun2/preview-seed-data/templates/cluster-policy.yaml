@@ -27,6 +27,9 @@ spec:
           spec:
             ttlSecondsAfterFinished: {{ .Values.jobTtlSecondsAfterFinished }}
             backoffLimit: 3
+            # backoffLimit counts FAILURES; a hung container never fails.
+            # This is what makes a stuck Job terminal. See values.yaml.
+            activeDeadlineSeconds: {{ .Values.jobActiveDeadlineSeconds }}
             template:
               spec:
                 restartPolicy: OnFailure
@@ -54,7 +57,9 @@ spec:
                         set -e
                         echo "waiting for omni-pitcher /health..."
                         for i in $(seq 1 "$HEALTH_ATTEMPTS"); do
-                          if curl -sf -o /dev/null "$PITCHER_URL/health"; then
+                          if curl -sf -o /dev/null \
+                               --max-time {{ .Values.curlMaxTimeSeconds }} \
+                               "$PITCHER_URL/health"; then
                             echo "healthy after $i attempts"
                             break
                           fi
@@ -69,6 +74,7 @@ spec:
                         echo "$EVENTS_JSON" | tr -d '\n' | sed 's/},{/}\n{/g' | tr -d '[]' | while read -r evt || [ -n "$evt" ]; do
                           [ -z "$evt" ] && continue
                           code=$(curl -s -o /dev/null -w '%{http_code}' \
+                            --max-time {{ .Values.curlMaxTimeSeconds }} \
                             -X POST "$PITCHER_URL/pitch" \
                             -H "Authorization: Bearer $AUTH_TOKEN" \
                             -H "Content-Type: application/json" \

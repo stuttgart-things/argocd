@@ -15,17 +15,24 @@ spec:
         urlPath: {{ printf "/api/v1/namespaces/%s/pods" "{{ target.metadata.name }}" | quote }}
         jmesPath: "items[*]"
   conditions:
+    # Kyverno ANDs `all` and `any` when both are present, so this reads:
+    #   older than maxAge  AND  (no Pods  OR  older than absoluteMaxAge)
     all:
-      # Skip namespaces that still have running Pods — i.e. live previews.
-      # Only abandoned shells (post-cascade-delete, post-finalizer cleanup)
-      # have zero Pods and become candidates.
-      - key: {{ "{{ nsPods | length(@) }}" | quote }}
-        operator: Equals
-        value: 0
       # Skip newly-created namespaces — gives the AppSet a moment to
       # actually deploy workloads before the sweep would otherwise nuke
       # the empty shell mid-bring-up.
       - key: {{ "{{ time_since('', '{{ target.metadata.creationTimestamp }}', '') }}" | quote }}
         operator: GreaterThan
         value: {{ .Values.maxAge | quote }}
+    any:
+      # Normal case: no Pods left, so the preview is finished.
+      - key: {{ "{{ nsPods | length(@) }}" | quote }}
+        operator: Equals
+        value: 0
+      # The unconditional bound. A Pod is NOT proof of a live preview -- a
+      # hung Job pins a namespace indefinitely (stuttgart-things#3200) -- so
+      # past absoluteMaxAge the Pod count stops being consulted at all.
+      - key: {{ "{{ time_since('', '{{ target.metadata.creationTimestamp }}', '') }}" | quote }}
+        operator: GreaterThan
+        value: {{ .Values.absoluteMaxAge | quote }}
   schedule: {{ .Values.schedule | quote }}
