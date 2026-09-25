@@ -20,7 +20,37 @@ spec:
         kind: ExternalSecret
         name: {{ .secretName | quote }}
         namespace: {{ "{{request.object.metadata.name}}" | quote }}
-        synchronize: true
+        # NOT `true`. Measured, not reasoned about (stuttgart-things#3200).
+        #
+        # `synchronize: true` makes Kyverno keep reverting drift on the object
+        # it generated. ESO then rewrites that same object on every refresh
+        # (`refreshInterval: 1m` below), Kyverno sees drift again, and the two
+        # never settle. A/B on a clean kind cluster -- Kyverno v1.19.1, ESO
+        # v2.10.0, one namespace, these four rules, ten-minute windows, only
+        # this flag changed:
+        #
+        #                             synchronize: true   synchronize: false
+        #   updaterequests                 79.101 /s            0.000 /s
+        #   externalsecrets                39.621 /s            0.066 /s
+        #   clusterephemeralreports        39.480 /s            0.000 /s
+        #   secrets                         0.113 /s            0.000 /s
+        #   etcd growth                   +818 MB/h            +0.0 MB/h
+        #
+        # The `secrets` row is the tell: 0.113/s is the work ESO is actually
+        # here to do -- four Secrets refreshed once a minute. Everything above
+        # it is the loop, roughly 700x more writing than working.
+        #
+        # On homerun2-test1 this filled a 2.1 GB etcd quota in about seven
+        # hours, twice, and cost the office database three days of backups. The
+        # measured rate there was LOWER (250-400 MB/h) only because k3s kept
+        # killing itself on lost leader elections and rebuilding the database
+        # file on restart.
+        #
+        # Nothing is lost by turning it off: all four ExternalSecrets reported
+        # Ready=True in BOTH arms. A preview namespace is ephemeral, and
+        # preview-seed-data already generates with `synchronize: false` for the
+        # same reason -- generate once, let the owning controller own it.
+        synchronize: false
         data:
           spec:
             refreshInterval: {{ $.Values.refreshInterval | quote }}
