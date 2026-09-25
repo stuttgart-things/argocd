@@ -3,23 +3,70 @@
   "title": "homerun2-preview-seed-data chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "namespacePrefix", "image", "omniPitcherService", "omniPitcherPort", "authTokenSecretName", "authTokenSecretKey", "healthCheck", "jobTtlSecondsAfterFinished", "events"],
+  "required": [
+    "name",
+    "namespacePrefix",
+    "image",
+    "omniPitcherService",
+    "omniPitcherPort",
+    "authTokenSecretName",
+    "authTokenSecretKey",
+    "healthCheck",
+    "jobTtlSecondsAfterFinished",
+    "events",
+    "curlMaxTimeSeconds",
+    "jobActiveDeadlineSeconds"
+  ],
   "properties": {
-    "name":                       { "type": "string", "minLength": 1 },
-    "namespacePrefix":            { "type": "string", "minLength": 1 },
-    "image":                      { "type": "string", "minLength": 1 },
-    "omniPitcherService":         { "type": "string", "minLength": 1 },
-    "omniPitcherPort":            { "type": "integer", "minimum": 1, "maximum": 65535 },
-    "authTokenSecretName":        { "type": "string", "minLength": 1 },
-    "authTokenSecretKey":         { "type": "string", "minLength": 1 },
-    "jobTtlSecondsAfterFinished": { "type": "integer", "minimum": 0 },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "namespacePrefix": {
+      "type": "string",
+      "minLength": 1
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1
+    },
+    "omniPitcherService": {
+      "type": "string",
+      "minLength": 1
+    },
+    "omniPitcherPort": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "authTokenSecretName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authTokenSecretKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "jobTtlSecondsAfterFinished": {
+      "type": "integer",
+      "minimum": 0
+    },
     "healthCheck": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attempts", "intervalSeconds"],
+      "required": [
+        "attempts",
+        "intervalSeconds"
+      ],
       "properties": {
-        "attempts":        { "type": "integer", "minimum": 1 },
-        "intervalSeconds": { "type": "integer", "minimum": 1 }
+        "attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "intervalSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "events": {
@@ -35,6 +82,16 @@
       "type": "object",
       "additionalProperties": true,
       "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "curlMaxTimeSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Per-request curl --max-time, seconds (stuttgart-things#3200)."
+    },
+    "jobActiveDeadlineSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Job activeDeadlineSeconds: turns a hung Job into Failed so its Pod cannot pin the namespace (stuttgart-things#3200)."
     }
   }
 }

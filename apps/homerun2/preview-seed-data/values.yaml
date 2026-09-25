@@ -32,6 +32,26 @@ healthCheck:
 # Auto-clean the completed Job after this many seconds via
 # `ttlSecondsAfterFinished`. 1h keeps it visible for reviewers to inspect
 # logs without leaving a permanent artifact.
+# Per-request ceiling for BOTH curl calls (stuttgart-things#3200). curl has no
+# default timeout: a connection that is accepted and then never answered hangs
+# the request forever, which is exactly what happened on homerun2-test1 -- the
+# health check sat inside one curl for twelve hours, so the retry loop never
+# advanced, the Job never failed, and its Pod pinned the preview namespace.
+curlMaxTimeSeconds: 10
+
+# The backstop under everything else. Worst legitimate runtime is
+# healthCheck.attempts x (curlMaxTimeSeconds + healthCheck.intervalSeconds)
+# = 60 x (10 + 5) = 900s, plus one bounded POST per event. 1200s leaves room
+# without letting a stuck Job outlive the PR that owns it.
+#
+# `backoffLimit` does NOT cover this: it counts FAILURES, and a hung container
+# never fails. With restartPolicy: OnFailure a hung Pod restarts in place, so
+# the Job stays Active indefinitely. activeDeadlineSeconds is the only field
+# that turns "running forever" into a terminal Failed state -- which is what
+# lets ttlSecondsAfterFinished collect it and the preview sweep reclaim the
+# namespace.
+jobActiveDeadlineSeconds: 1200
+
 jobTtlSecondsAfterFinished: 3600
 
 # Fixture of events posted to /pitch. Each entry is a full JSON object the

@@ -14,6 +14,23 @@ namespacePrefix: "homerun2-pr-*"
 # doesn't track ns for prune) has zero Pods and is reclaimed.
 maxAge: 1h
 
+# The second, unconditional bound (stuttgart-things#3200). A namespace older
+# than this is deleted EVEN IF it still has Pods.
+#
+# WHY IT HAS TO EXIST. "Has Pods" is a proxy for "is a live preview", and a
+# proxy can be satisfied by something that is not a live preview: on
+# homerun2-test1 a `seed-test-events` Job hung for twelve hours because its
+# health-check `curl` had no timeout. With `restartPolicy: OnFailure` a hung
+# pod restarts IN PLACE, so it never fails, never exhausts `backoffLimit`, and
+# never stops counting as a Pod. The namespace from a PR that had been closed
+# for four days was therefore never swept -- and the Kyverno/ESO write loop
+# inside it filled etcd to its quota twice, costing the office database three
+# days of backups.
+#
+# So this bound deliberately does NOT ask why a Pod is there. No preview lives
+# a day; anything that does is wreckage.
+absoluteMaxAge: 24h
+
 # Cron schedule for the cleanup controller. Every 30 minutes balances
 # fast reclaim vs. controller load.
 schedule: "*/30 * * * *"
