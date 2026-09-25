@@ -37,20 +37,47 @@ spec:
 {{- if and .Values.database.enabled .Values.backup.enabled }}
     - name: schmetterpause.backup
       rules:
+        # EVERY EXPRESSION IN THIS GROUP READS max_over_time(...[15m]) AND EVERY
+        # RULE CARRIES keep_firing_for. Both are load-bearing, measured on
+        # homerun2-test1 after the 09-21..09-24 outage (stuttgart-things#3192).
+        #
+        # SchmetterpauseBackupTooOld notified 34 times and resolved itself 34
+        # times across those two and a half days, flapping every 30-90 minutes,
+        # while its condition was CONTINUOUSLY TRUE -- the last backup timestamp
+        # sat frozen at 09-21 03:00 the whole time. The channel's final word, on
+        # 09-24 11:37, was "Resolved", two hours before a backup actually ran.
+        # An alert that says broken/fixed 34 times is correctly ignored.
+        #
+        # It was NOT the series going absent and NOT a label change: one stable
+        # series, Prometheus with zero restarts, zero missed rule iterations and
+        # 2ms evaluations. It was SINGLE-SCRAPE DROPOUTS. Over the outage the raw
+        # expression was true for 3081 of 3211 minutes across 127 interruptions --
+        # 124 of them exactly ONE minute. Each one resets the `for:` timer, so a
+        # 30-minute `for` can only fire when a clean 30-minute run happens to
+        # occur. The sicker the cluster, the flakier its scrapes: the rule is
+        # least able to fire exactly when it matters most.
+        #
+        # max_over_time(...[15m]) bridges a dropout instead of evaluating to
+        # empty. The same query over the same window: true for 3211 of 3211
+        # minutes, zero interruptions. keep_firing_for carries the alert through
+        # anything longer. An exporter gone for good is already covered by
+        # SchmetterpauseDatabaseExporterDown, so no absent_over_time is needed.
         # Not "seconds since the last archival": with nobody writing, no WAL
         # segment fills and that number grows all night while everything is
         # fine. A failure newer than the last success is the signal.
         - alert: SchmetterpauseWALArchivingFailing
-          expr: cnpg_pg_stat_archiver_last_failed_time{namespace="{{ $ns }}"} > cnpg_pg_stat_archiver_last_archived_time{namespace="{{ $ns }}"}
+          expr: max_over_time(cnpg_pg_stat_archiver_last_failed_time{namespace="{{ $ns }}"}[15m]) > max_over_time(cnpg_pg_stat_archiver_last_archived_time{namespace="{{ $ns }}"}[15m])
           for: 15m
+          keep_firing_for: 1h
           labels:
             severity: critical
           annotations:
             summary: WAL archiving of {{ $db }} is failing
             description: The last WAL archive attempt of {{ $db }} failed and none has succeeded since, for 15 minutes. Point-in-time recovery stops at the last archived segment.
         - alert: SchmetterpauseWALArchiveBacklog
-          expr: cnpg_collector_pg_wal_archive_status{namespace="{{ $ns }}", value="ready"} > 10
+          expr: max_over_time(cnpg_collector_pg_wal_archive_status{namespace="{{ $ns }}", value="ready"}[15m]) > 10
           for: 30m
+          keep_firing_for: 1h
           labels:
             severity: warning
           annotations:
@@ -59,16 +86,18 @@ spec:
         # The Barman Cloud plugin's own timestamp: cnpg_collector_last_available_backup_timestamp
         # stays 0 for plugin backups. 0 here means "never" and alerts, as it should.
         - alert: SchmetterpauseBackupTooOld
-          expr: time() - barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="{{ $ns }}"} > {{ mul .Values.backup.maxAgeHours 3600 }}
+          expr: time() - max_over_time(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="{{ $ns }}"}[15m]) > {{ mul .Values.backup.maxAgeHours 3600 }}
           for: 30m
+          keep_firing_for: 1h
           labels:
             severity: warning
           annotations:
             summary: No recent base backup of {{ $db }}
             description: The newest base backup of {{ $db }} is older than {{ .Values.backup.maxAgeHours }} hours; the daily ScheduledBackup has not completed.
         - alert: SchmetterpauseBackupFailed
-          expr: barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp{namespace="{{ $ns }}"} > barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="{{ $ns }}"}
+          expr: max_over_time(barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp{namespace="{{ $ns }}"}[15m]) > max_over_time(barman_cloud_cloudnative_pg_io_last_available_backup_timestamp{namespace="{{ $ns }}"}[15m])
           for: 5m
+          keep_firing_for: 1h
           labels:
             severity: warning
           annotations:
