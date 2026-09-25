@@ -7,8 +7,7 @@
     "name",
     "namespacePrefix",
     "maxAge",
-    "schedule",
-    "absoluteMaxAge"
+    "schedule"
   ],
   "properties": {
     "name": {
@@ -23,11 +22,6 @@
       "type": "string",
       "minLength": 1,
       "description": "Go duration string (e.g. 1h, 24h, 168h)."
-    },
-    "absoluteMaxAge": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Go duration string. A namespace older than this is deleted even if it still has Pods (stuttgart-things#3200)."
     },
     "schedule": {
       "type": "string",

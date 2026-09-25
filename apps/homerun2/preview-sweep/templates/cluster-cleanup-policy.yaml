@@ -15,24 +15,38 @@ spec:
         urlPath: {{ printf "/api/v1/namespaces/%s/pods" "{{ target.metadata.name }}" | quote }}
         jmesPath: "items[*]"
   conditions:
-    # Kyverno ANDs `all` and `any` when both are present, so this reads:
-    #   older than maxAge  AND  (no Pods  OR  older than absoluteMaxAge)
+    # BOTH conditions live in `all`, and that is not a style choice.
+    #
+    # stuttgart-things/argocd#523 moved the Pod check into an `any` block to
+    # express "older than maxAge AND (no Pods OR older than absoluteMaxAge)".
+    # Kyverno's ClusterCleanupPolicy **ignores `any` entirely** -- only `all`
+    # is evaluated. Measured on kind (Kyverno v1.19.1), two complementary runs:
+    #
+    #   all TRUE  (age > 2m) + any FALSE (Pod present, age < 8m)  -> DELETED
+    #   all FALSE (age > 99h) + any TRUE  (no Pods)               -> kept
+    #
+    # So that change silently reduced the rule to `age > maxAge` and dropped
+    # the Pod guard: every preview namespace would have been deleted an hour
+    # after creation, live ones included. This restores the form that has been
+    # working in the field -- homerun2-pr-204 survived four days with a Pod,
+    # which is the behaviour #3200 describes.
     all:
-      # Skip newly-created namespaces — gives the AppSet a moment to
+      # Skip namespaces that still have running Pods -- i.e. live previews.
+      # Only abandoned shells (post-cascade-delete, post-finalizer cleanup)
+      # have zero Pods and become candidates.
+      #
+      # This test is imperfect: a hung Job pins a namespace indefinitely, which
+      # is exactly how #3200 happened. The guards in preview-seed-data
+      # (activeDeadlineSeconds, curl --max-time) attack that from the other
+      # side, and an absolute age bound is still wanted -- but it needs a
+      # mechanism that is verified, not an `any` block that does nothing.
+      - key: {{ "{{ nsPods | length(@) }}" | quote }}
+        operator: Equals
+        value: 0
+      # Skip newly-created namespaces -- gives the AppSet a moment to
       # actually deploy workloads before the sweep would otherwise nuke
       # the empty shell mid-bring-up.
       - key: {{ "{{ time_since('', '{{ target.metadata.creationTimestamp }}', '') }}" | quote }}
         operator: GreaterThan
         value: {{ .Values.maxAge | quote }}
-    any:
-      # Normal case: no Pods left, so the preview is finished.
-      - key: {{ "{{ nsPods | length(@) }}" | quote }}
-        operator: Equals
-        value: 0
-      # The unconditional bound. A Pod is NOT proof of a live preview -- a
-      # hung Job pins a namespace indefinitely (stuttgart-things#3200) -- so
-      # past absoluteMaxAge the Pod count stops being consulted at all.
-      - key: {{ "{{ time_since('', '{{ target.metadata.creationTimestamp }}', '') }}" | quote }}
-        operator: GreaterThan
-        value: {{ .Values.absoluteMaxAge | quote }}
   schedule: {{ .Values.schedule | quote }}
