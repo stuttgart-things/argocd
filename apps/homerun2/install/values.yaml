@@ -318,7 +318,7 @@ notificationCatcher:
   enabled: false
   # v3.0.1 waits for Redis at startup (REDIS_STARTUP_TIMEOUT) instead of exiting.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-  version: v3.0.1
+  version: v3.0.2
   # Stream to consume. `messages` is where omni-pitcher's default_stream puts
   # everything; a cluster that routes alerts onto their own stream (the flux
   # side sends /pitch/grafana to `alerts`) sets that here instead.
