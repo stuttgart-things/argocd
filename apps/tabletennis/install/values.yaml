@@ -151,7 +151,7 @@ zaehlwerk:
   namespace: zaehlwerk
   hostname: ""                       # empty = zaehlwerk.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
-  version: v0.5.0
+  version: v0.7.0
   # The handover to schmetterpause: a won match goes to its POST /api/results and
   # the scoring page offers its real players (zaehlwerk ADR-0004,
   # schmetterpause ADR-0015).
