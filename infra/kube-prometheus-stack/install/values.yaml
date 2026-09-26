@@ -15,7 +15,7 @@ destination:
 
 # Upstream prometheus-community/kube-prometheus-stack Helm chart version.
 # renovate: datasource=helm depName=kube-prometheus-stack registryUrl=https://prometheus-community.github.io/helm-charts
-chartVersion: 91.4.1
+chartVersion: 91.5.0
 
 # Stamped on every series and alert as the `cluster` label when set, so an
 # alert that reaches a shared channel says which cluster it came from.
