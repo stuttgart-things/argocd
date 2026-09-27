@@ -34,7 +34,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.56.0
+        targetRevision: v0.57.0
         path: cicd/kargo/install
         helm:
           valuesObject:
@@ -60,11 +60,34 @@ spec:
             #
             # Keys expected in the Secret: ADMIN_ACCOUNT_PASSWORD_HASH
             # (bcrypt, $2a$ variant) + ADMIN_ACCOUNT_TOKEN_SIGNING_KEY (32
-            # chars). Created per-cluster out-of-band (see platform README).
+            # chars). Created per-cluster out-of-band (see platform README) --
+            # or from Vault, below.
             extraValues:
               api:
                 secret:
                   name: kargo-admin
+            # kargo-admin FROM VAULT on a cluster that says it can: a
+            # ClusterStack with the `kargo` profile writes kargo/<cluster> and
+            # derives the gate cicd-platform.stuttgart-things.com/secrets-config
+            # plus the store and entry annotations below
+            # (stuttgart-things/stuttgart-things#3232). The store is passed ONLY
+            # when the gate is "true" -- everywhere else it is "" and the chart
+            # renders nothing new, so a cluster with a hand-made kargo-admin is
+            # untouched. A string rather than a flag, because this template can
+            # only produce strings.
+            #
+            # Not a selector: gating the AppSet itself would make the gate a
+            # new opt-in label every form that writes cicd-platform labels has
+            # to answer for, and would drop kargo from every cluster without it.
+            secrets:
+              clusterSecretStoreName: '{{ if eq (index .metadata.labels "cicd-platform.stuttgart-things.com/secrets-config" | default "") "true" }}{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/kargo-secret-store" | default "" }}{{ end }}'
+              vaultSecretName: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/kargo-secret-key" | default .name }}'
+            # The tag above, again: the secrets Application reads the same
+            # release the install chart comes from. Its own renovate comment,
+            # so a bump moves both.
+            catalog:
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.57.0
       syncPolicy:
         automated:
           prune: true
