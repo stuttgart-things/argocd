@@ -80,6 +80,42 @@ spec:
       secret:
         name: {{ .Values.bootstrap.secretName | quote }}
   {{- end }}
+  # The owner role's password, reconciled instead of inherited.
+  #
+  # `bootstrap` is read ONLY at creation, and on the recovery path it is not
+  # read at all: the role and its SCRAM verifier come out of the restored data,
+  # so a recovered Cluster accepts the SOURCE cluster's password and nothing
+  # else. Measured on homerun2-dev2, 2026-09-27: the data restored perfectly
+  # (18 players, 77 matches, identical last played_at) and the app's `migrate`
+  # init container crashlooped anyway --
+  #
+  #   failed SASL auth: FATAL: password authentication failed
+  #   for user "schmetterpause" (SQLSTATE 28P01)
+  #
+  # -- because the ClusterStack model gives every cluster its own Vault entry
+  # (crossplane-configurations#464), so the consumer's password is by design
+  # NOT the source's. Nothing reports the mismatch; the Cluster is "in healthy
+  # state" and only the app fails.
+  #
+  # Declaring the role here makes CNPG reconcile the password from the same
+  # Secret the app reads, on every reconcile, so recovery and rotation both
+  # land without a hand-run ALTER ROLE.
+  #
+  # On an EXISTING cluster this is a no-op as long as the Secret already holds
+  # the live password -- which it must, or the app would not be connecting.
+  # Note that CNPG sets the attributes it does not list to their defaults; the
+  # owner role initdb creates has LOGIN and nothing else, which is what is
+  # written out below.
+  managed:
+    roles:
+      - name: {{ .Values.bootstrap.owner | quote }}
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        passwordSecret:
+          name: {{ .Values.bootstrap.secretName | quote }}
   {{- if $recovery.enabled }}
   # The server to replay from, through the read-only ObjectStore in
   # templates/backup.yaml. Reading only: nothing here can write to that path.
