@@ -1,6 +1,6 @@
 # cicd/kargo
 
-Catalog entries for [Kargo](https://kargo.akuity.io/) — multi-stage promotion orchestrator for GitOps. Three independently deployable pieces, mirroring the Cilium layout — consumers create one ArgoCD `Application` per piece they need.
+Catalog entries for [Kargo](https://kargo.akuity.io/) — multi-stage promotion orchestrator for GitOps. Three independently deployable pieces, mirroring the Cilium layout — consumers create one ArgoCD `Application` per piece they need. A fourth, `secrets/`, is rendered by `install` itself.
 
 ## Layout
 
@@ -9,6 +9,7 @@ cicd/kargo/
 ├── install/      app-of-apps — renders Application "kargo" (OCI Helm, sync-wave 0)
 ├── certs/        plain Helm chart — renders cert-manager Certificate(s) for the API hostname
 ├── httproute/    plain Helm chart — renders Gateway API HTTPRoute(s) for the API
+├── secrets/      plain Helm chart — kargo-admin from Vault through ESO; rendered BY install, not by a consumer
 └── README.md
 ```
 
@@ -74,7 +75,11 @@ Argo CD 2.8+ with `helm.enableOciSupport: true` (default) is required. The regis
 
 ### Credentials
 
-`api.adminAccount.passwordHash` and `api.adminAccount.tokenSigningKey` ship as empty placeholders — **don't deploy as-is**. Consumers inject real credentials one of three ways:
+`api.adminAccount.passwordHash` and `api.adminAccount.tokenSigningKey` ship as empty placeholders — **don't deploy as-is**.
+
+**On a ClusterStack cluster with the `kargo` profile, nothing is done by hand.** The stack writes `kargo/<cluster>` in Vault (`password`, `tokenSigningKey`), derives the store and the gate `cicd-platform.stuttgart-things.com/secrets-config`, and `platforms/cicd/appset-kargo` passes `secrets.clusterSecretStoreName` to `install`, which then renders [`secrets/`](#secrets) — see there (stuttgart-things/stuttgart-things#3232).
+
+Everywhere else, consumers inject real credentials one of three ways:
 
 1. **External Secrets / Vault**: a secret-management operator writes `kargo-admin` into the namespace, then the consumer overlay sets `extraValues.api.adminAccount.existingSecret: kargo-admin`.
 2. **Argo CD Vault Plugin**: wrap the consumer-side Application source in a plugin overlay that templates `<path:vault/data/kargo#password-hash>` placeholders.
@@ -104,10 +109,24 @@ See `install/values.yaml` / `install/values.schema.json` for the full contract.
 | `api.tls.enabled` | `false` | TLS terminates at the Gateway / Ingress, not the API Service |
 | `api.ingress.enabled` | `false` | Chart Ingress disabled in favor of `httproute/` |
 | `api.adminAccount.*` | empty placeholders | See *Credentials* above |
+| `secrets.clusterSecretStoreName` | `""` | Non-empty renders the sibling Application `<name>-secrets` from [`secrets/`](#secrets). A string rather than an `enabled` flag, because an ApplicationSet templates only strings |
+| `secrets.vaultSecretName` | `""` | Vault entry with `password` + `tokenSigningKey`; required once a store is named |
+| `secrets.secretName` | `kargo-admin` | Must match the upstream chart's `api.secret.name` |
+| `catalog.repoURL` / `targetRevision` | this repo / `""` | Where `secrets/` is read from; the revision is required once a store is named — pass the tag `install` itself comes from |
 | `controller.logLevel` / `garbageCollector.logLevel` | `INFO` | Log levels (`DEBUG`/`INFO`/`WARN`/`ERROR`) |
 | `webhooksServer.tls.selfSignedCert` | `true` | Webhook TLS bootstraps via its own self-signed cert |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
 | `syncPolicy` | automated + retry | Applied to the rendered child Application |
+
+## secrets/
+
+One `ExternalSecret`, `kargo-admin`, rendered as a sibling Application by `install` (sync-wave `-10`, ahead of Kargo) — not meant to be consumed directly.
+
+Kargo wants `ADMIN_ACCOUNT_PASSWORD_HASH` as a bcrypt hash (`$2a$`). Vault holds the password **in plain** — an AppSecretProfile can generate a value, not hash one — so ESO's template engine hashes it (`bcrypt`, golang.org/x/crypto). The plain value is also what a person logs in with: `vault kv get kargo/<cluster>`.
+
+`refreshPolicy: CreatedOnce`, because bcrypt salts: every refresh would write a new, equally valid hash. **Rotate** by changing the Vault entry, deleting the `kargo-admin` Secret (ESO recreates it) and restarting `kargo-api`, which reads it only at start.
+
+An empty `vaultSecretName` renders nothing, on purpose: a default entry would read another cluster's admin credential without a word.
 
 ## certs/
 

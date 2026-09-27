@@ -87,6 +87,23 @@
       },
       "required": ["tls"]
     },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterSecretStoreName": { "type": "string" },
+        "vaultSecretName":        { "type": "string" },
+        "secretName":             { "type": "string", "minLength": 1 }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL":        { "type": "string", "minLength": 1 },
+        "targetRevision": { "type": "string" }
+      }
+    },
     "extraValues": {
       "type": "object",
       "additionalProperties": true
