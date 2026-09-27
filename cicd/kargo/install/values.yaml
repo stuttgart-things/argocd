@@ -44,6 +44,24 @@ webhooksServer:
   tls:
     selfSignedCert: true
 
+# kargo-admin from Vault through External Secrets (../secrets). OFF while
+# clusterSecretStoreName is empty -- then kargo-admin is the hand-made Secret
+# ../README.md describes. A string, not an `enabled` flag, because an
+# ApplicationSet can template only strings into these values.
+secrets:
+  clusterSecretStoreName: ""
+  # Vault KV entry carrying `password` and `tokenSigningKey`; on a ClusterStack
+  # cluster, the cluster's own name.
+  vaultSecretName: ""
+  # Must match the upstream chart's `api.secret.name`, which the consumer sets.
+  secretName: kargo-admin
+
+# Where ../secrets is read from. targetRevision is required once secrets are on:
+# the tag this chart itself is rendered from, so the two cannot drift.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: ""
+
 # Deep-merged on top of the computed valuesObject passed to the upstream chart.
 # Use for any upstream key not exposed as a first-class value above (resources,
 # nodeSelector, image pinning, extra env, OIDC config, etc.).
