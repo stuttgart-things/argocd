@@ -61,8 +61,9 @@ Usage: include "tabletennis.subValues" (dict "computed" $computed "override" .Va
 
 {{/*
 tabletennis.schmetterpauseOverride -- schmetterpause's pass-through `values`,
-with `database.backup.enabled` and `database.recovery.enabled` turned into real
-booleans when they are present.
+with `database.backup.enabled`, `database.recovery.enabled` and the
+application's own `monitoring`, `policy`, `scoreboard` and `kiosk` switches
+turned into real booleans when they are present.
 
 A platform AppSet templates them from cluster annotations
 (`tabletennis-platform.stuttgart-things.com/db-backup-enabled` and
@@ -87,6 +88,17 @@ Returns JSON; callers fromJson it.
 {{- if and (kindIs "map" $b) (hasKey $b "enabled") -}}
 {{- $_ := set $b "enabled" (eq (toString (get $b "enabled")) "true") -}}
 {{- end -}}
+{{- end -}}
+{{- end -}}
+{{- /* The same treatment for the application's own switches, which a platform
+       AppSet templates from cluster annotations for the same reason. Listed
+       explicitly rather than "every .enabled found": a rename upstream should
+       fail the render here, not silently stop converting and hand a string to
+       a schema that wants a boolean. */ -}}
+{{- range $block := list "monitoring" "policy" "scoreboard" "kiosk" -}}
+{{- $b := get $v $block -}}
+{{- if and (kindIs "map" $b) (hasKey $b "enabled") -}}
+{{- $_ := set $b "enabled" (eq (toString (get $b "enabled")) "true") -}}
 {{- end -}}
 {{- end -}}
 {{- toJson $v -}}
