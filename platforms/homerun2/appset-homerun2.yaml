@@ -28,9 +28,16 @@
 # string fails the chart schema, which wants a boolean. In `values` the text is
 # parsed as YAML by Helm, so `enabled: true` is a real bool -- the technique
 # platforms/network/appset-cert-manager-cluster-ca.yaml already uses. The
-# earlier comment here said booleans were impossible; they are not. Argo CD
-# merges `valuesObject` OVER `values`, so no `enabled` key may appear in
-# valuesObject below.
+# earlier comment here said booleans were impossible; they are not.
+#
+# EVERY COMPONENT BLOCK LIVES WHOLLY IN `values`. Argo CD combines `values` and
+# `valuesObject` at the TOP LEVEL only: a `ledCatcher:` block in valuesObject
+# carrying just a hostname REPLACES the `ledCatcher:` block of `values`, its
+# `enabled` with it, and the chart default applies. That is how #544 shipped:
+# led-catcher (chart default off) vanished everywhere, and the opt-outs of the
+# default-on components were ignored. valuesObject keeps only keys `values`
+# never sets (applicationName, project, catalog, destination, cascadingDelete,
+# httpRoute, secrets).
 #
 # Turning redis-stack off breaks every catcher and pitcher unless they point at
 # another Redis; it is a toggle for a cluster that runs one elsewhere.
@@ -126,51 +133,6 @@ spec:
           # read as "not set".
           values: |
             {{- $l := default (dict) .metadata.labels }}
-            redisStack:
-              enabled: {{ ne (default "" (index $l "homerun2-platform/redis-stack")) "false" }}
-            omniPitcher:
-              enabled: {{ ne (default "" (index $l "homerun2-platform/omni-pitcher")) "false" }}
-            coreCatcher:
-              enabled: {{ ne (default "" (index $l "homerun2-platform/core-catcher")) "false" }}
-            scout:
-              enabled: {{ ne (default "" (index $l "homerun2-platform/scout")) "false" }}
-            ledCatcher:
-              enabled: {{ ne (default "" (index $l "homerun2-platform/led-catcher")) "false" }}
-            lightCatcher:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/light-catcher")) "true" }}
-            wledMock:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/wled-mock")) "true" }}
-            demoPitcher:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/demo-pitcher")) "true" }}
-            configViewer:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/config-viewer")) "true" }}
-            notificationCatcher:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/notification-catcher")) "true" }}
-            gitPitcher:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/git-pitcher")) "true" }}
-            k8sPitcher:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/k8s-pitcher")) "true" }}
-            smokeTest:
-              enabled: {{ eq (default "" (index $l "homerun2-platform/smoke-test")) "true" }}
-          valuesObject:
-            # MUST differ from this template's own metadata.name above -- see the
-            # comment there.
-            applicationName: 'homerun2-{{ .name }}'
-            project: '{{ .name }}'
-            catalog:
-              repoURL: https://github.com/stuttgart-things/argocd.git
-              # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.56.0
-            # Target the labelled remote cluster, not the management one.
-            destination:
-              server: '{{ .server }}'
-              namespace: homerun2
-            # A long-lived platform install: an opt-out should stop Argo CD
-            # managing homerun2, not uninstall it -- and against an already
-            # deregistered cluster a prune can never complete, leaving the child
-            # Applications stuck in Terminating (#324).
-            cascadingDelete: false
-
             # Component VERSIONS are intentionally not overridden -- they inherit
             # apps/homerun2/install/values.yaml, which Renovate keeps bumped, so
             # the platform tracks the released chart default rather than a second
@@ -190,8 +152,8 @@ spec:
             # Without a ScoutProfile scout runs on its environment defaults and
             # leaves alerting off -- add one through an overlay if the cluster
             # wants alerts.
-
             redisStack:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/redis-stack")) "false" }}
               persistence:
                 enabled: true
                 # The chart default is `standard`, which does not exist on these
@@ -205,8 +167,8 @@ spec:
               # exactly this name.
               auth:
                 existingSecret: redis-stack-auth
-
             omniPitcher:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/omni-pitcher")) "false" }}
               # The chart patches the HTTPRoute shipped inside the omni-pitcher
               # OCI (parentRef + hostname) and the shared -httproute
               # Application skips omni-pitcher. Off, BOTH rendered a route of
@@ -240,31 +202,59 @@ spec:
                   - match:
                       system: tabletennis
                     stream: tabletennis
-
             coreCatcher:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/core-catcher")) "false" }}
               hostname: 'core-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
-
             scout:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/scout")) "false" }}
               hostname: 'scout.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
-
             # The catcher zaehlwerk switches onto the tabletennis stream during a
             # match. On in the flux platform profile too; harmless on a cluster
             # without tabletennis, where it just consumes `messages`.
             ledCatcher:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/led-catcher")) "false" }}
               hostname: 'led-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
-
             # ---- extras (opt-in, see the header) ----------------------------
             # Hostnames only; each renders nothing while its toggle is off.
             lightCatcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/light-catcher")) "true" }}
               hostname: 'light-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             wledMock:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/wled-mock")) "true" }}
               hostname: 'wled-mock.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             demoPitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/demo-pitcher")) "true" }}
               hostname: 'demo-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             configViewer:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/config-viewer")) "true" }}
               hostname: 'config-viewer.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            notificationCatcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/notification-catcher")) "true" }}
             gitPitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/git-pitcher")) "true" }}
               hostname: 'git-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            k8sPitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/k8s-pitcher")) "true" }}
+            smokeTest:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/smoke-test")) "true" }}
+          valuesObject:
+            # MUST differ from this template's own metadata.name above -- see the
+            # comment there.
+            applicationName: 'homerun2-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.56.0
+            # Target the labelled remote cluster, not the management one.
+            destination:
+              server: '{{ .server }}'
+              namespace: homerun2
+            # A long-lived platform install: an opt-out should stop Argo CD
+            # managing homerun2, not uninstall it -- and against an already
+            # deregistered cluster a prune can never complete, leaving the child
+            # Applications stuck in Terminating (#324).
+            cascadingDelete: false
 
             httpRoute:
               enabled: true
