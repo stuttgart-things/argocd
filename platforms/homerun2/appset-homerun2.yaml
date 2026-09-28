@@ -30,14 +30,14 @@
 # platforms/network/appset-cert-manager-cluster-ca.yaml already uses. The
 # earlier comment here said booleans were impossible; they are not.
 #
-# EVERY COMPONENT BLOCK LIVES WHOLLY IN `values`. Argo CD combines `values` and
-# `valuesObject` at the TOP LEVEL only: a `ledCatcher:` block in valuesObject
-# carrying just a hostname REPLACES the `ledCatcher:` block of `values`, its
-# `enabled` with it, and the chart default applies. That is how #544 shipped:
-# led-catcher (chart default off) vanished everywhere, and the opt-outs of the
-# default-on components were ignored. valuesObject keeps only keys `values`
-# never sets (applicationName, project, catalog, destination, cascadingDelete,
-# httpRoute, secrets).
+# EVERYTHING LIVES IN `values`; there is NO `valuesObject`. When a source sets
+# `valuesObject`, Argo CD uses it and IGNORES `values` altogether -- it does not
+# merge them. #544 had toggles in `values` and the rest in `valuesObject`, so
+# every toggle, hostname and the omni-pitcher routes were dropped: led-catcher
+# (chart default off) vanished, the omni-pitcher route collided again on the
+# placeholder hostname, and the opt-outs did nothing (#545 moved blocks between
+# the two, which could not help). platforms/network/appset-cert-manager-
+# cluster-ca.yaml, the precedent, likewise has `values` only.
 #
 # Turning redis-stack off breaks every catcher and pitcher unless they point at
 # another Redis; it is a toggle for a cluster that runs one elsewhere.
@@ -110,7 +110,7 @@ spec:
       project: '{{ .name }}'
       # The parent renders Application CRDs, which must land in the argocd ns on
       # the management cluster. The children target the remote cluster via
-      # valuesObject.destination.server below.
+      # destination.server in the values below.
       destination:
         server: https://kubernetes.default.svc
         namespace: argocd
@@ -237,7 +237,7 @@ spec:
               enabled: {{ eq (default "" (index $l "homerun2-platform/k8s-pitcher")) "true" }}
             smokeTest:
               enabled: {{ eq (default "" (index $l "homerun2-platform/smoke-test")) "true" }}
-          valuesObject:
+            # ---- not component toggles: the app-of-apps wiring ----
             # MUST differ from this template's own metadata.name above -- see the
             # comment there.
             applicationName: 'homerun2-{{ .name }}'
