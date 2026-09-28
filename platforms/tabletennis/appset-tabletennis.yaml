@@ -197,10 +197,47 @@ spec:
                   recovery:
                     enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-recovery-enabled") }}'
                     sourceServerName: '{{ default "schmetterpause-db" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-recovery-source-server-name") }}'
-                # Monitoring stays off: it needs the Prometheus Operator CRDs,
-                # which come from observability-platform, and its `enabled` is a
-                # boolean an AppSet cannot template from a label. Turn it on
-                # through an overlay on clusters that run the stack.
+                # Die Schalter der Anwendung selbst. Gleiche Form wie der
+                # database-Block darueber: aus Cluster-Annotationen, als STRINGS,
+                # die apps/tabletennis/install in Booleans wandelt
+                # (tabletennis.schmetterpauseOverride). Alles ausser "true" ist aus.
+                #
+                # Frueher stand hier, Monitoring muesse ueber ein Overlay laufen,
+                # weil ein AppSet keine Booleans erzeugen kann. Das stimmt nicht
+                # mehr, seit die Umwandlung existiert -- und ein Overlay gab es nie,
+                # weshalb KEIN AppSet-Cluster diese Funktionen hatte, waehrend der
+                # handregistrierte homerun2-test1 sie alle trug (#3228).
+                #
+                # monitoring braucht die Prometheus-Operator-CRDs aus
+                # observability-platform; ohne sie synct die Application nicht.
+                # Nur auf Clustern einschalten, die den Stack fahren.
+                monitoring:
+                  enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/monitoring-enabled") }}'
+                # Kyverno-Policy, CLUSTERWEIT: sie gilt fuer schmetterpause und
+                # alle schmetterpause-pr-*. Nur an EINER Stelle je Cluster
+                # einschalten, sonst streiten zwei Applications um ein Objekt.
+                policy:
+                  enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/policy-enabled") }}'
+                # Die JSON-Flaeche, die das Zaehlwerk liest. Ohne Token registriert
+                # die Anwendung die Routen gar nicht -- der Schalter IST die Flaeche.
+                # vaultPath default: der Eintrag, den ein ClusterStack selbst anlegt
+                # (schmetterpause/<cluster>-scoreboard, crossplane-configurations#464).
+                scoreboard:
+                  enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/scoreboard-enabled") }}'
+                  vaultPath: '{{ default (printf "%s-scoreboard" .name) (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/scoreboard-vault-path") }}'
+                  vaultProperty: token
+                # Der Kiosk -- der einzige Weg zurueck fuer jemanden, der PIN UND
+                # Wiederherstellungscode verloren hat (schmetterpause ADR-0006).
+                # Der Eintrag muss VOR dem Einschalten existieren, sonst hoert das
+                # ganze App-Secret auf zu synchronisieren. Ein ClusterStack legt ihn
+                # NOCH NICHT an, deshalb hier ohne Namens-Default.
+                kiosk:
+                  enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/kiosk-enabled") }}'
+                  vaultPath: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/kiosk-vault-path") }}'
+                  vaultProperty: token
+                # Der erste Admin, bei jedem Start vergeben (ADR-0008). Leer setzt
+                # nichts, was nach dem ersten Durchlauf der Normalzustand ist.
+                bootstrapAdmin: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/bootstrap-admin") }}'
 
             zaehlwerk:
               enabled: true
