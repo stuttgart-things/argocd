@@ -25,20 +25,41 @@ The fixed profile is what `flux/apps/homerun2/profiles/platform` installs:
 plus the ExternalSecrets for every component's Redis password and the `/pitch`
 bearer token.
 
-Off, at their chart defaults: k8s-pitcher, light-catcher, wled-mock,
-config-viewer, demo-pitcher, git-pitcher, notification-catcher, the ScoutProfile
-and the smoke-test. Component **versions** are not overridden either — they
+The component set is chosen per cluster by labels -- see *Components* below. A
+cluster that carries only the umbrella gets exactly the core five above.
+Component **versions** are not overridden — they
 inherit `apps/homerun2/install/values.yaml`, which Renovate keeps bumped, so the
 platform tracks the released chart default rather than a second pinned copy.
 
-### Why the profile is fixed
+### Components
 
-An ApplicationSet can only template **strings** into a chart's values. A
-`<component>.enabled` boolean therefore cannot come from a cluster label without
-widening all thirteen of those schemas to accept a string — and the string
-`"false"` is truthy in a Go template, so every one of them would also need a
-`toString` comparison. A cluster that needs a different component set uses the
-aggregator-overlay model instead (repo README, *When to pick which model*).
+| Component | Kind | Label to flip it | Notes |
+|---|---|---|---|
+| redis-stack | core (on) | `homerun2-platform/redis-stack: 'false'` | every catcher/pitcher needs a Redis; off only with another one |
+| omni-pitcher | core (on) | `homerun2-platform/omni-pitcher: 'false'` | route inline (`inlineHttpRoute: true`, #518) |
+| core-catcher | core (on) | `homerun2-platform/core-catcher: 'false'` | |
+| scout | core (on) | `homerun2-platform/scout: 'false'` | no ScoutProfile: alerting off |
+| led-catcher | core (on) | `homerun2-platform/led-catcher: 'false'` | |
+| light-catcher | extra (off) | `homerun2-platform/light-catcher: 'true'` | drives WLED; the mock unless configured |
+| wled-mock | extra (off) | `homerun2-platform/wled-mock: 'true'` | dev/lab |
+| demo-pitcher | extra (off) | `homerun2-platform/demo-pitcher: 'true'` | dev/lab |
+| config-viewer | extra (off) | `homerun2-platform/config-viewer: 'true'` | read-only view |
+| notification-catcher | extra (off) | `homerun2-platform/notification-catcher: 'true'` | needs its notify ConfigMap + Teams webhook, out of band |
+| git-pitcher | extra (off) | `homerun2-platform/git-pitcher: 'true'` | needs the shared GitHub token (`…/shared-git-pat-secret-key`) |
+| k8s-pitcher | extra (off) | `homerun2-platform/k8s-pitcher: 'true'` | needs cluster RBAC + a profile ConfigMap |
+| smoke-test | extra (off) | `homerun2-platform/smoke-test: 'true'` | |
+
+**Core** components are opt-OUT (on unless `'false'`), so a cluster that only
+carries the umbrella keeps the set this AppSet shipped before the labels
+existed. **Extras** are opt-IN (off unless `'true'`): under "absent means on"
+every cluster carrying the umbrella would start them on the next sync.
+
+How: the toggles go through `helm.values`, a YAML **string** that Helm parses,
+so `enabled: true` arrives as a real boolean -- the same technique as
+`platforms/network/appset-cert-manager-cluster-ca.yaml`. (This README used to
+say booleans could not come from labels; they can, through `values` rather than
+`valuesObject`.) Argo CD merges `valuesObject` over `values`, so no `enabled`
+key may be set in `valuesObject`.
 
 ## Labels and annotations
 

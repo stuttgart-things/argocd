@@ -138,10 +138,15 @@ spec:
     observability-platform.stuttgart-things.com/secrets-config: 'true'
 
     # ---- profile: homerun2-platform ----
-    # The homerun2 event bus: redis-stack + omni-pitcher + core-catcher + scout +
-    # led-catcher. The component set is FIXED — see platforms/homerun2/README.md.
+    # The homerun2 event bus. Core components (on unless 'false'):
+    # redis-stack, omni-pitcher, core-catcher, scout, led-catcher. Extras (off
+    # unless 'true'): light-catcher, wled-mock, demo-pitcher, config-viewer,
+    # notification-catcher, git-pitcher, k8s-pitcher, smoke-test.
+    # See platforms/homerun2/README.md, "Components".
     homerun2-platform: 'true'
     homerun2-platform/stack: 'true'             # → appset-homerun2 [ann: fqdn, secret-store]
+    # homerun2-platform/scout: 'false'          # core, opt-out
+    # homerun2-platform/light-catcher: 'true'   # extra, opt-in
     # gate — set this to 'true' only once the ClusterSecretStore named in the
     # secret-store annotation exists and can read the entry.
     # ExternalSecrets fail closed: label it too early and the Pods sit in

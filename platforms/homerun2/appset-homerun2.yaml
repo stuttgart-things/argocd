@@ -8,16 +8,35 @@
 # apps/homerun2/install, which in turn renders the redis-stack, the pitchers and
 # catchers, and the routes.
 #
-# THE PROFILE IS FIXED: redis-stack + omni-pitcher + core-catcher + scout +
-# led-catcher, which is what `flux/apps/homerun2/profiles/platform` installs. It
-# is not per-cluster selectable, and that is a limitation of the mechanism rather
-# than a decision: an AppSet can only template STRINGS into a chart's values, so
-# a `<component>.enabled` boolean cannot come from a cluster label without
-# widening every one of those thirteen schemas to accept a string. A cluster that
-# needs a different component set uses the aggregator-overlay model instead (see
-# the repo README, "When to pick which model").
+# COMPONENTS ARE PER-CLUSTER LABELS, two kinds:
 #
-# Opt a cluster out with label `homerun2-platform/stack: "false"`.
+#   core   ON unless `homerun2-platform/<component>: "false"`
+#          redis-stack, omni-pitcher, core-catcher, scout, led-catcher
+#          -- what `flux/apps/homerun2/profiles/platform` installs, and what
+#          this AppSet shipped as a fixed set until the labels existed, so a
+#          cluster that only carries the umbrella keeps exactly that.
+#   extra  OFF unless `homerun2-platform/<component>: "true"`
+#          light-catcher, wled-mock, demo-pitcher, config-viewer,
+#          notification-catcher, git-pitcher, k8s-pitcher, smoke-test
+#          -- dev/lab tools, hardware, or things that need more than the
+#          AppSecretProfile provides (see the notes at each below). Opt-in, not
+#          opt-out: under "absent means on" every cluster carrying the umbrella
+#          today would start them on the next sync.
+#
+# The toggles arrive through `helm.values`, a YAML STRING, not `valuesObject`:
+# an AppSet can only template strings, and a `<component>.enabled: "true"`
+# string fails the chart schema, which wants a boolean. In `values` the text is
+# parsed as YAML by Helm, so `enabled: true` is a real bool -- the technique
+# platforms/network/appset-cert-manager-cluster-ca.yaml already uses. The
+# earlier comment here said booleans were impossible; they are not. Argo CD
+# merges `valuesObject` OVER `values`, so no `enabled` key may appear in
+# valuesObject below.
+#
+# Turning redis-stack off breaks every catcher and pitcher unless they point at
+# another Redis; it is a toggle for a cluster that runs one elsewhere.
+#
+# The whole stack is opted out with `homerun2-platform/stack: "false"`, as
+# before (selector below).
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -101,6 +120,38 @@ spec:
         path: apps/homerun2/install
         helm:
           releaseName: 'homerun2-{{ .name }}'
+          # The component toggles -- see the header. Core: `ne … "false"`,
+          # extras: `eq … "true"`. `default ""` because missingkey=error would
+          # otherwise not apply to `index`, but an absent label still has to
+          # read as "not set".
+          values: |
+            {{- $l := default (dict) .metadata.labels }}
+            redisStack:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/redis-stack")) "false" }}
+            omniPitcher:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/omni-pitcher")) "false" }}
+            coreCatcher:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/core-catcher")) "false" }}
+            scout:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/scout")) "false" }}
+            ledCatcher:
+              enabled: {{ ne (default "" (index $l "homerun2-platform/led-catcher")) "false" }}
+            lightCatcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/light-catcher")) "true" }}
+            wledMock:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/wled-mock")) "true" }}
+            demoPitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/demo-pitcher")) "true" }}
+            configViewer:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/config-viewer")) "true" }}
+            notificationCatcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/notification-catcher")) "true" }}
+            gitPitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/git-pitcher")) "true" }}
+            k8sPitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/k8s-pitcher")) "true" }}
+            smokeTest:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/smoke-test")) "true" }}
           valuesObject:
             # MUST differ from this template's own metadata.name above -- see the
             # comment there.
@@ -125,17 +176,22 @@ spec:
             # the platform tracks the released chart default rather than a second
             # pinned copy.
             #
-            # Components left at their chart defaults (off): k8s-pitcher,
-            # light-catcher, wled-mock, config-viewer, demo-pitcher, git-pitcher,
-            # notification-catcher, the ScoutProfile and the smoke-test. The
-            # first five are dev/lab tools, git-pitcher is the cicd profile, and
-            # notification-catcher needs a notify ConfigMap this bundle cannot
-            # know. Without a ScoutProfile scout runs on its environment defaults
-            # and leaves alerting off -- add one through an overlay if the cluster
+            # Which components run is decided by the `values` toggles above.
+            # Everything below configures a component IF it runs; for one that
+            # is off it renders nothing.
+            #
+            # Extras that need more than this AppSet knows:
+            #   notification-catcher  its notify ConfigMap
+            #                         (homerun2-notification-catcher-notify)
+            #                         and the Teams webhook, out of band
+            #   git-pitcher           the shared GitHub token entry
+            #                         (…/shared-git-pat-secret-key below)
+            #   k8s-pitcher           cluster RBAC and a profile ConfigMap
+            # Without a ScoutProfile scout runs on its environment defaults and
+            # leaves alerting off -- add one through an overlay if the cluster
             # wants alerts.
 
             redisStack:
-              enabled: true
               persistence:
                 enabled: true
                 # The chart default is `standard`, which does not exist on these
@@ -151,7 +207,13 @@ spec:
                 existingSecret: redis-stack-auth
 
             omniPitcher:
-              enabled: true
+              # The chart patches the HTTPRoute shipped inside the omni-pitcher
+              # OCI (parentRef + hostname) and the shared -httproute
+              # Application skips omni-pitcher. Off, BOTH rendered a route of
+              # the same name and the OCI's placeholder
+              # homerun2-omni-pitcher.example.com won (#518, #498) -- the one
+              # hostname alerts are sent to.
+              inlineHttpRoute: true
               hostname: 'omni-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               # The stream allowlist the bus offers, matching what the flux path
               # ships. `tabletennis` is in it on every cluster, not only those
@@ -180,19 +242,29 @@ spec:
                     stream: tabletennis
 
             coreCatcher:
-              enabled: true
               hostname: 'core-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
 
             scout:
-              enabled: true
               hostname: 'scout.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
 
             # The catcher zaehlwerk switches onto the tabletennis stream during a
             # match. On in the flux platform profile too; harmless on a cluster
             # without tabletennis, where it just consumes `messages`.
             ledCatcher:
-              enabled: true
               hostname: 'led-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+
+            # ---- extras (opt-in, see the header) ----------------------------
+            # Hostnames only; each renders nothing while its toggle is off.
+            lightCatcher:
+              hostname: 'light-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            wledMock:
+              hostname: 'wled-mock.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            demoPitcher:
+              hostname: 'demo-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            configViewer:
+              hostname: 'config-viewer.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            gitPitcher:
+              hostname: 'git-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
 
             httpRoute:
               enabled: true

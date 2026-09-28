@@ -110,11 +110,29 @@ bundle changes the behaviour of nothing already running. See
 ### `homerun2-platform` — the homerun2 event bus
 | Label | AppSet | Needs annotations |
 |---|---|---|
-| `homerun2-platform` | `appset-homerun2` → redis-stack + omni-pitcher + core-catcher + scout + led-catcher, their routes and their ExternalSecrets (the `flux/apps/homerun2/profiles/platform` profile) | **gate** `homerun2-platform.stuttgart-things.com/secrets-config: 'true'` + `…/secret-store` **(user)**; optional `…/secret-key` (def cluster name), `…/storage-class` (def `openebs-hostpath`), `…/redis-storage-size` (def `8Gi`); `…/fqdn` *(auto)* for every hostname |
+| `homerun2-platform` | `appset-homerun2` → by default redis-stack + omni-pitcher + core-catcher + scout + led-catcher (the `flux/apps/homerun2/profiles/platform` set), their routes and their ExternalSecrets; every component is a label (below) | **gate** `homerun2-platform.stuttgart-things.com/secrets-config: 'true'` + `…/secret-store` **(user)**; optional `…/secret-key` (def cluster name), `…/storage-class` (def `openebs-hostpath`), `…/redis-storage-size` (def `8Gi`); `…/fqdn` *(auto)* for every hostname |
 
-Opt one cluster out with `homerun2-platform/stack: 'false'`. The component set is
-fixed — an AppSet can only template strings, so a `<component>.enabled` boolean
-cannot come from a label. See [`platforms/homerun2`](./homerun2/).
+Opt one cluster out with `homerun2-platform/stack: 'false'`. Components are
+per-cluster labels: **core** ones are on unless `homerun2-platform/<component>:
+'false'`, **extras** are off unless `'true'`:
+
+| Component | Kind | Label to flip it | Notes |
+|---|---|---|---|
+| redis-stack | core (on) | `homerun2-platform/redis-stack: 'false'` | every catcher/pitcher needs a Redis; off only with another one |
+| omni-pitcher | core (on) | `homerun2-platform/omni-pitcher: 'false'` | route inline (`inlineHttpRoute: true`, #518) |
+| core-catcher | core (on) | `homerun2-platform/core-catcher: 'false'` | |
+| scout | core (on) | `homerun2-platform/scout: 'false'` | no ScoutProfile: alerting off |
+| led-catcher | core (on) | `homerun2-platform/led-catcher: 'false'` | |
+| light-catcher | extra (off) | `homerun2-platform/light-catcher: 'true'` | drives WLED; the mock unless configured |
+| wled-mock | extra (off) | `homerun2-platform/wled-mock: 'true'` | dev/lab |
+| demo-pitcher | extra (off) | `homerun2-platform/demo-pitcher: 'true'` | dev/lab |
+| config-viewer | extra (off) | `homerun2-platform/config-viewer: 'true'` | read-only view |
+| notification-catcher | extra (off) | `homerun2-platform/notification-catcher: 'true'` | needs its notify ConfigMap + Teams webhook, out of band |
+| git-pitcher | extra (off) | `homerun2-platform/git-pitcher: 'true'` | needs the shared GitHub token (`…/shared-git-pat-secret-key`) |
+| k8s-pitcher | extra (off) | `homerun2-platform/k8s-pitcher: 'true'` | needs cluster RBAC + a profile ConfigMap |
+| smoke-test | extra (off) | `homerun2-platform/smoke-test: 'true'` | |
+
+See [`platforms/homerun2`](./homerun2/).
 
 ### `tabletennis-platform` — schmetterpause + zaehlwerk
 | Label | AppSet | Needs annotations |
