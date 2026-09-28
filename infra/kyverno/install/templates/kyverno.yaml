@@ -26,9 +26,15 @@ spec:
     namespace: {{ .Values.destination.namespace | quote }}
   # Suppress permanent OutOfSync from server-side defaulted fields the upstream
   # chart doesn't set (Kyverno is otherwise Healthy). Verified diffs:
-  #   * CRDs: the chart renders metadata.labels as an empty {} the live object
-  #     lacks (ArgoCD won't normalise it away), and the API server defaults
-  #     spec.conversion to {strategy: None} the chart omits.
+  #   * CRDs: the chart renders metadata.labels AND metadata.annotations as an
+  #     empty {} on the eleven policies.kyverno.io CRDs, which the live objects
+  #     lack (ArgoCD won't normalise it away), and the API server defaults
+  #     spec.conversion to {strategy: None} the chart omits. Labels were ignored
+  #     from the start; the empty annotations were missed, and that alone kept
+  #     every kyverno-security-* Application OutOfSync on every cluster -- the
+  #     CRDs whose chart metadata is filled never were (checked 2026-09-28,
+  #     stuttgart-things/stuttgart-things#3220). Only an EMPTY map is dropped:
+  #     a real annotation still diffs.
   #   * kyverno-migrate-resources: a completed Helm post-upgrade hook Job; Jobs
   #     are immutable and the controller auto-populates selector/labels/defaults.
   ignoreDifferences:
@@ -36,6 +42,7 @@ spec:
       kind: CustomResourceDefinition
       jqPathExpressions:
         - .metadata.labels
+        - .metadata.annotations | select(. == {})
         - .spec.conversion
     - group: batch
       kind: Job
