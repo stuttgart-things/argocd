@@ -33,13 +33,11 @@ syncPolicy:
     # Honour the chart's ignoreDifferences during sync/selfHeal so it never
     # tries to rewrite the server-defaulted CRD/Job fields it can't change.
     - RespectIgnoreDifferences=true
-    # NOTE: on clusters that strip managedFields (e.g. k3s), the CRDs may still
-    # show as OutOfSync. ServerSideApply's diff needs managedFields to honour
-    # ignoreDifferences; with none present the controller reports false-positive
-    # diffs on spec.conversion / empty metadata.labels. This is cosmetic only —
-    # Kyverno installs and runs Healthy. ServerSideDiff=true does NOT help (it
-    # also needs managedFields). The real fix is cluster-side: retain
-    # managedFields. The client-side diff (`argocd app diff --core`) is clean.
+    # The CRDs that used to stay OutOfSync did so because of an EMPTY
+    # metadata.annotations the chart renders and ignoreDifferences did not
+    # cover (see templates/kyverno.yaml). NOT because k3s strips managedFields,
+    # as this note used to say: the live CRDs on k3s carry managedFields from
+    # argocd-controller (Apply) and k3s (Update) (checked 2026-09-28).
   retry:
     limit: 5
     backoff:
