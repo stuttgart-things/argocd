@@ -46,7 +46,21 @@ spec:
           # + Dashboard + Chains + Results), targetNamespace=tekton-pipelines.
           # Override per-cluster via cluster Secret annotations + a
           # valuesObject override here if profiles diverge in the future.
-          valuesObject: {}
+          #
+          # READ-ONLY DASHBOARD. The operator's default is `readonly: false`
+          # (a plain bool with no defaulting, tektoncd/operator v0.79.0,
+          # docs/TektonDashboard.md), and tekton-dashboard-httproute-cicd puts
+          # the dashboard on tekton.<cluster-fqdn> with nothing in front of it.
+          # Read-write, anyone who reaches that name can create PipelineRuns
+          # with the dashboard's service account. Since
+          # stuttgart-things/stuttgart-things#3262 any ClusterStack can switch
+          # tekton on from a Backstage checkbox, so the safe side is the
+          # default here. A cluster that needs to START runs from the UI needs
+          # authentication in front of the route first, not this flag flipped.
+          valuesObject:
+            extraSpec:
+              dashboard:
+                readonly: true
       syncPolicy:
         automated:
           prune: true
