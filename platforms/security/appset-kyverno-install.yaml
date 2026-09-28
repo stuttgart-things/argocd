@@ -86,7 +86,20 @@ spec:
               # otherwise. Granting it here keeps the security-platform
               # bundle self-contained for ESO-driven policies (e.g.
               # `apps/homerun2/preview-secrets`).
+              # MEMORY. The chart default limit for both controllers is 128Mi.
+              # On tabletennis (harvester, 2026-09-28) both sat at 127Mi of
+              # 128Mi under memory pressure: the kernel kept evicting and
+              # re-reading their pages, ~45 MiB/s of reads between the two,
+              # I/O pressure 97% in the VM, etcd applies timed out, the
+              # control plane lost leader election and k3s restarted in a loop.
+              # They scale with the number of resources and policies watched,
+              # not with traffic, so a busier cluster outgrows 128Mi quietly.
               backgroundController:
+                resources:
+                  requests:
+                    memory: 128Mi
+                  limits:
+                    memory: 512Mi
                 rbac:
                   coreClusterRole:
                     extraResources:
@@ -108,6 +121,12 @@ spec:
                       - apiGroups: ["batch"]
                         resources: ["jobs"]
                         verbs: ["create", "update", "patch", "delete"]
+              reportsController:
+                resources:
+                  requests:
+                    memory: 128Mi
+                  limits:
+                    memory: 512Mi
       syncPolicy:
         automated:
           prune: true
