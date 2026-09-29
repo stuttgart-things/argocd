@@ -16,7 +16,9 @@ pipeline:
   # (e.g. StepActions, v1 TaskRun inline specs).
   enableApiFields: beta
   # Blocks `spec.taskSpec` / `pipelineSpec` inline usage when set to
-  # "false" or "true". Empty string ("") = operator default.
+  # "false" or "true". Empty string ("") = operator default, and the key is
+  # then left out of the TektonConfig altogether (an empty value is dropped
+  # by the API server and would keep the Application OutOfSync).
   disableInlineSpec: ""
 
 # Tekton resource pruner (operator-managed CronJob that trims old TaskRuns /
