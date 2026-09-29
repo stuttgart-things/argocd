@@ -1,9 +1,15 @@
+{{- /* disable-inline-spec only when it says something: rendered as "" it is
+    dropped by the API server, and Argo CD keeps the Application OutOfSync
+    forever over a field that means "operator default" (seen on every
+    cicd-platform cluster, stuttgart-things/stuttgart-things#3232). */}}
+{{- $pipeline := dict "enable-api-fields" .Values.pipeline.enableApiFields }}
+{{- with .Values.pipeline.disableInlineSpec }}
+{{- $_ := set $pipeline "disable-inline-spec" . }}
+{{- end }}
 {{- $computed := dict
     "targetNamespace" .Values.targetNamespace
     "profile" .Values.profile
-    "pipeline" (dict
-        "enable-api-fields"   .Values.pipeline.enableApiFields
-        "disable-inline-spec" .Values.pipeline.disableInlineSpec)
+    "pipeline" $pipeline
     "pruner" (dict
         "disabled"  .Values.pruner.disabled
         "schedule"  .Values.pruner.schedule
