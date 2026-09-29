@@ -112,13 +112,16 @@ spec:
             # demo field instead of coming up as an empty ranking.
             version: 'pr-{{ .number }}-{{ .head_sha }}'
 
-            # Covered by the gateway's wildcard certificate
-            # (*.homerun2-test1.sthings-vsphere.labul.sva.de) and by wildcard
-            # DNS, so a new PR needs neither a record nor a certificate.
-            hostname: 'schmetterpause-pr-{{ .number }}.homerun2-test1.sthings-vsphere.labul.sva.de'
+            # Covered by the gateway's wildcard certificate and by wildcard DNS
+            # of whichever cluster carries the label, so a new PR needs neither
+            # a record nor a certificate. Derived from the cluster, as the
+            # homerun2 previews do -- this used to name homerun2-test1, which
+            # made the label useless on any other cluster (app-dev,
+            # stuttgart-things/stuttgart-things#3065).
+            hostname: 'schmetterpause-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
 
             gateway:
-              name: homerun2-test1-gateway
+              name: '{{ .name }}-gateway'
               namespace: default
 
             secretStore:
