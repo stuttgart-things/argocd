@@ -222,7 +222,18 @@ scoreboard:
   # There is deliberately no fallback to the app's entry: the template fails to
   # render without a value here rather than quietly addressing the dangerous
   # one.
-  vaultPath: schmetterpause-scoreboard
+  #
+  # EMPTY BY DEFAULT since the fleet-wide entry `schmetterpause-scoreboard` goes
+  # away with homerun2-test1 (crossplane-configurations#464 step 7). That cluster
+  # was the only reader; every ClusterStack cluster gets `<cluster>-scoreboard`,
+  # written by its own VaultSecretSet, and the platform AppSet passes the name in.
+  #
+  # A default pointing at a path that no longer exists is WORSE than none: ESO
+  # fails the WHOLE ExternalSecret on a missing property, so the app would lose
+  # SP_SESSION_KEY with it and sign every player out. Empty makes the schema
+  # refuse `scoreboard.enabled: true` without a path -- loud, at render time, on
+  # the consumer that forgot it.
+  vaultPath: ""
   vaultProperty: token
 
 # The kiosk: one browser at the table that may enter results for anyone and
