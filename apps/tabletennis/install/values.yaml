@@ -100,7 +100,7 @@ schmetterpause:
   namespace: schmetterpause
   hostname: ""                       # empty = schmetterpause.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-  version: v0.13.0
+  version: v0.14.0
   # Display name of the player who gets the admin flag at every start
   # (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing, which is
   # the normal state after the first pass: the person has to have joined
