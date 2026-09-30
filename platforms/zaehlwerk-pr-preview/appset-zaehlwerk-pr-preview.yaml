@@ -1,0 +1,116 @@
+---
+# Per-PR preview environments for stuttgart-things/zaehlwerk.
+#
+# Fans out across (clusters labelled zaehlwerk-pr-preview: "true") x (open PRs
+# on zaehlwerk carrying the `preview` label). One parent Application per cell,
+# rendering apps/zaehlwerk/install with the PR's artefact, its own namespace
+# and its own hostname -- the same shape as platforms/homerun2-pr-preview and
+# platforms/schmetterpause-pr-preview.
+#
+# A preview is zaehlwerk ALONE: no panel, no schmetterpause. Both are optional
+# upstream (an absent OMNI_PITCHER_URL / schmetterpause url is a first-class
+# way to run, ADR-0004), and both would be wrong here -- a test match must not
+# take over the real LED strip or be reported into the real league.
+#
+# Prereqs not declared here:
+#   - The target cluster registered with the label zaehlwerk-pr-preview: "true".
+#   - CI publishing ghcr.io/stuttgart-things/zaehlwerk{,-kustomize}:pr-<n>-<head sha>
+#     (zaehlwerk .github/workflows/push-kustomize-pr.yaml).
+#
+# What it does NOT need, because the platform already has it: the PR-reader
+# token (homerun2-omni-pitcher-pat, shared by every preview set), the
+# AppProject (cluster-projects grants namespace '*'), and Vault work -- the
+# panel ExternalSecret reads the same entry the cluster's permanent zaehlwerk
+# reads, see secretStore below.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: zaehlwerk-pr-preview
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  zaehlwerk-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: zaehlwerk
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                # The opt-in: CI builds an artefact for every PR, but a
+                # Renovate bump does not need an environment.
+                labels:
+                  - preview
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'zaehlwerk-pr-{{ .number }}'
+      labels:
+        zaehlwerk.stuttgart-things.com/pr: '{{ .number }}'
+      # Without it Argo deletes the parent the moment the generator drops the
+      # PR and orphans the child and its workload. With it, prune runs first.
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      # The parent renders an Application, so it lands in argocd on the
+      # management cluster; the workload cluster has no argoproj.io CRDs.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/zaehlwerk/install
+        helm:
+          releaseName: 'zaehlwerk-pr-{{ .number }}'
+          valuesObject:
+            # NOT the parent's name: the chart uses applicationName verbatim for
+            # its child, and a child called zaehlwerk-pr-<n> would be the parent.
+            applicationName: 'zaehlwerk-pr-{{ .number }}-app'
+            project: '{{ .name }}'
+            destination:
+              name: '{{ .name }}'
+              namespace: 'zaehlwerk-pr-{{ .number }}'
+
+            # The per-PR base; its image is zaehlwerk:pr-<n>-<head sha>.
+            version: 'pr-{{ .number }}-{{ .head_sha }}'
+
+            # Under the gateway's wildcard certificate and wildcard DNS of
+            # whichever cluster carries the label, derived from the cluster as
+            # the other previews do.
+            hostname: 'zaehlwerk-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            gateway:
+              name: '{{ .name }}-gateway'
+              namespace: default
+              sectionName: https
+
+            # The panel ExternalSecret has to resolve for the Application to be
+            # Healthy, even with no panel wired (both keys are optional in the
+            # Pod). It reads homerun2's own entry for this cluster -- what the
+            # cluster's permanent zaehlwerk reads (vault-homerun2, entry
+            # <cluster> on app-dev). A cluster whose homerun2 store is named
+            # differently says so in this annotation.
+            secretStore:
+              kind: ClusterSecretStore
+              name: '{{ default "vault-homerun2" (index (default (dict) .metadata.annotations) "zaehlwerk-pr-preview.stuttgart-things.com/secret-store") }}'
+            homerun2Secrets:
+              vaultEntry: '{{ .name }}'
+
+            # A closed PR takes its workload with it (the chart default, stated
+            # because the platforms/ AppSets turn it off).
+            cascadingDelete: true
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

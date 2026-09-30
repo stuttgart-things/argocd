@@ -1,0 +1,52 @@
+---
+# Namespace sweep for zaehlwerk previews: a Kyverno ClusterCleanupPolicy per
+# labelled cluster that deletes zaehlwerk-pr-* namespaces once they are older
+# than an hour and have no Pods. CreateNamespace=true does not track the
+# namespace for prune, so without it every closed PR leaves an empty namespace
+# behind. Same chart and shape as the homerun2 sweeps
+# (platforms/homerun2-pr-preview/appset-policies.yaml); the cluster's Kyverno
+# cleanup controller needs pods get/list for it (security platform).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: zaehlwerk-pr-preview-sweep
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            zaehlwerk-pr-preview: "true"
+  template:
+    metadata:
+      name: 'zaehlwerk-preview-sweep-{{ .name }}'
+    spec:
+      project: '{{ .name }}'
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/homerun2/preview-sweep
+        helm:
+          releaseName: zaehlwerk-preview-sweep
+          valuesObject:
+            name: zaehlwerk-preview-sweep
+            namespacePrefix: "zaehlwerk-pr-*"
+      destination:
+        name: '{{ .name }}'
+        namespace: kyverno
+      ignoreDifferences:
+        - group: kyverno.io
+          kind: ClusterCleanupPolicy
+          jqPathExpressions:
+            - .spec.context[].apiCall.method
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - ServerSideApply=true
