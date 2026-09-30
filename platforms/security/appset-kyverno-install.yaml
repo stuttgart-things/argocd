@@ -78,6 +78,17 @@ spec:
                       - apiGroups: [""]
                         resources: ["namespaces"]
                         verbs: ["get", "list", "watch", "delete"]
+                      # The homerun2 preview-sweep lists a namespace's Pods
+                      # (context apiCall `nsPods`) to skip live previews.
+                      # Without this the call fails "permission denied" the
+                      # moment a namespace MATCHES -- the policy stops
+                      # executing, and orphaned preview namespaces were
+                      # never reclaimed (homerun2-light-catcher-pr-78,
+                      # stuttgart-things/argocd#561). Sweeps with no match
+                      # still look healthy, which is why it went unnoticed.
+                      - apiGroups: [""]
+                        resources: ["pods"]
+                        verbs: ["get", "list"]
               # Background-controller's RBAC needs `external-secrets.io`
               # CRD verbs so `generate` rules can produce ExternalSecret
               # resources. Kyverno's admission webhook validates the
