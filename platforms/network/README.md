@@ -6,6 +6,7 @@ All ApplicationSets share a base anchor — the ArgoCD cluster `Secret` enriched
 
 ```
 clusterbook.stuttgart-things.com/allocation-ip: <label exists>
+clusterbook.stuttgart-things.com/cluster-ready: "true"   # label, clusterbook-operator >= v0.21.0
 clusterbook.stuttgart-things.com/ip:    <annotation, the reserved IP>
 clusterbook.stuttgart-things.com/fqdn:  <annotation, the reserved FQDN>
 ```
@@ -20,6 +21,8 @@ clusterbook.stuttgart-things.com/vault-token-secret:<annotation, Secret name>   
 ```
 
 These are emitted by `ClusterbookCluster` and `ClusterbookAllocation` CRs. Nothing here generates until clusterbook-operator has populated them.
+
+`allocation-ip` only says that an IP was booked. `cluster-ready` is the readiness gate: clusterbook-operator (>= v0.21.0) sets it once the cluster's `/readyz` has answered 200, and it latches — a later outage does not remove it, so Applications are not pulled from a cluster that goes down temporarily ([clusterbook-operator#119](https://github.com/stuttgart-things/clusterbook-operator/issues/119)). The operator stamps it only on Secrets it renders (create mode); a Secret registered in enrich mode (`spec.existingSecretRef`) carries neither `allocation-ip` nor `cluster-ready` and is not selected here either way.
 
 ## Opt-in: `network-platform` master gate + per-feature toggles
 
@@ -52,6 +55,9 @@ matchLabels:
 matchExpressions:
   - key: clusterbook.stuttgart-things.com/allocation-ip
     operator: Exists
+  - key: clusterbook.stuttgart-things.com/cluster-ready
+    operator: In
+    values: ["true"]
   - key: network-platform/<feature>
     operator: NotIn
     values: ["false"]
@@ -66,6 +72,9 @@ matchLabels:
 matchExpressions:
   - key: clusterbook.stuttgart-things.com/allocation-ip
     operator: Exists
+  - key: clusterbook.stuttgart-things.com/cluster-ready
+    operator: In
+    values: ["true"]
 ```
 
 Default-enabled means: cluster Secret needs `network-platform: "true"` to receive the component, and can opt out with `network-platform/<feature>: "false"`. Missing per-feature labels default to enabled (NotIn ["false"] matches both true and missing).
@@ -98,7 +107,7 @@ If you need real ordering (e.g. to swap the selfsigned + cluster-ca chain for a 
 kubectl apply -k https://github.com/stuttgart-things/argocd.git/platforms/network?ref=main
 ```
 
-All ApplicationSets land in the `argocd` namespace on the management cluster. They become active once clusterbook-operator labels the cluster Secret with `allocation-ip` **and** the `ClusterbookCluster` carries `spec.labels.network-platform: "true"` (plus, optionally, per-feature opt-in / opt-out toggles).
+All ApplicationSets land in the `argocd` namespace on the management cluster. They become active once clusterbook-operator labels the cluster Secret with `allocation-ip` and `cluster-ready=true` **and** the `ClusterbookCluster` carries `spec.labels.network-platform: "true"` (plus, optionally, per-feature opt-in / opt-out toggles).
 
 ## Enabling the secondary gateway
 
