@@ -15,6 +15,12 @@ spec:
           matchExpressions:
             - key: clusterbook.stuttgart-things.com/allocation-ip
               operator: Exists
+            # Latched by clusterbook-operator >= v0.21.0 once the cluster's
+            # /readyz answered 200 (clusterbook-operator#119) -- allocation-ip
+            # alone only says an IP was booked, not that the API server is up.
+            - key: clusterbook.stuttgart-things.com/cluster-ready
+              operator: In
+              values: ["true"]
             - key: network-platform/cert-manager-cluster-ca
               operator: NotIn
               values: ["false"]
