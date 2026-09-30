@@ -148,7 +148,7 @@ Opt out with `tabletennis-platform/tabletennis: 'false'`. See
 [`platforms/tabletennis`](./tabletennis/).
 
 ### Opt-in app/preview platforms (single label, no umbrella)
-`homerun2-pr-preview` · `machinery-pr-preview` · `machinery-catalog-publisher-pr-preview`
+`homerun2-pr-preview` · `machinery-pr-preview` · `machinery-catalog-publisher-pr-preview` · `schmetterpause-pr-preview` · `zaehlwerk-pr-preview`
 — set the label to `'true'` to fan the matching `platforms/<name>/` AppSets onto the cluster.
 
 ## Annotations: who sets them
