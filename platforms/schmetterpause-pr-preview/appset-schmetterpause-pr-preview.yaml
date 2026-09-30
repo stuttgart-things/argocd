@@ -3,8 +3,11 @@
 #
 # Fans out across (clusters labelled schmetterpause-pr-preview: "true") ×
 # (open PRs on schmetterpause carrying the `preview` label). One parent
-# Application per cell, rendering apps/schmetterpause/install with the PR's
-# artefact, its own namespace, its own hostname and its own database.
+# Application per cell, rendering the tabletennis bundle
+# (apps/tabletennis/install) into its own namespace: schmetterpause from the
+# PR's artefact with its own database, plus zaehlwerk at its released version,
+# wired by the handover -- so a change to GET /api/players or POST /api/results
+# is seen from the side that calls them.
 #
 # Why this app gets previews at all: Schmetterpause is a browser app whose
 # premise is a colleague opening it on their phone in a break. "Does this look
@@ -28,10 +31,10 @@
 #     cluster labelled auto-project, and that chart always grants
 #     `name: <cluster>, namespace: '*'` — so schmetterpause-pr-* is allowed
 #     without an extraDestination.
-#   - No Vault work per preview. ClusterSecretStore `vault-schmetterpause`
-#     authenticates as the cluster's ESO service account rather than per
-#     namespace, so an ExternalSecret in a preview namespace resolves like any
-#     other.
+#   - No Vault work per preview. The ClusterSecretStores authenticate as the
+#     cluster's ESO service account rather than per namespace, so an
+#     ExternalSecret in a preview namespace resolves like any other; the
+#     entries are the ones the cluster's tabletennis platform reads.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -90,68 +93,88 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
-        path: apps/schmetterpause/install
+        path: apps/tabletennis/install
         helm:
           releaseName: 'schmetterpause-pr-{{ .number }}'
           valuesObject:
-            # NOT the parent's name. The chart uses applicationName verbatim
-            # for the app Application and `<name>-db` for the database, so a
-            # child called `schmetterpause-pr-5` would be the same object as
-            # its parent, overwrite the parent's spec, and leave the sync
-            # waiting on the deletion of itself.
-            applicationName: 'schmetterpause-pr-{{ .number }}-app'
+            # The bundle (apps/tabletennis/install): schmetterpause and zaehlwerk
+            # together, wired by the handover -- the one place the two meet
+            # (zaehlwerk ADR-0004, schmetterpause ADR-0015). A preview of either
+            # side shows the other too. Both in the preview's namespace.
+            #
+            # NOT the parent's name: the chart names its children
+            # <applicationName>-schmetterpause / -zaehlwerk, and a child called
+            # schmetterpause-pr-<n> would be the parent.
+            applicationName: 'schmetterpause-pr-{{ .number }}-bundle'
             project: '{{ .name }}'
             destination:
               name: '{{ .name }}'
-              namespace: 'schmetterpause-pr-{{ .number }}'
-
-            # The per-PR artefact. CI tags the image and the kustomize base
-            # with pr-<number>-<full head sha>, which is exactly what
-            # .head_sha carries — and the artefact under that tag is the only
-            # one that contains the seed Job, so a preview fills itself with a
-            # demo field instead of coming up as an empty ranking.
-            version: 'pr-{{ .number }}-{{ .head_sha }}'
-
-            # Covered by the gateway's wildcard certificate and by wildcard DNS
-            # of whichever cluster carries the label, so a new PR needs neither
-            # a record nor a certificate. Derived from the cluster, as the
-            # homerun2 previews do -- this used to name homerun2-test1, which
-            # made the label useless on any other cluster (app-dev,
-            # stuttgart-things/stuttgart-things#3065).
-            hostname: 'schmetterpause-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
-
+            domain: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             gateway:
               name: '{{ .name }}-gateway'
               namespace: default
+              sectionNameHTTPS: https
+              sectionNameHTTP: http
 
+            # Stores and entries as the cluster's tabletennis platform reads them
+            # (annotations stamped by its ClusterStack), so a preview reads what
+            # the cluster's permanent schmetterpause and zaehlwerk read -- and the
+            # handover token from <entry>-scoreboard, one credential both sides of
+            # the preview read.
             secretStore:
               kind: ClusterSecretStore
-              name: vault-schmetterpause
+              name: '{{ default "vault-schmetterpause" (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-store") }}'
+            secretSources:
+              schmetterpause:
+                store: '{{ default "vault-schmetterpause" (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-store") }}'
+                entry: '{{ default .name (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-key") }}'
+              homerun2:
+                store: '{{ default "vault-homerun2" (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/homerun2-secret-store") }}'
+                entry: '{{ default .name (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/homerun2-secret-key") }}'
 
-            database:
-              enabled: true
-              instances: 1
-              # OFF here, and only here. The Cluster is normally annotated
-              # Prune=false + Delete=false, because the PVC hangs off it and
-              # the permanent instance must survive a bad render. A preview is
-              # the opposite case: it is meant to die with its pull request.
-              #
-              # With the guard on, tearing a preview down leaves the Postgres
-              # pod, its three Services and a 1Gi volume running in a namespace
-              # nothing points at any more — observed on pr-187, 86 minutes
-              # after the pull request was merged and the application was long
-              # gone.
-              protect: false
-              storage:
-                # A preview is thrown away in days and holds a fixture, so it
-                # gets an eighth of what the permanent instance has. The
-                # number matters: this is one PVC per open labelled pull
-                # request, which is the cost #82 called the expensive half.
-                size: 1Gi
-                # Explicit, always: this cluster has TWO default
-                # StorageClasses (local-path and openebs-hostpath), and an
-                # unclassed PVC gets an undefined one of them.
-                storageClass: openebs-hostpath
+            # No panel and no LED strip: a test match must not take over the
+            # real strip. Empty homerun2.namespace is the chart's "homerun2 is
+            # not here" -- zaehlwerk runs without a panel, the light-catcher is
+            # refused.
+            homerun2:
+              namespace: ""
+            lightCatcher:
+              enabled: false
+
+            schmetterpause:
+              namespace: 'schmetterpause-pr-{{ .number }}'
+              # Under the gateway's wildcard certificate and wildcard DNS: one
+              # label, derived from the cluster like every other preview.
+              hostname: 'schmetterpause-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              # The PR's artefact; only `pr-*` artefacts carry the seed Job, so the
+                # preview fills itself with a demo field.
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              # The receiving side of the handover; with zaehlwerk.handover on
+              # (the default) this one switch wires both ends.
+              scoreboard:
+                enabled: true
+              values:
+                database:
+                  enabled: true
+                  instances: 1
+                  # OFF here, and only here: a preview is meant to die with its
+                  # pull request, and with the guard on the Postgres pod and its
+                  # volume outlive it (observed on pr-187).
+                  protect: false
+                  storage:
+                    # One PVC per open labelled PR -- an eighth of the permanent
+                    # instance. Explicit class: this cluster has TWO defaults.
+                    size: 1Gi
+                    storageClass: openebs-hostpath
+
+            zaehlwerk:
+              namespace: 'schmetterpause-pr-{{ .number }}'
+              hostname: 'zaehlwerk-schmetterpause-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              # At the chart's released version: this preview is about schmetterpause.
+              panel: false
+
+            # A closed PR takes its workloads with it.
+            cascadingDelete: true
       syncPolicy:
         automated:
           prune: true

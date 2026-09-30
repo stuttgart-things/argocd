@@ -29,11 +29,16 @@ For pull request 42 on a cluster called `homerun2-test1`:
 | | |
 |---|---|
 | Parent Application | `schmetterpause-pr-42` (argocd ns, management cluster) |
-| App Application | `schmetterpause-pr-42-app` |
-| Database Application | `schmetterpause-pr-42-app-db` (sync wave -10) |
-| Namespace | `schmetterpause-pr-42` |
-| URL | `https://schmetterpause-pr-42.homerun2-test1.sthings-vsphere.labul.sva.de` |
-| Artefacts | `ghcr.io/stuttgart-things/schmetterpause{,-kustomize}:pr-42-<head sha>` |
+| Children | `schmetterpause-pr-42-bundle-schmetterpause` (+ its database), `schmetterpause-pr-42-bundle-zaehlwerk` |
+| Namespace | `schmetterpause-pr-42` (both apps) |
+| URLs | `https://schmetterpause-pr-42.<fqdn>`, `https://zaehlwerk-schmetterpause-pr-42.<fqdn>` |
+| Artefacts | `schmetterpause{,-kustomize}:pr-42-<head sha>`, zaehlwerk at the tabletennis chart's version |
+
+The cell is the tabletennis bundle (`apps/tabletennis/install`): the PR's
+schmetterpause plus a released zaehlwerk wired to it by the handover
+(`scoreboard.enabled`), so a change to `GET /api/players`, `/api/operators` or
+`POST /api/results` is seen from the side that calls them. No panel, no LED
+strip. See `platforms/zaehlwerk-pr-preview/README.md` for the mirror image.
 
 The parent's name and `applicationName` differ on purpose. The chart uses
 `applicationName` verbatim, so a child sharing the parent's name would *be* the
