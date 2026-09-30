@@ -24,31 +24,30 @@ For pull request 54 on `app-dev`:
 | | |
 |---|---|
 | Parent Application | `zaehlwerk-pr-54` (argocd ns, management cluster) |
-| App Application | `zaehlwerk-pr-54-app` |
-| Namespace | `zaehlwerk-pr-54` |
-| URL | `https://zaehlwerk-pr-54.app-dev.sthings-vsphere.labul.sva.de` |
-| Artefacts | `ghcr.io/stuttgart-things/zaehlwerk{,-kustomize}:pr-54-<head sha>` |
+| Children | `zaehlwerk-pr-54-bundle-zaehlwerk`, `zaehlwerk-pr-54-bundle-schmetterpause` (+ its database) |
+| Namespace | `zaehlwerk-pr-54` (both apps) |
+| URLs | `https://zaehlwerk-pr-54.<fqdn>`, `https://schmetterpause-zaehlwerk-pr-54.<fqdn>` |
+| Artefacts | `zaehlwerk{,-kustomize}:pr-54-<head sha>`, `schmetterpause-kustomize:preview` |
 
-The parent's name and `applicationName` differ on purpose: the chart uses
-`applicationName` verbatim, so a child sharing the parent's name would *be* the
-parent.
+## What a preview is
 
-## What a preview is — and is not
+The tabletennis bundle (`apps/tabletennis/install`): zaehlwerk from the PR plus
+a schmetterpause of its own, wired by the handover (zaehlwerk ADR-0004) — the
+one place the two meet. zaehlwerk takes its players **and** the people allowed
+to keep score from schmetterpause, so that schmetterpause is the `preview` tag:
+main, rendered with the seed Job (schmetterpause CI job `kustomize-preview`). A
+release artefact has no seed, and an empty league would make the preview
+unusable. A won match lands in the preview's league, never in the real one.
 
-zaehlwerk **alone**. The panel (omni-pitcher, led-catcher) and the
-schmetterpause handover are left off: both are optional upstream, and both
-would be wrong in a preview — a test match must not take over the real LED
-strip or land in the real league. With no panel URL the chart removes
-`OMNI_PITCHER_URL` from the ConfigMap, which is zaehlwerk's "no panel".
+Both apps read the entries the cluster's tabletennis platform reads (cluster
+annotations `tabletennis-platform.stuttgart-things.com/{schmetterpause,homerun2}-secret-{store,key}`),
+including the handover token `<entry>-scoreboard` — one credential both sides
+of the preview read.
 
-zaehlwerk owns no database (the running match is in memory), so unlike
-schmetterpause a preview costs one Pod and no volume.
+No panel and no LED strip: `homerun2.namespace` is empty, which is the chart's
+"homerun2 is not here", so a test match cannot take over the real strip.
 
-The panel ExternalSecret still has to resolve for the Application to be
-Healthy. It reads homerun2's entry for the cluster (`<cluster>` under
-`vault-homerun2`), exactly what the cluster's permanent zaehlwerk reads. A
-cluster whose homerun2 store has another name sets the annotation
-`zaehlwerk-pr-preview.stuttgart-things.com/secret-store`.
+A preview costs the zaehlwerk Pod plus a schmetterpause with a 1Gi Postgres.
 
 ## Opt-in
 

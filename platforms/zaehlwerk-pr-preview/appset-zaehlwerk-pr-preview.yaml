@@ -3,25 +3,24 @@
 #
 # Fans out across (clusters labelled zaehlwerk-pr-preview: "true") x (open PRs
 # on zaehlwerk carrying the `preview` label). One parent Application per cell,
-# rendering apps/zaehlwerk/install with the PR's artefact, its own namespace
-# and its own hostname -- the same shape as platforms/homerun2-pr-preview and
-# platforms/schmetterpause-pr-preview.
+# rendering the tabletennis bundle (apps/tabletennis/install) into its own
+# namespace: zaehlwerk from the PR's artefact plus a schmetterpause of its own
+# (seeded `preview` tag), wired by the handover -- the one place the two meet.
+# A won match lands in the preview's league, never in the real one.
 #
-# A preview is zaehlwerk ALONE: no panel, no schmetterpause. Both are optional
-# upstream (an absent OMNI_PITCHER_URL / schmetterpause url is a first-class
-# way to run, ADR-0004), and both would be wrong here -- a test match must not
-# take over the real LED strip or be reported into the real league.
+# No panel and no LED strip: a test match must not take over the real strip.
 #
 # Prereqs not declared here:
 #   - The target cluster registered with the label zaehlwerk-pr-preview: "true".
 #   - CI publishing ghcr.io/stuttgart-things/zaehlwerk{,-kustomize}:pr-<n>-<head sha>
-#     (zaehlwerk .github/workflows/push-kustomize-pr.yaml).
+#     (zaehlwerk .github/workflows/push-kustomize-pr.yaml) and
+#     schmetterpause-kustomize:preview (schmetterpause CI job kustomize-preview).
 #
 # What it does NOT need, because the platform already has it: the PR-reader
 # token (homerun2-omni-pitcher-pat, shared by every preview set), the
-# AppProject (cluster-projects grants namespace '*'), and Vault work -- the
-# panel ExternalSecret reads the same entry the cluster's permanent zaehlwerk
-# reads, see secretStore below.
+# AppProject (cluster-projects grants namespace '*'), and Vault work -- both
+# apps read the entries the cluster's permanent tabletennis platform reads,
+# see secretSources below.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -69,44 +68,89 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         targetRevision: main
-        path: apps/zaehlwerk/install
+        path: apps/tabletennis/install
         helm:
           releaseName: 'zaehlwerk-pr-{{ .number }}'
           valuesObject:
-            # NOT the parent's name: the chart uses applicationName verbatim for
-            # its child, and a child called zaehlwerk-pr-<n> would be the parent.
-            applicationName: 'zaehlwerk-pr-{{ .number }}-app'
+            # The bundle (apps/tabletennis/install): schmetterpause and zaehlwerk
+            # together, wired by the handover -- the one place the two meet
+            # (zaehlwerk ADR-0004, schmetterpause ADR-0015). A preview of either
+            # side shows the other too. Both in the preview's namespace.
+            #
+            # NOT the parent's name: the chart names its children
+            # <applicationName>-schmetterpause / -zaehlwerk, and a child called
+            # zaehlwerk-pr-<n> would be the parent.
+            applicationName: 'zaehlwerk-pr-{{ .number }}-bundle'
             project: '{{ .name }}'
             destination:
               name: '{{ .name }}'
-              namespace: 'zaehlwerk-pr-{{ .number }}'
-
-            # The per-PR base; its image is zaehlwerk:pr-<n>-<head sha>.
-            version: 'pr-{{ .number }}-{{ .head_sha }}'
-
-            # Under the gateway's wildcard certificate and wildcard DNS of
-            # whichever cluster carries the label, derived from the cluster as
-            # the other previews do.
-            hostname: 'zaehlwerk-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+            domain: '{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             gateway:
               name: '{{ .name }}-gateway'
               namespace: default
-              sectionName: https
+              sectionNameHTTPS: https
+              sectionNameHTTP: http
 
-            # The panel ExternalSecret has to resolve for the Application to be
-            # Healthy, even with no panel wired (both keys are optional in the
-            # Pod). It reads homerun2's own entry for this cluster -- what the
-            # cluster's permanent zaehlwerk reads (vault-homerun2, entry
-            # <cluster> on app-dev). A cluster whose homerun2 store is named
-            # differently says so in this annotation.
+            # Stores and entries as the cluster's tabletennis platform reads them
+            # (annotations stamped by its ClusterStack), so a preview reads what
+            # the cluster's permanent schmetterpause and zaehlwerk read -- and the
+            # handover token from <entry>-scoreboard, one credential both sides of
+            # the preview read.
             secretStore:
               kind: ClusterSecretStore
-              name: '{{ default "vault-homerun2" (index (default (dict) .metadata.annotations) "zaehlwerk-pr-preview.stuttgart-things.com/secret-store") }}'
-            homerun2Secrets:
-              vaultEntry: '{{ .name }}'
+              name: '{{ default "vault-schmetterpause" (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-store") }}'
+            secretSources:
+              schmetterpause:
+                store: '{{ default "vault-schmetterpause" (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-store") }}'
+                entry: '{{ default .name (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/schmetterpause-secret-key") }}'
+              homerun2:
+                store: '{{ default "vault-homerun2" (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/homerun2-secret-store") }}'
+                entry: '{{ default .name (index .metadata.annotations "tabletennis-platform.stuttgart-things.com/homerun2-secret-key") }}'
 
-            # A closed PR takes its workload with it (the chart default, stated
-            # because the platforms/ AppSets turn it off).
+            # No panel and no LED strip: a test match must not take over the
+            # real strip. Empty homerun2.namespace is the chart's "homerun2 is
+            # not here" -- zaehlwerk runs without a panel, the light-catcher is
+            # refused.
+            homerun2:
+              namespace: ""
+            lightCatcher:
+              enabled: false
+
+            schmetterpause:
+              namespace: 'zaehlwerk-pr-{{ .number }}'
+              # Under the gateway's wildcard certificate and wildcard DNS: one
+              # label, derived from the cluster like every other preview.
+              hostname: 'schmetterpause-zaehlwerk-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              # Moving tag: main, rendered with the seed Job (schmetterpause CI job
+                # kustomize-preview). zaehlwerk takes its players AND the people
+                # allowed to keep score from here, so an empty league would make
+                # the zaehlwerk preview unusable.
+              version: preview
+              # The receiving side of the handover; with zaehlwerk.handover on
+              # (the default) this one switch wires both ends.
+              scoreboard:
+                enabled: true
+              values:
+                database:
+                  enabled: true
+                  instances: 1
+                  # OFF here, and only here: a preview is meant to die with its
+                  # pull request, and with the guard on the Postgres pod and its
+                  # volume outlive it (observed on pr-187).
+                  protect: false
+                  storage:
+                    # One PVC per open labelled PR -- an eighth of the permanent
+                    # instance. Explicit class: this cluster has TWO defaults.
+                    size: 1Gi
+                    storageClass: openebs-hostpath
+
+            zaehlwerk:
+              namespace: 'zaehlwerk-pr-{{ .number }}'
+              hostname: 'zaehlwerk-pr-{{ .number }}.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              version: 'pr-{{ .number }}-{{ .head_sha }}'
+              panel: false
+
+            # A closed PR takes its workloads with it.
             cascadingDelete: true
       syncPolicy:
         automated:
