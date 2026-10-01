@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/part-of: zaehlwerk
+spec:
+  replicas: 1
+  # One board per table: a second one would take turns on the same match.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.name }}
+        app.kubernetes.io/part-of: zaehlwerk
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: piezo
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          env:
+            - name: ZAEHLWERK_URL
+              value: {{ .Values.zaehlwerkURL | quote }}
+            # Wait for a match started on the page, like the real board.
+            - name: PIEZO_JOIN
+              value: "true"
+            # 0 = keep going: after a match, wait for the next.
+            - name: PIEZO_MATCHES
+              value: "0"
+            - name: PIEZO_BEST_OF
+              value: {{ .Values.board.bestOf | quote }}
+            - name: PIEZO_PACE
+              value: {{ .Values.board.pace | quote }}
+            - name: PIEZO_AMBIGUOUS
+              value: {{ .Values.board.ambiguous | quote }}
+            - name: PIEZO_RESEND
+              value: {{ .Values.board.resend | quote }}
+            - name: PIEZO_UNDO
+              value: {{ .Values.board.undo | quote }}
+            - name: PIEZO_SEED
+              value: {{ .Values.board.seed | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

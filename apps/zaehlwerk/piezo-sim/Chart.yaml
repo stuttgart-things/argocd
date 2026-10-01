@@ -1,0 +1,5 @@
+apiVersion: v2
+name: zaehlwerk-piezo-sim
+description: The piezo board simulator (zaehlwerk tools/chain-mock, image zaehlwerk-piezo) as a Deployment next to a zaehlwerk — for PR previews, where a reviewer starts a match on the scoring page and the board plays it like the real hardware would.
+type: application
+version: 0.1.0

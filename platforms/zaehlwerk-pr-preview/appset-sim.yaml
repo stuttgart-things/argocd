@@ -1,0 +1,78 @@
+---
+# The piezo board simulator for a zaehlwerk preview, opt-in per PR: a PR
+# carrying BOTH `preview` and `preview-sim` gets apps/zaehlwerk/piezo-sim in
+# its preview namespace. The board waits, like the real one, until a match is
+# started on the preview's scoring page, then plays it through POST
+# /ingest/piezo -- with the duplicates, delta-0 events and undos zaehlwerk has
+# to absorb -- and the won match goes over the handover into the preview's own
+# schmetterpause.
+#
+# Its own AppSet rather than a switch in the bundle: the pullRequest generator
+# filters on labels, so taking `preview-sim` off removes just the board, and a
+# preview without it costs nothing extra.
+#
+# The board image is the PR's (zaehlwerk CI builds zaehlwerk-piezo:pr-<n>-<sha>
+# alongside the app), so a PR that changes the board runs its own board.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: zaehlwerk-pr-preview-sim
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  zaehlwerk-pr-preview: "true"
+          - pullRequest:
+              github:
+                owner: stuttgart-things
+                repo: zaehlwerk
+                tokenRef:
+                  secretName: homerun2-omni-pitcher-pat
+                  key: token
+                # Both: the board belongs to a preview, never stands alone.
+                labels:
+                  - preview
+                  - preview-sim
+              requeueAfterSeconds: 600
+  template:
+    metadata:
+      name: 'zaehlwerk-pr-{{ .number }}-sim'
+      labels:
+        zaehlwerk.stuttgart-things.com/pr: '{{ .number }}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{ .name }}'
+      destination:
+        name: '{{ .name }}'
+        namespace: 'zaehlwerk-pr-{{ .number }}'
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        targetRevision: main
+        path: apps/zaehlwerk/piezo-sim
+        helm:
+          releaseName: 'zaehlwerk-pr-{{ .number }}-sim'
+          valuesObject:
+            image:
+              tag: 'pr-{{ .number }}-{{ .head_sha }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          # The bundle creates the namespace; this only covers the race where
+          # the board syncs first.
+          - CreateNamespace=true

@@ -4,3 +4,4 @@ namespace: argocd
 resources:
   - appset-zaehlwerk-pr-preview.yaml
   - appset-sweep.yaml
+  - appset-sim.yaml

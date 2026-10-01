@@ -1,0 +1,44 @@
+---
+# The piezo board simulator next to a zaehlwerk (stuttgart-things/zaehlwerk
+# tools/chain-mock). Rendered by platforms/zaehlwerk-pr-preview for a PR that
+# carries both `preview` and `preview-sim`.
+#
+# JOIN MODE ONLY. The board waits, as the real board does, until a match is
+# started on zaehlwerk's scoring page, then plays it through POST /ingest/piezo
+# -- points, duplicates, delta 0 and undos -- and waits for the next. It never
+# starts a match of its own, so nothing lands in a league unless a person
+# started that match. (The board's other mode creates matches through
+# schmetterpause's form; that is for the CI chain, not for an environment a
+# reviewer looks at.)
+
+# Deployment name; also the Pod's app label.
+name: zaehlwerk-piezo-sim
+
+image:
+  repository: ghcr.io/stuttgart-things/zaehlwerk-piezo
+  # The preview passes pr-<n>-<head sha>, so a PR that changes the board runs
+  # its own board.
+  tag: main
+
+# zaehlwerk in the same namespace: Service `zaehlwerk`, port 80.
+zaehlwerkURL: http://zaehlwerk
+
+board:
+  # Sets per match (best of).
+  bestOf: 3
+  # Time between two rallies.
+  pace: 1s
+  # Shares of rallies that send delta 0, resend the last event, or undo it --
+  # the board's deliberate noise, which zaehlwerk has to absorb.
+  ambiguous: "0.1"
+  resend: "0.1"
+  undo: "0.05"
+  # Seed of the board's randomness; the same seed replays the same match.
+  seed: "1"
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 64Mi
