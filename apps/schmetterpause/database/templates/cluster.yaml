@@ -66,6 +66,12 @@ spec:
     # nothing — including after the rebuild it was switched on for.
     recovery:
       source: origin
+      # CNPG's webhook defaults, written out for the same reason as the role
+      # attributes below: Argo owns what it applied, and its local diff saw
+      # these two as fields to remove, forever. Read only at creation and not
+      # at all on this path (see below), so stating them changes nothing.
+      database: app
+      owner: app
       {{- with $recovery.recoveryTarget }}
       recoveryTarget:
         {{- toYaml . | nindent 8 }}
@@ -131,6 +137,12 @@ spec:
   externalClusters:
     - name: origin
       plugin:
+        # The plugin defaults, written out: `externalClusters` is an atomic
+        # list, so the webhook-defaulted copy never matched the rendered one
+        # (homerun2-dev2's database Application sat OutOfSync). The source is
+        # read from, never archived to.
+        enabled: true
+        isWALArchiver: false
         name: barman-cloud.cloudnative-pg.io
         parameters:
           barmanObjectName: {{ printf "%s-origin" .Values.name | quote }}
