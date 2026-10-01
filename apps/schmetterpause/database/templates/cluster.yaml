@@ -114,6 +114,15 @@ spec:
         superuser: false
         createdb: false
         createrole: false
+        # The two attributes CNPG's webhook defaults on admission. Written out
+        # because `roles` is an ATOMIC list in the CRD (no list-type): Argo owns
+        # the whole list, and its diff -- local, without the webhook -- compared
+        # this list to the defaulted one forever. Every schmetterpause database
+        # Application sat OutOfSync and re-synced every five minutes while the
+        # server saw nothing to change. Both values are CNPG's defaults, so on a
+        # live cluster this changes nothing.
+        inherit: true
+        connectionLimit: -1
         passwordSecret:
           name: {{ .Values.bootstrap.secretName | quote }}
   {{- if $recovery.enabled }}
