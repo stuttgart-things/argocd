@@ -14,6 +14,7 @@ platforms/zaehlwerk-pr-preview/
 ├── kustomization.yaml                # lists the AppSets (not the bootstrap)
 ├── appset-zaehlwerk-pr-preview.yaml  # (clusters × labelled PRs)
 ├── appset-sweep.yaml                 # namespace sweep per cluster
+├── appset-sim.yaml                   # opt-in board simulator (preview-sim)
 └── README.md
 ```
 
@@ -48,6 +49,17 @@ No panel and no LED strip: `homerun2.namespace` is empty, which is the chart's
 "homerun2 is not here", so a test match cannot take over the real strip.
 
 A preview costs the zaehlwerk Pod plus a schmetterpause with a 1Gi Postgres.
+
+## The board simulator (`preview-sim`)
+
+A PR carrying `preview-sim` **in addition to** `preview` also gets the piezo
+board simulator (`apps/zaehlwerk/piezo-sim`, image `zaehlwerk-piezo` from the
+PR) in its namespace (`appset-sim.yaml`). The board waits like the real one:
+start a match on the preview's scoring page and it plays it — rallies, the
+deliberate duplicates, delta-0 events and undos — and the won match goes over
+the handover into the preview's schmetterpause. It never starts a match of its
+own, so nothing lands in the league unless a person started that match. Taking
+the label off removes just the board.
 
 ## Opt-in
 
