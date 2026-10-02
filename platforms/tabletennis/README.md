@@ -110,6 +110,7 @@ other field is documented in `apps/schmetterpause/database/values.yaml`.
 | `tabletennis-platform: 'true'` | **[user]** the gate |
 | `tabletennis-platform/tabletennis: 'false'` | **[user]** opt this cluster out |
 | `tabletennis-platform/light-catcher: 'true'` | **[user]** the LED strip at the table |
+| `tabletennis-platform/piezo-sim: 'true'` | **[user]** the piezo board simulator: plays every match started on the scoring page. A won match is handed over like any other, so only on a cluster whose league is a demo or a test. Needs zaehlwerk ≥ v0.8.0 |
 | `tabletennis-platform.stuttgart-things.com/secrets-config: 'true'` | **[user]** gate — set it to `'true'` only once the ClusterSecretStore holds both entries |
 | `clusterbook.stuttgart-things.com/allocation-ip` | *[auto]* must exist and be non-empty |
 

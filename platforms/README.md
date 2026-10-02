@@ -139,6 +139,7 @@ See [`platforms/homerun2`](./homerun2/).
 |---|---|---|
 | `tabletennis-platform` | `appset-tabletennis` → schmetterpause + its CNPG database, zaehlwerk, and (opt-in) the LED strip at the table | **gate** `tabletennis-platform.stuttgart-things.com/secrets-config: 'true'` + `…/secret-store` **(user)**; optional `…/storage-class`, `…/db-storage-size` (def `8Gi`), `…/homerun2-namespace` (def `homerun2`), `…/wled-endpoint`; `…/fqdn` *(auto)* |
 | `tabletennis-platform/light-catcher` | the LED strip, an opt-in `'true'` — physical hardware, so per cluster | `…/wled-endpoint` **(user)**, optional |
+| `tabletennis-platform/piezo-sim` | the piezo board simulator, an opt-in `'true'` — plays every match started on the page; results are handed over, so demo/test clusters only | — |
 
 > ⚠️ **Requires `storage-platform/cloudnative-pg: 'true'`.** schmetterpause's
 > database is a CNPG `Cluster`; without the CRD that Application's dry-run

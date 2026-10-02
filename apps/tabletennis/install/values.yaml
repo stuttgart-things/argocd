@@ -231,6 +231,29 @@ lightCatcher:
   # out in every effect.
   profileContent: ""
 
+# The piezo board simulator next to zaehlwerk (apps/zaehlwerk/piezo-sim): it
+# waits, like the real board, until a match is started on the scoring page, then
+# plays it -- rallies, the deliberate duplicates, delta-0 events and undos -- and
+# waits for the next. It never starts a match itself.
+#
+# A WON MATCH IS HANDED OVER LIKE ANY OTHER. With zaehlwerk.handover and
+# schmetterpause.scoreboard on, a simulated match lands in that cluster's league
+# (pending, ADR-0015). Meant for demo and test clusters; the PR previews run the
+# same chart (platforms/zaehlwerk-pr-preview, label preview-sim).
+piezoSim:
+  # Boolean, or the string "true"/"false" from a platform AppSet label.
+  enabled: false
+  # zaehlwerk-piezo image tag. Empty = zaehlwerk.version (the board ships with
+  # zaehlwerk). Exists from v0.8.0 on; the chart refuses anything older.
+  version: ""
+  board:
+    bestOf: 3
+    pace: 1s
+    ambiguous: "0.1"
+    resend: "0.1"
+    undo: "0.05"
+    seed: "1"
+
 # The light-catcher's Redis credential, as an ExternalSecret in its namespace.
 # Renders apps/homerun2/secrets (a generic ExternalSecret renderer) at
 # sync-wave -10, which also creates that namespace ahead of the catcher.

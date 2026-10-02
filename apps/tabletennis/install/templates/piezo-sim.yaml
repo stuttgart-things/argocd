@@ -1,0 +1,48 @@
+{{- if eq (.Values.piezoSim.enabled | default false | toString) "true" }}
+{{- if not .Values.zaehlwerk.enabled }}
+{{- fail "piezoSim.enabled needs zaehlwerk.enabled: the board plays the matches zaehlwerk runs." }}
+{{- end }}
+{{- $version := .Values.piezoSim.version | default .Values.zaehlwerk.version }}
+{{- /* The board image (zaehlwerk-piezo) exists from zaehlwerk v0.8.0 on. Below
+       that the pod would sit in ImagePullBackOff with the Application Healthy
+       enough to look fine -- refuse it here instead. Non-semver tags (main,
+       pr-<n>-<sha>) are taken as they are. */}}
+{{- if and (regexMatch "^v?[0-9]+\\.[0-9]+\\.[0-9]+$" $version) (not (semverCompare ">=0.8.0" $version)) }}
+{{- fail (printf "piezoSim needs zaehlwerk-piezo, which exists from v0.8.0 on; the version is %s. Set piezoSim.version or raise zaehlwerk.version." $version) }}
+{{- end }}
+{{- $appName := include "tabletennis.appName" . }}
+{{- $ns := .Values.zaehlwerk.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-piezo-sim" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # After zaehlwerk (wave 0): the board waits for a match on the page, so it
+    # only has to find zaehlwerk's Service, never a match.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/zaehlwerk/piezo-sim
+    helm:
+      releaseName: {{ include "tabletennis.releaseName" (printf "%s-piezo-sim" $appName) | quote }}
+      valuesObject:
+        image:
+          tag: {{ $version | quote }}
+        # Same namespace as zaehlwerk, so its Service answers by its short name.
+        zaehlwerkURL: http://zaehlwerk
+        board:
+          {{- toYaml .Values.piezoSim.board | nindent 10 }}
+  destination:
+    {{- include "tabletennis.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

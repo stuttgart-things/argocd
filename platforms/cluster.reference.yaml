@@ -165,6 +165,9 @@ spec:
     # The LED strip at the table. Physical hardware, so per cluster; an opt-IN
     # 'true' rather than an opt-out.
     tabletennis-platform/light-catcher: 'false'
+    # The piezo board simulator: plays every match started on the scoring page,
+    # and the result is handed over -- demo/test clusters only.
+    tabletennis-platform/piezo-sim: 'false'
     # gate — set to 'true' only once the store holds BOTH the `schmetterpause` and
     # the `zaehlwerk` entry. schmetterpause's database BOOTSTRAPS from the Secret
     # its ExternalSecret produces, so without it the CNPG Cluster never
