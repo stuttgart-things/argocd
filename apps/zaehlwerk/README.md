@@ -18,8 +18,14 @@ on its own only where zaehlwerk is wanted without the league.
 
 ```
 apps/zaehlwerk/
-└── install/        renders Application "zaehlwerk" (sync-wave 0) → the published
-                    kustomize OCI artifact, environment patched in
+├── install/        renders Application "zaehlwerk" (sync-wave 0) → the published
+│                   kustomize OCI artifact, environment patched in
+└── piezo-sim/      the piezo board simulator (image zaehlwerk-piezo, zaehlwerk ≥ v0.8.0)
+                    as a Deployment next to zaehlwerk, in join mode: it plays every match
+                    started on the scoring page. Rendered by apps/tabletennis/install
+                    (piezoSim) and by the PR previews (platforms/zaehlwerk-pr-preview,
+                    label preview-sim). A won match is handed over like any other — demo
+                    and test clusters only.
 ```
 
 No sub-charts. Unlike schmetterpause, zaehlwerk owns no database: the running match lives in
