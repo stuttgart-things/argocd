@@ -264,6 +264,14 @@ spec:
               # address.
               wledEndpoint: '{{ default "" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/wled-endpoint") }}'
 
+            # The piezo board simulator, opt-in per cluster like the strip:
+            # tabletennis-platform/piezo-sim: 'true'. It plays every match started
+            # on that cluster's scoring page, and a won match is handed over --
+            # so only for a cluster whose league is a demo or a test. Same
+            # coercions as lightCatcher above.
+            piezoSim:
+              enabled: '{{ if eq (toString (index (default (dict) .metadata.labels) "tabletennis-platform/piezo-sim")) "true" }}true{{ else }}false{{ end }}'
+
             secrets:
               enabled: true
               # Empty on a ClusterStack cluster: the chart takes homerun2's

@@ -19,6 +19,7 @@ apps/tabletennis/
                       Application "…-zaehlwerk"              (wave  0) → apps/zaehlwerk/install
                       Application "…-light-catcher"          (wave  0) → homerun2-light-catcher OCI, opt-in
                       Application "…-light-catcher-secrets"  (wave -10) → apps/homerun2/secrets, opt-in
+                      Application "…-piezo-sim"              (wave  1) → apps/zaehlwerk/piezo-sim, opt-in
 ```
 
 The two applications are delegated rather than re-implemented: their charts
@@ -130,6 +131,24 @@ each pointed at `wledEndpoint`. They match on the tags zaehlwerk v0.3.0+ emits, 
 **light-catcher v1.1.0 or later is required**: an older catcher ignores tags, and then the
 first rule takes every set *and* match and side a's colour every point. `profileContent`
 replaces the whole file.
+
+## The piezo board simulator (`piezoSim`)
+
+`piezoSim.enabled: true` (platform: cluster label `tabletennis-platform/piezo-sim: 'true'`)
+renders [`apps/zaehlwerk/piezo-sim`](../zaehlwerk/piezo-sim/) into zaehlwerk's namespace: the
+piezo board from zaehlwerk's `tools/chain-mock` (image `zaehlwerk-piezo`). It waits, like the
+real board, until a match is started on the scoring page, plays it through `POST /ingest/piezo`
+— rallies, the deliberate duplicates, delta-0 events and undos — and waits for the next. It
+never starts a match itself.
+
+**A won match is handed over like any other.** With `zaehlwerk.handover` and
+`schmetterpause.scoreboard` on, every simulated match lands in that cluster's league (pending,
+schmetterpause ADR-0015). Demo and test clusters only.
+
+The image tag is `zaehlwerk.version`, or `piezoSim.version` when set. `zaehlwerk-piezo` exists
+from **v0.8.0** on, and the chart refuses an older version rather than leave a pod in
+ImagePullBackOff. `piezoSim.board` sets best of, pace, the noise shares and the seed. The PR
+previews run the same chart (`platforms/zaehlwerk-pr-preview`, label `preview-sim`).
 
 ## Per-cluster secrets
 

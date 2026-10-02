@@ -348,6 +348,59 @@
     "cascadingDelete": {
       "type": "boolean",
       "description": "Put a resources-finalizer on every rendered child Application, so deleting the parent prunes the workloads. True (the default) for preview environments; the platforms/ AppSets set it false, because for a long-lived install an opt-out should stop managing the stack rather than delete it, and a prune against a deregistered cluster hangs the children in Terminating (argocd#324)."
+    },
+    "piezoSim": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The piezo board simulator (zaehlwerk tools/chain-mock, image zaehlwerk-piezo) next to zaehlwerk. It waits until a match is started on the scoring page and plays it through POST /ingest/piezo, like the real board. A won match is handed over to schmetterpause like any other -- so with zaehlwerk.handover on, simulated matches land in the league. For demo and test clusters, not one whose league counts.",
+      "properties": {
+        "enabled": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "Accepts \"true\"/\"false\" as well as a boolean, so a platform AppSet can template it from a per-cluster label."
+        },
+        "version": {
+          "type": "string",
+          "description": "zaehlwerk-piezo image tag. Empty = zaehlwerk.version. Needs v0.8.0 or later."
+        },
+        "board": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bestOf": {
+              "type": "integer",
+              "enum": [
+                1,
+                3,
+                5,
+                7
+              ]
+            },
+            "pace": {
+              "type": "string",
+              "pattern": "^[0-9]+(ms|s|m)$"
+            },
+            "ambiguous": {
+              "type": "string",
+              "pattern": "^(0(\\.[0-9]+)?|1(\\.0+)?)$"
+            },
+            "resend": {
+              "type": "string",
+              "pattern": "^(0(\\.[0-9]+)?|1(\\.0+)?)$"
+            },
+            "undo": {
+              "type": "string",
+              "pattern": "^(0(\\.[0-9]+)?|1(\\.0+)?)$"
+            },
+            "seed": {
+              "type": "string",
+              "pattern": "^-?[0-9]+$"
+            }
+          }
+        }
+      }
     }
   }
 }
