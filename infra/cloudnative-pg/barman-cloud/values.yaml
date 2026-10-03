@@ -22,7 +22,7 @@ applicationName: ""
 # CloudNativePG 1.26 or later and cert-manager: the chart renders a self-signed
 # Issuer and the two Certificates for operator <-> plugin TLS.
 # renovate: datasource=helm depName=plugin-barman-cloud registryUrl=https://cloudnative-pg.github.io/charts
-chartVersion: 0.8.0
+chartVersion: 0.8.1
 
 # Deep-merged on top of the computed valuesObject passed to the upstream chart.
 # Use for any upstream key not exposed as a first-class value (resources,
