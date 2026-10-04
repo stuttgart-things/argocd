@@ -15,7 +15,7 @@ destination:
 
 # Official CloudNativePG cluster Helm chart (https://cloudnative-pg.github.io/charts).
 # renovate: datasource=helm depName=cluster registryUrl=https://cloudnative-pg.github.io/charts
-chartVersion: 0.8.1
+chartVersion: 0.9.0
 
 # Name of the Cluster CR (upstream nameOverride + fullnameOverride). Also seeds
 # the derived Application name, so two Clusters on one target cluster don't
