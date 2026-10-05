@@ -22,6 +22,62 @@ spec:
           annotations:
             summary: schmetterpause exposes no metrics
             description: No schmetterpause pod in {{ $ns }} has answered on /metrics for 10 minutes.
+    - name: schmetterpause.results
+      rules:
+        # The confirmation loop -- enter, confirm, rate -- has stopped moving
+        # while every technical signal stays green (schmetterpause#251). The
+        # thresholds live here, not in the binary: the app exports how long the
+        # oldest open result has waited, and nothing about what is too long.
+        #
+        # 72 h for pending so a match entered Friday afternoon and confirmed on
+        # Monday stays quiet. 24 h for disputed, because a dispute waits on a
+        # person -- an admin -- not on the calendar.
+        #
+        # entered_via stays a label rather than being summed away. Results from
+        # an evening at zaehlwerk (entered_via="scoreboard") are pending by
+        # design (schmetterpause ADR-0015), and the alert has to say which kind
+        # of row is stuck. Whether they get their own threshold is left to the
+        # first real evening; today they share 72 h.
+        #
+        # max by (status, entered_via): every replica answers the same query,
+        # so a second pod must not double the alert. max_over_time bridges a
+        # single dropped scrape, the failure SchmetterpauseBackupTooOld taught
+        # in schmetterpause.backup below; the series is exported as 0 when
+        # nothing waits, so it never goes absent while the query answers.
+        #
+        # The metrics exist from schmetterpause v0.12.0 on. Against an older
+        # version these rules find no series and stay silent.
+        - alert: SchmetterpauseResultPendingTooLong
+          expr: max by (status, entered_via) (max_over_time(schmetterpause_matches_oldest_open_seconds{namespace="{{ $ns }}", status="pending"}[15m])) > {{ mul .Values.results.pendingMaxAgeHours 3600 }}
+          for: 15m
+          keep_firing_for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: A result has waited for confirmation for more than {{ .Values.results.pendingMaxAgeHours }} hours
+            description: 'The oldest pending result entered via {{"{{"}} $labels.entered_via {{"}}"}} has not been confirmed for more than {{ .Values.results.pendingMaxAgeHours }} hours, so it is not rated. /admin lists open results, oldest first, with the actions to settle them.'
+        - alert: SchmetterpauseResultDisputedTooLong
+          expr: max by (status, entered_via) (max_over_time(schmetterpause_matches_oldest_open_seconds{namespace="{{ $ns }}", status="disputed"}[15m])) > {{ mul .Values.results.disputedMaxAgeHours 3600 }}
+          for: 15m
+          keep_firing_for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: A disputed result has waited for an admin for more than {{ .Values.results.disputedMaxAgeHours }} hours
+            description: 'The oldest disputed result entered via {{"{{"}} $labels.entered_via {{"}}"}} has been open for more than {{ .Values.results.disputedMaxAgeHours }} hours. A dispute only moves when an admin decides it; /admin lists it.'
+        # The collector exports nothing but query_up = 0 when its query fails,
+        # on purpose: zeros would read as "nothing waits" and resolve the two
+        # alerts above. Missing series resolve them too, so this says why.
+        # max_over_time == 0 means every scrape in 15 minutes failed -- one
+        # slow query is not an outage.
+        - alert: SchmetterpauseResultQueryFailing
+          expr: max(max_over_time(schmetterpause_matches_open_query_up{namespace="{{ $ns }}"}[15m])) == 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: schmetterpause cannot count its open results
+            description: The query behind schmetterpause_matches_open has failed on every scrape for 30 minutes, so the alerts on pending and disputed results cannot fire. The application's database connection is the first suspect.
 {{- if .Values.database.enabled }}
     - name: schmetterpause.database
       rules:

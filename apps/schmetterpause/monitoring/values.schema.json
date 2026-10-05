@@ -3,7 +3,7 @@
   "title": "schmetterpause monitoring",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespace", "interval", "app", "database", "backup", "policy"],
+  "required": ["namespace", "interval", "app", "database", "backup", "results", "policy"],
   "properties": {
     "destination": {
       "type": "object",
@@ -42,6 +42,16 @@
         "maxAgeHours": { "type": "integer", "minimum": 1 }
       },
       "required": ["enabled", "maxAgeHours"]
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Thresholds for results still waiting on a player (pending) or an admin (disputed).",
+      "properties": {
+        "pendingMaxAgeHours":  { "type": "integer", "minimum": 1 },
+        "disputedMaxAgeHours": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["pendingMaxAgeHours", "disputedMaxAgeHours"]
     },
     "policy": {
       "type": "object",

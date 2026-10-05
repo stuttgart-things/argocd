@@ -240,6 +240,9 @@ kubectl -n schmetterpause get externalsecret schmetterpause-app   # SecretSynced
 | Alert | Severity | When |
 |---|---|---|
 | `SchmetterpauseMetricsDown` | warning | no healthy `/metrics` target for 10 min — also while the app is scaled to 0 for a restore |
+| `SchmetterpauseResultPendingTooLong` | warning | the oldest pending result is older than `results.pendingMaxAgeHours` (72), per `entered_via` |
+| `SchmetterpauseResultDisputedTooLong` | warning | the oldest disputed result is older than `results.disputedMaxAgeHours` (24), per `entered_via` |
+| `SchmetterpauseResultQueryFailing` | warning | the query behind the two above failed on every scrape for 15 min, so they cannot fire |
 | `SchmetterpauseDatabaseExporterDown` | warning | the CNPG exporter silent for 10 min, which also silences the backup alerts |
 | `SchmetterpauseWALArchivingFailing` | critical | last failed archive newer than the last successful one, for 15 min |
 | `SchmetterpauseWALArchiveBacklog` | warning | more than 10 WAL segments `ready` for 30 min |
@@ -248,6 +251,8 @@ kubectl -n schmetterpause get externalsecret schmetterpause-app   # SecretSynced
 | `SchmetterpauseUnsignedImageAdmitted` | warning | the image-signature policy failed a verification in the last 15 min; the `resource_namespace` label says where |
 | `SchmetterpauseSignatureCheckSkipped` | warning | the image-signature webhook failed and `failurePolicy: Ignore` admitted a pod **unchecked** in the last 15 min — not a refusal; the policy never ran |
 | `SchmetterpauseKyvernoMetricsDown` | warning | no healthy `kyverno-svc-metrics` target for 10 min, so `SchmetterpauseUnsignedImageAdmitted` cannot fire |
+
+The three result alerts read `schmetterpause_matches_oldest_open_seconds` and `schmetterpause_matches_open_query_up`, which exist from **schmetterpause v0.12.0** on; against an older `version` they find no series and stay silent. They answer stuttgart-things/schmetterpause#251: a result stuck in `pending` is the one sign that enter → confirm → rate has stopped while everything technical is green. The thresholds are monitoring-chart values, not app settings. `entered_via` stays a label because results counted at zaehlwerk arrive pending by design (schmetterpause ADR-0015), so the alert says which kind of row is stuck. `/admin` lists open results, oldest first, and that is where to act on one.
 
 The four WAL and backup alerts only exist with `database.backup.enabled`, and the three policy alerts only with `policy.enabled`. Five choices in them are deliberate:
 

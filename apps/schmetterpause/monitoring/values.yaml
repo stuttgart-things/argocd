@@ -28,6 +28,15 @@ backup:
   # The schedule is daily; 26 h leaves room for one slow run before it alerts.
   maxAgeHours: 26
 
+# Results waiting on a player or an admin (schmetterpause#251), read off
+# schmetterpause_matches_oldest_open_seconds, which exists from schmetterpause
+# v0.12.0 on. Thresholds live here, not in the app.
+results:
+  # A match entered Friday afternoon and confirmed Monday stays quiet.
+  pendingMaxAgeHours: 72
+  # A dispute waits on an admin, not on the calendar.
+  disputedMaxAgeHours: 24
+
 # The image-signature policy's refusals (apps/schmetterpause/install
 # policy.enabled). The policy runs in Audit, so an unsigned image still starts,
 # and this is the only place a refusal reaches a human: a ServiceMonitor on
