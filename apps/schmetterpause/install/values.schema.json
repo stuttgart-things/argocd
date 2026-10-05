@@ -138,6 +138,11 @@
       "type": "string",
       "description": "Display name that gets the admin flag at every start (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing."
     },
+    "zaehlwerkURL": {
+      "type": "string",
+      "pattern": "^(https?://[^/?#]+/?)?$",
+      "description": "Scheme and host of the zaehlwerk the start page shows the running score from (SP_ZAEHLWERK_URL, schmetterpause >= v0.15.0). Empty sets nothing."
+    },
     "gateway": {
       "type": "object",
       "additionalProperties": false,
