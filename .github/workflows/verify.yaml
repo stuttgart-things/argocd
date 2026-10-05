@@ -62,10 +62,18 @@ jobs:
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-helm-verify.yaml@main
     with:
       chart-path: ${{ matrix.chart }}
+      # GitHub-hosted, not the template's default `dagger-labda`. Both jobs
+      # only run `dagger call`, which needs Docker and nothing from the lab,
+      # and a self-hosted runner that goes offline otherwise leaves every PR
+      # and every push to main queued with no error at all (2026-10-05).
+      runs-on: ubuntu-latest
     secrets: inherit
 
   validate-schemas:
     uses: stuttgart-things/github-workflow-templates/.github/workflows/call-validate-json-schema.yaml@main
+    with:
+      # Same reason as `verify` above.
+      runs-on: ubuntu-latest
     secrets: inherit
 
   renovate-comments:
