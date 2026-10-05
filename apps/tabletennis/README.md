@@ -239,6 +239,7 @@ Hostnames come out as `schmetterpause.tabletennis.sthings.lab` and
 | Monitoring | three components (`schmetterpause-monitoring-off` / `-on` / `-backup`) | `schmetterpause.values.monitoring` |
 | The scoreboard token | a component pair (`schmetterpause-scoreboard-off` / `-on`), because ESO fails the whole app secret over one missing Vault property | `schmetterpause.scoreboard.enabled` |
 | The handover | a component pair (`zaehlwerk-handover-off` / `-on`), wired from the same variables | derived from `schmetterpause.scoreboard.enabled` + `zaehlwerk.handover` |
+| The live score | — | `zaehlwerk.liveScore`: schmetterpause's `SP_ZAEHLWERK_URL` and zaehlwerk's `ALLOWED_ORIGINS`, derived from the two hostnames |
 | The image-signature policy | a component pair (`schmetterpause-policy-off` / `-on`) reading the schmetterpause repo through a `GitRepository` | `schmetterpause.policy.enabled`, a git Application at the same tag |
 | The bootstrap admin | `TABLETENNIS_SCHMETTERPAUSE_BOOTSTRAP_ADMIN` — a plain substitution, since empty means "none" to the app | `schmetterpause.bootstrapAdmin` |
 | omni-pitcher routing | a default `routes.yaml` in the homerun2 base | set on homerun2's `routesContent` — see above |
