@@ -37,7 +37,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.67.1
+        targetRevision: v0.70.0
         path: infra/cert-manager/cluster-ca
         helm:
           values: |
