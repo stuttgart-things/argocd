@@ -42,6 +42,11 @@ One addition rather than a replacement: `.Values.bootstrapAdmin`, when set, adds
 per-office decision (schmetterpause ADR-0008). It names a player who has already joined, and
 it grants nothing without that player's own PIN.
 
+`.Values.zaehlwerkURL` works the same way: when set, it adds `SP_ZAEHLWERK_URL`, and the
+start page shows the running score from that zaehlwerk's table stream (schmetterpause#188,
+v0.15.0 and later). The browser connects to it, so it has to be an address players resolve,
+and the zaehlwerk needs `https://<hostname>` in its `ALLOWED_ORIGINS`.
+
 The listener names come from `gateway.sectionNameHTTPS` / `sectionNameHTTP`. The patches
 replace `parentRefs` wholesale, so they have to be repeated — and getting them wrong is the
 quiet kind of wrong: both routes attach to *every* listener and the redirect sends HTTPS

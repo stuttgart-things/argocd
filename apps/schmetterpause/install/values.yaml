@@ -67,6 +67,13 @@ hostname: schmetterpause.cluster.example.com
 # failed start. Not a secret: it grants nothing without that player's own PIN.
 bootstrapAdmin: ""
 
+# Scheme and host of the zaehlwerk whose running score the start page shows
+# (SP_ZAEHLWERK_URL, schmetterpause#188, from v0.15.0 on). Empty sets nothing
+# and the page shows no score. The players' browsers connect to it, not the
+# pod, so it has to be an address they resolve, and that zaehlwerk has to list
+# this app's https://<hostname> in its ALLOWED_ORIGINS.
+zaehlwerkURL: ""
+
 # Gateway the HTTPRoutes attach to. The base names a Gateway called `gateway`
 # in `default`.
 #
