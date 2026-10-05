@@ -176,9 +176,19 @@ zaehlwerk:
   # whose schmetterpause serves other tables — ADR-0004 keeps that a first-class
   # way to run.
   handover: true
-  # Browser origins allowed to read the live match stream. schmetterpause's
-  # origin belongs here once its live tab exists; upstream refuses the `*`
-  # wildcard, and empty means none.
+  # The running score on schmetterpause's start page (schmetterpause#188): its
+  # SP_ZAEHLWERK_URL set to zaehlwerk's hostname, and schmetterpause's origin
+  # added to zaehlwerk's ALLOWED_ORIGINS. Both at once, because the browser
+  # reads zaehlwerk's GET /live/stream directly and one half without the other
+  # is either no element or a 403.
+  #
+  # On by default, gated on schmetterpause being on this cluster. Needs
+  # schmetterpause >= v0.15.0 to show anything (older tags ignore the variable)
+  # and zaehlwerk >= v0.9.0 for the table stream.
+  liveScore: true
+  # Further browser origins allowed to read the live match stream, comma
+  # separated. schmetterpause's own is added by `liveScore`; upstream refuses
+  # the `*` wildcard, and empty means none.
   allowedOrigins: ""
   # The scoreboard panel is wired from `homerun2.namespace` above. Set this to
   # false to run zaehlwerk without one even where homerun2 is present — the

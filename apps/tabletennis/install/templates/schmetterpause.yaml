@@ -39,6 +39,11 @@
 {{- if $spSrc.entry }}
 {{- $_ := set $computed "vaultEntry" $spSrc.entry }}
 {{- end }}
+{{- /* The running score from zaehlwerk (schmetterpause#188); zaehlwerk.yaml
+       allows this origin under the same condition. */}}
+{{- if and .Values.zaehlwerk.enabled .Values.zaehlwerk.liveScore }}
+{{- $_ := set $computed "zaehlwerkURL" (printf "https://%s" (include "tabletennis.hostname" (dict "root" . "name" "zaehlwerk"))) }}
+{{- end }}
 {{- /* The sub-chart's destination takes `server` or `name`, same as ours. */}}
 {{- if .Values.destination.name }}
 {{- $_ := set (index $computed "destination") "name" .Values.destination.name }}

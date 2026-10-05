@@ -254,7 +254,11 @@
         },
         "allowedOrigins": {
           "type": "string",
-          "description": "Browser origins allowed to read the live match stream. Empty = none; upstream refuses the `*` wildcard."
+          "description": "Further browser origins allowed to read the live match stream, comma separated. schmetterpause's is added by liveScore. Empty = none; upstream refuses the `*` wildcard."
+        },
+        "liveScore": {
+          "type": "boolean",
+          "description": "Wire schmetterpause's running score: its SP_ZAEHLWERK_URL to zaehlwerk's hostname and its origin into zaehlwerk's ALLOWED_ORIGINS, when both are on this cluster. Shows from schmetterpause >= v0.15.0."
         },
         "panel": {
           "type": "boolean",
