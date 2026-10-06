@@ -54,7 +54,7 @@ syncPolicy:
 # off auto-merge for exactly that reason; do not fold them back in.
 #
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-version: v0.15.0
+version: v0.16.0
 
 # FQDN the app is served on. Patched into both HTTPRoutes and into
 # SP_PUBLIC_BASE_URL, which the app uses to build absolute links — the base
@@ -286,9 +286,9 @@ monitoring:
 # Applications fight over the same object.
 #
 # With monitoring.enabled as well, the monitoring Application scrapes Kyverno
-# for this policy's results and alerts on a refusal. The policy runs in Audit,
-# so an unsigned image still starts, and that alert is the only place a refusal
-# reaches a human.
+# for this policy's results and alerts on a refusal. The policy runs in Deny
+# from v0.16.0 (schmetterpause#262): an unsigned image is refused at admission,
+# and the alert tells whoever is not watching the rollout.
 policy:
   enabled: false
 

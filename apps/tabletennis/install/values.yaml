@@ -100,7 +100,7 @@ schmetterpause:
   namespace: schmetterpause
   hostname: ""                       # empty = schmetterpause.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-  version: v0.15.0
+  version: v0.16.0
   # Display name of the player who gets the admin flag at every start
   # (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing, which is
   # the normal state after the first pass: the person has to have joined
@@ -125,8 +125,8 @@ schmetterpause:
     vaultProperty: token
   # Kyverno admission policy: the app image must carry a keyless signature from
   # schmetterpause's CI (ADR-0020/0021), read from the schmetterpause repository
-  # at the same tag as `version`. Audit mode — an unsigned image still starts and
-  # the refusal is a PolicyReport. Off by default: it needs Kyverno serving
+  # at the same tag as `version`. Deny from v0.16.0 — an unsigned image is
+  # refused at admission. Off by default: it needs Kyverno serving
   # policies.kyverno.io/v1 on the target cluster.
   #
   # The policy is CLUSTER-SCOPED. Enable it in one consumer per cluster, or two
