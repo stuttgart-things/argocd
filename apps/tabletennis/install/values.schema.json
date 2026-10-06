@@ -215,7 +215,7 @@
         "policy": {
           "type": "object",
           "additionalProperties": false,
-          "description": "Kyverno admission policy checking the app image's keyless signature (ADR-0020/0021), read from the schmetterpause repository at the same tag as `version`. Audit mode. Needs Kyverno serving policies.kyverno.io/v1; the policy is cluster-scoped, so enable it in one consumer per cluster.",
+          "description": "Kyverno admission policy checking the app image's keyless signature (ADR-0020/0021), read from the schmetterpause repository at the same tag as `version`. Deny from schmetterpause v0.16.0. Needs Kyverno serving policies.kyverno.io/v1; the policy is cluster-scoped, so enable it in one consumer per cluster.",
           "properties": {
             "enabled": {
               "type": "boolean"
