@@ -29,12 +29,29 @@
        the URL without the receiving surface is a 404 per finished match, and
        upstream reads the URL as the on-switch. So a platform turns the feature
        on in ONE place and both sides move together. */}}
+{{- /* The scoreboard as schmetterpause actually gets it: the bundle's own
+       `schmetterpause.scoreboard`, overridden by `schmetterpause.values.scoreboard`
+       the same way schmetterpause.yaml hands it down. platforms/tabletennis
+       sets the switch ONLY in the override (from the cluster annotation), so
+       reading the bundle-level key alone left every AppSet cluster with
+       schmetterpause's /api on and zaehlwerk's SCHMETTERPAUSE_URL off --
+       homerun2-dev2 logged "schmetterpause handover disabled" from its first
+       start (schmetterpause#188, 2026-10-06). */}}
+{{- $spOverride := include "tabletennis.schmetterpauseOverride" .Values.schmetterpause.values | fromJson }}
+{{- $scoreboard := mergeOverwrite (deepCopy .Values.schmetterpause.scoreboard) ((get $spOverride "scoreboard") | default dict) }}
+{{- $scoreboardPath := .Values.schmetterpause.scoreboard.vaultPath }}
+{{- if $spSrc.entry }}
+{{- $scoreboardPath = printf "%s-scoreboard" $spSrc.entry }}
+{{- end }}
+{{- with (get ((get $spOverride "scoreboard") | default dict) "vaultPath") }}
+{{- $scoreboardPath = . }}
+{{- end }}
 {{- $handover := dict }}
-{{- if and .Values.zaehlwerk.handover .Values.schmetterpause.enabled .Values.schmetterpause.scoreboard.enabled }}
+{{- if and .Values.zaehlwerk.handover .Values.schmetterpause.enabled $scoreboard.enabled }}
 {{- $handover = dict
       "url"           (printf "https://%s" (include "tabletennis.hostname" (dict "root" . "name" "schmetterpause")))
-      "vaultPath"     (ternary (printf "%s-scoreboard" ($spSrc.entry | default "")) .Values.schmetterpause.scoreboard.vaultPath (not (empty $spSrc.entry)))
-      "vaultProperty" .Values.schmetterpause.scoreboard.vaultProperty }}
+      "vaultPath"     $scoreboardPath
+      "vaultProperty" $scoreboard.vaultProperty }}
 {{- if and $spSrc.store (ne $spSrc.store $panelStore) }}
 {{- $_ := set $handover "secretStore" (dict "kind" .Values.secretStore.kind "name" $spSrc.store) }}
 {{- end }}
@@ -66,7 +83,7 @@
                           "namespace"   .Values.gateway.namespace
                           "sectionName" .Values.gateway.sectionNameHTTPS)
       "secretStore"     (dict "kind" .Values.secretStore.kind "name" $panelStore)
-      "allowedOrigins"  (join "," $origins)
+      "allowedOrigins"  (join "," ($origins | uniq))
       "panel"           $panel
       "schmetterpause"  $handover
 }}
