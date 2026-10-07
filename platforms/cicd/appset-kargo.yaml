@@ -34,7 +34,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.70.1
+        targetRevision: v0.71.0
         path: cicd/kargo/install
         helm:
           valuesObject:
@@ -87,7 +87,7 @@ spec:
             # so a bump moves both.
             catalog:
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.70.1
+              targetRevision: v0.71.0
       syncPolicy:
         automated:
           prune: true
