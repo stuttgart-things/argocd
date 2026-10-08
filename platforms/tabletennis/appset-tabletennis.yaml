@@ -149,6 +149,21 @@ spec:
               enabled: true
               values:
                 database:
+                  # Die Postgres-MAJOR der Rangliste, hier gepinnt statt vom
+                  # Katalog geerbt. Der Katalog-Default in
+                  # apps/schmetterpause/install ist fuer Consumer ohne Daten
+                  # gedacht; ihn anzuheben ist fuer einen bestehenden CNPG-Cluster
+                  # ein OFFLINE-Upgrade an Ort und Stelle (pg_upgrade). Ein Cluster
+                  # mit der Buero-Rangliste soll das nur durch eine Aenderung
+                  # bekommen, die genau das sagt: die Annotation `db-image-name`
+                  # an seinem Cluster, oder dieser Fallback hier.
+                  #
+                  # Der Fallback ist bewusst EIN fester Wert und kein `default ""`:
+                  # ein leerer String kaeme als imageName "" beim Cluster an.
+                  # 18 ist, was alle tabletennis-Cluster heute fahren (dev2:
+                  # 18.6, gelesen am 2026-10-08), also aendert sich beim Merge
+                  # nichts. (schmetterpause#315, Befund aus den Runbooks)
+                  imageName: '{{ default "ghcr.io/cloudnative-pg/postgresql:18" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-image-name") }}'
                   storage:
                     size: '{{ default "8Gi" (index (default (dict) .metadata.annotations) "tabletennis-platform.stuttgart-things.com/db-storage-size") }}'
                     # Empty = the cluster's default StorageClass. Name one on a

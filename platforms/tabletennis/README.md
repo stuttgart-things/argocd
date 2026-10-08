@@ -120,6 +120,7 @@ other field is documented in `apps/schmetterpause/database/values.yaml`.
 | `tabletennis-platform.stuttgart-things.com/secret-store` | **[user]** required — the ClusterSecretStore name (`vault-<cluster>`) |
 | `tabletennis-platform.stuttgart-things.com/storage-class` | **[user]** optional, empty = the cluster's default SC |
 | `tabletennis-platform.stuttgart-things.com/db-storage-size` | **[user]** optional, default `8Gi` |
+| `tabletennis-platform.stuttgart-things.com/db-image-name` | **[user]** optional, default `ghcr.io/cloudnative-pg/postgresql:18`. The Postgres major of the ranking, pinned here rather than inherited from the catalog: raising it is an offline in-place upgrade of the existing CNPG Cluster, so take a backup first |
 | `tabletennis-platform.stuttgart-things.com/homerun2-namespace` | **[user]** optional, default `homerun2`; blank it where homerun2 is absent |
 | `tabletennis-platform.stuttgart-things.com/wled-endpoint` | **[user]** optional — the real strip's address; empty uses homerun2's wled-mock |
 | `homerun2-platform.stuttgart-things.com/secret-key` | **[user]** optional — reused, so the light-catcher reads the *same* Vault entry as every other homerun2 component |
