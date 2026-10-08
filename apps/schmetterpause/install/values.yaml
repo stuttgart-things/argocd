@@ -122,8 +122,10 @@ database:
   # For a consumer that does not set this, raising it is an offline in-place
   # major upgrade of an existing Cluster by CloudNativePG (pg_upgrade --link):
   # the database is down for the upgrade. A Cluster holding data worth keeping
-  # should pin imageName in its consumer file, as homerun2-test1 does, and
-  # take a backup before moving it.
+  # should pin imageName and take a backup before moving it: in its consumer
+  # file for a hand-registered cluster, or through the cluster annotation
+  # `tabletennis-platform.stuttgart-things.com/db-image-name` for one from the
+  # platforms/tabletennis AppSet, which pins postgresql:18 when it is absent.
   imageName: ghcr.io/cloudnative-pg/postgresql:18
   storage:
     size: 8Gi
