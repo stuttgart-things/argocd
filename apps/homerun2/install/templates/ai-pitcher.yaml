@@ -95,6 +95,10 @@ spec:
                               value: {{ .Values.aiPitcher.model | quote }}
                             - name: SUMMARY_LANGUAGE
                               value: {{ .Values.aiPitcher.language | quote }}
+                            - name: LLM_RETRIES
+                              value: {{ .Values.aiPitcher.retries | toString | quote }}
+                            - name: TICKER_ENABLED
+                              value: {{ .Values.aiPitcher.ticker | toString | quote }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}

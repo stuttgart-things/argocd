@@ -532,7 +532,7 @@
         "model": {
           "type": "string",
           "minLength": 1,
-          "description": "OpenRouter model id; openrouter/free routes to an available free model."
+          "description": "OpenRouter model id or a comma-separated list (tried in groups of 3)."
         },
         "language": {
           "type": "string",
@@ -545,6 +545,14 @@
         "schedulePitcherTokenSecret": {
           "type": "string",
           "minLength": 1
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ticker": {
+          "type": "boolean",
+          "description": "Also pitch short ticker lines for the LED matrix (system ai-ticker)."
         }
       },
       "required": [

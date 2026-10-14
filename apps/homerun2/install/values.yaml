@@ -367,13 +367,21 @@ gitPitcher:
 aiPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-ai-pitcher-kustomize
-  version: v0.1.0
+  version: v0.2.0
   schedule: "45 7 * * *"
   timeZone: Europe/Berlin
   suspend: false
-  # OpenRouter model id; openrouter/free routes to an available free model.
-  model: openrouter/free
+  # OpenRouter model id or a comma-separated list, tried in groups of 3.
+  # Most reliable free models first (local runs 2026-10-14,
+  # stuttgart-things/homerun2-ai-pitcher#4); openrouter/free alone can route
+  # to tiny or classifier models.
+  model: nvidia/nemotron-3-super-120b-a12b:free,cohere/north-mini-code:free,nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-31b-it:free,openrouter/free
   language: German
+  # More tries after a failed model call (free models fail often).
+  retries: 2
+  # Up to 4 short ASCII lines for the LED matrix, each pitched as its own
+  # message with system ai-ticker.
+  ticker: true
   # schedule-pitcher is not part of this chart. Set its in-cluster URL (and
   # the Secret holding its API token, key auth-token) to add open findings.
   schedulePitcherURL: ""
