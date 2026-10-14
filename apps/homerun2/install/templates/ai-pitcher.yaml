@@ -1,0 +1,111 @@
+{{- if .Values.aiPitcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-ai-pitcher" }}
+{{- $ns := .Values.destination.namespace }}
+---
+{{- /* homerun2-ai-pitcher (stuttgart-things/homerun2-ai-pitcher): a CronJob
+       that summarises scout's digest (and, with schedulePitcherURL, the
+       schedule-pitcher's open findings) via OpenRouter and pitches it to
+       omni-pitcher as system ai-digest. Design:
+       stuttgart-things/homerun-library#135.
+
+       The base ships one Secret homerun2-ai-pitcher with four placeholder
+       keys. ESO here writes one key per Secret, so the placeholder is
+       deleted and the CronJob reads the Secrets this chart already has:
+       scout and omni-pitcher share the `authToken` Vault field, so
+       SCOUT_TOKEN and PITCHER_TOKEN come from their Secrets. Only the
+       OpenRouter key gets its own ExternalSecret (templates/secrets.yaml,
+       Vault property openrouterApiKey). It is optional: without it every run
+       pitches the plain digest marked "[AI n/a]". */}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-ai-pitcher" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "ai-pitcher" | quote }}
+    targetRevision: {{ .Values.aiPitcher.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+        - target:
+            kind: Secret
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" $name) | indent 12 }}
+        - target:
+            kind: CronJob
+            name: {{ $name }}
+          patch: |
+            apiVersion: batch/v1
+            kind: CronJob
+            metadata:
+              name: {{ $name }}
+            spec:
+              schedule: {{ .Values.aiPitcher.schedule | quote }}
+              timeZone: {{ .Values.aiPitcher.timeZone | quote }}
+              suspend: {{ .Values.aiPitcher.suspend }}
+              jobTemplate:
+                spec:
+                  template:
+                    spec:
+                      containers:
+                        - name: {{ $name }}
+                          env:
+                            - name: SCOUT_URL
+                              value: {{ printf "http://homerun2-scout.%s.svc.cluster.local" $ns | quote }}
+                            - name: SCOUT_TOKEN
+                              valueFrom:
+                                secretKeyRef:
+                                  name: homerun2-scout-token
+                                  key: auth-token
+                            - name: PITCHER_URL
+                              value: {{ printf "http://homerun2-omni-pitcher.%s.svc.cluster.local" $ns | quote }}
+                            - name: PITCHER_TOKEN
+                              valueFrom:
+                                secretKeyRef:
+                                  name: homerun2-omni-pitcher-token
+                                  key: auth-token
+                            # Empty skips the findings: this chart does not
+                            # install a schedule-pitcher.
+                            - name: SCHEDULE_PITCHER_URL
+                              value: {{ .Values.aiPitcher.schedulePitcherURL | quote }}
+                            - name: SCHEDULE_PITCHER_TOKEN
+                              valueFrom:
+                                secretKeyRef:
+                                  name: {{ .Values.aiPitcher.schedulePitcherTokenSecret | quote }}
+                                  key: auth-token
+                                  optional: true
+                            - name: OPENROUTER_API_KEY
+                              valueFrom:
+                                secretKeyRef:
+                                  name: {{ printf "%s-openrouter" $name | quote }}
+                                  key: api-key
+                                  optional: true
+                            - name: OPENROUTER_MODEL
+                              value: {{ .Values.aiPitcher.model | quote }}
+                            - name: SUMMARY_LANGUAGE
+                              value: {{ .Values.aiPitcher.language | quote }}
+                            - name: LLM_RETRIES
+                              value: {{ .Values.aiPitcher.retries | toString | quote }}
+                            - name: TICKER_ENABLED
+                              value: {{ .Values.aiPitcher.ticker | toString | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

@@ -507,6 +507,58 @@
         "enabled"
       ]
     },
+    "aiPitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schedule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeZone": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suspend": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OpenRouter model id or a comma-separated list (tried in groups of 3)."
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schedulePitcherURL": {
+          "type": "string",
+          "description": "In-cluster schedule-pitcher URL; empty skips the open findings."
+        },
+        "schedulePitcherTokenSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ticker": {
+          "type": "boolean",
+          "description": "Also pitch short ticker lines for the LED matrix (system ai-ticker)."
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "httpRoute": {
       "type": "object",
       "additionalProperties": false,
