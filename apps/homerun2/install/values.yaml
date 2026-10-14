@@ -359,6 +359,26 @@ gitPitcher:
   # created by this chart, the same way k8sPitcherProfileConfigMap is not.
   inlineWatchConfig: true
 
+# homerun2-ai-pitcher: CronJob, AI summary of scout's digest via OpenRouter
+# (stuttgart-things/homerun2-ai-pitcher, stuttgart-things/homerun-library#135).
+# Needs scout and omni-pitcher. The OpenRouter key comes from the Vault
+# property `openrouterApiKey` (secrets.enabled); without it the run pitches
+# the plain digest marked "[AI n/a]".
+aiPitcher:
+  enabled: false
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-ai-pitcher-kustomize
+  version: v0.1.0
+  schedule: "45 7 * * *"
+  timeZone: Europe/Berlin
+  suspend: false
+  # OpenRouter model id; openrouter/free routes to an available free model.
+  model: openrouter/free
+  language: German
+  # schedule-pitcher is not part of this chart. Set its in-cluster URL (and
+  # the Secret holding its API token, key auth-token) to add open findings.
+  schedulePitcherURL: ""
+  schedulePitcherTokenSecret: homerun2-schedule-pitcher-token
+
 # Gateway API HTTPRoutes for every enabled component that exposes one.
 httpRoute:
   enabled: true

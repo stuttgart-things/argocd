@@ -507,6 +507,50 @@
         "enabled"
       ]
     },
+    "aiPitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schedule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeZone": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suspend": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OpenRouter model id; openrouter/free routes to an available free model."
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schedulePitcherURL": {
+          "type": "string",
+          "description": "In-cluster schedule-pitcher URL; empty skips the open findings."
+        },
+        "schedulePitcherTokenSecret": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "httpRoute": {
       "type": "object",
       "additionalProperties": false,
