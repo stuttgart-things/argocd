@@ -113,6 +113,10 @@
         "enabled": {
           "type": "boolean"
         },
+        "chartVersion": {
+          "type": "string",
+          "minLength": 1
+        },
         "storageClass": {
           "type": "string",
           "minLength": 1
@@ -149,6 +153,10 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "chartVersion": {
+          "type": "string",
+          "minLength": 1
         },
         "storageClass": {
           "type": "string",

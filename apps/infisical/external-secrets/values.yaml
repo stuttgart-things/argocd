@@ -20,3 +20,11 @@ refreshInterval: 1h
 keys:
   - ENCRYPTION_KEY
   - AUTH_SECRET
+  - DB_PASSWORD
+  - REDIS_PASSWORD
+
+# Extra Secret keys rendered by ESO from the fetched ones (ESO template
+# syntax). Empty: the Secret holds exactly `keys`.
+templateData:
+  DB_CONNECTION_URI: "postgresql://infisical:{{ .DB_PASSWORD }}@postgresql:5432/infisicalDB"
+  REDIS_URL: "redis://default:{{ .REDIS_PASSWORD }}@redis-master:6379"

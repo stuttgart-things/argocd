@@ -29,10 +29,16 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["ClusterSecretStore", "SecretStore"]
+          "enum": [
+            "ClusterSecretStore",
+            "SecretStore"
+          ]
         }
       },
-      "required": ["name", "kind"]
+      "required": [
+        "name",
+        "kind"
+      ]
     },
     "secretPath": {
       "type": "string",
@@ -54,6 +60,13 @@
       "type": "object",
       "additionalProperties": true,
       "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "templateData": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Extra Secret keys rendered by ESO (target.template, mergePolicy Merge) from the fetched keys."
     }
   }
 }

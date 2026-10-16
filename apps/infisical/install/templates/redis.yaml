@@ -1,0 +1,45 @@
+{{- if and .Values.externalSecrets.enabled .Values.redis.enabled }}
+{{- $defaultName := printf "infisical-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- /* ESO mode only: the Redis the upstream chart would bundle, with the
+       same name (Service `redis-master`) and image, but reading its password
+       from the ESO Secret. */}}
+{{- $values := dict
+      "fullnameOverride" "redis"
+      "architecture"     "standalone"
+      "image" (dict "registry" "mirror.gcr.io" "repository" "bitnamilegacy/redis")
+      "auth" (dict
+        "enabled"                   true
+        "existingSecret"            .Values.infisical.secretName
+        "existingSecretPasswordKey" "REDIS_PASSWORD"
+      )
+      "master" (dict "persistence" (dict
+        "enabled"      true
+        "storageClass" .Values.redis.storageClass
+        "size"         .Values.redis.storageSize
+      ))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-redis" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: registry-1.docker.io/bitnamicharts
+    chart: redis
+    targetRevision: {{ .Values.redis.chartVersion | quote }}
+    helm:
+      releaseName: redis
+      valuesObject:
+        {{- toYaml $values | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

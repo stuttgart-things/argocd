@@ -18,8 +18,10 @@ apps/infisical/
 │       ├── chart.yaml            renders Application "infisical"                  (sync-wave 0)
 │       ├── external-secrets.yaml renders Application "infisical-external-secrets" (sync-wave -10, gated by externalSecrets.enabled)
 │       ├── secrets.yaml          renders Application "infisical-secrets"          (sync-wave -10, gated by secretsApp.enabled — DEV ONLY)
+│       ├── postgresql.yaml       renders Application "infisical-postgresql"       (sync-wave -5, ESO mode + postgresql.enabled)
+│       ├── redis.yaml            renders Application "infisical-redis"            (sync-wave -5, ESO mode + redis.enabled)
 │       └── httproute.yaml        renders Application "infisical-httproute"        (sync-wave 10, gated by httpRoute.enabled)
-├── external-secrets/             ESO ExternalSecret — ENCRYPTION_KEY + AUTH_SECRET from Vault (production path)
+├── external-secrets/             ESO ExternalSecret — root keys + DB/Redis credentials from Vault (production path)
 ├── secrets/                      ENCRYPTION_KEY + AUTH_SECRET Secret (dev-only path)
 └── httproute/                    Gateway API HTTPRoute
 ```
@@ -37,13 +39,40 @@ Computed `valuesObject`:
 - `infisical.extraEnv` — `SITE_URL`, from `infisical.siteUrl` or `https://<httpRoute.hostname>`
 - `ingress.enabled: false` and `ingress.nginx.enabled: false` — no Ingress, no bundled ingress-nginx; the HTTPRoute
   is the ingress path
-- `postgresql.*` / `redis.*` — bundled Bitnami PostgreSQL and Redis (standalone), with StorageClass and size
+- `postgresql.*` / `redis.*` — bundled Bitnami PostgreSQL and Redis (standalone), with StorageClass and size.
+  In ESO mode both sub-charts are **off** here and run as their own Applications (below).
 - `.Values.extraValues` — deep-merged on top as an escape hatch
 
 ### `infisical-external-secrets` Application (opt-in, `externalSecrets.enabled: true`, sync-wave -10)
-The **production path for the root keys**. Renders an `ExternalSecret` that materialises the Secret named by
-`infisical.secretName` with `ENCRYPTION_KEY` and `AUTH_SECRET` from the referenced store
-(`vault kv put <mount>/infisical ENCRYPTION_KEY=$(openssl rand -hex 16) AUTH_SECRET=$(openssl rand -base64 32)`).
+The **production path** — no credential in values or git. Renders an `ExternalSecret` that materialises the
+Secret named by `infisical.secretName` from these store properties:
+
+| Property | When |
+|---|---|
+| `ENCRYPTION_KEY` (`openssl rand -hex 16`), `AUTH_SECRET` (`openssl rand -base64 32`) | always |
+| `DB_PASSWORD` | `postgresql.enabled: true` |
+| `DB_CONNECTION_URI` | `postgresql.enabled: false` (external database, taken as-is) |
+| `REDIS_PASSWORD` | `redis.enabled: true` |
+| `REDIS_URL` | `redis.enabled: false` (external Redis, taken as-is) |
+
+With the bundled databases, ESO templates `DB_CONNECTION_URI` and `REDIS_URL` into the same Secret from the
+passwords (`target.template`, `mergePolicy: Merge`), so each password lives in the store exactly once. Keep them
+alphanumeric — they land in a URL.
+
+```bash
+vault kv put <mount>/infisical \
+  ENCRYPTION_KEY=$(openssl rand -hex 16) AUTH_SECRET=$(openssl rand -base64 32) \
+  DB_PASSWORD=$(openssl rand -hex 24) REDIS_PASSWORD=$(openssl rand -hex 24)
+```
+
+### `infisical-postgresql` / `infisical-redis` Applications (ESO mode, sync-wave -5)
+Why they exist: the upstream chart builds `DB_CONNECTION_URI` / `REDIS_URL` from `values` whenever its bundled
+sub-charts are on, and an explicit `env` entry wins over `envFrom` — a password in a Secret could never reach
+Infisical. So in ESO mode those sub-charts are switched off, and the same Bitnami charts
+(`registry-1.docker.io/bitnamicharts/{postgresql,redis}` at `postgresql.chartVersion` / `redis.chartVersion`, the
+versions upstream pins, `mirror.gcr.io/bitnamilegacy` images) run as their own Applications with the same
+names (`postgresql`, `redis-master`), reading `DB_PASSWORD` / `REDIS_PASSWORD` via `existingSecret`. Infisical
+gets both URLs through `envFrom`.
 
 ### `infisical-secrets` Application (opt-in, `secretsApp.enabled: true`, sync-wave -10)
 Dev-only alternative: inlines `secretsApp.encryptionKey` / `secretsApp.authSecret` in git. Enable **either**
@@ -52,13 +81,14 @@ Dev-only alternative: inlines `secretsApp.encryptionKey` / `secretsApp.authSecre
 ### `infisical-httproute` Application (opt-in, `httpRoute.enabled: true`, sync-wave 10)
 Renders an `HTTPRoute` for `httpRoute.hostname` to the `infisical` Service on port 8080.
 
-## Database and Redis passwords
+## Database and Redis passwords without ESO
 
-The upstream chart builds `DB_CONNECTION_URI` and `REDIS_URL` from `postgresql.auth.password` and
-`redis.auth.password` **in values** — it cannot read them from a Secret while the bundled PostgreSQL / Redis are
-enabled. Both must be set (alphanumeric — they land in a URL); inject them via ArgoCD Vault Plugin / SOPS, never
-commit a literal. For an external database, set `postgresql.enabled: false` and use
-`extraValues.postgresql.useExistingPostgresSecret`.
+Without `externalSecrets`, the upstream sub-charts run and build both URLs from `postgresql.auth.password` and
+`redis.auth.password` **in values**. Set both (alphanumeric) and inject them via ArgoCD Vault Plugin / SOPS — never
+commit a literal. Prefer the ESO mode above.
+
+Switching an existing install between the two modes keeps the Service names, but the PVCs belong to different
+Helm releases — treat it as a migration (backup and restore), not a toggle.
 
 ## Backups
 
@@ -87,12 +117,8 @@ spec:
           namespace: infisical
         postgresql:
           storageClass: nfs4-csi
-          auth:
-            password: <alnum>
         redis:
           storageClass: nfs4-csi
-          auth:
-            password: <alnum>
         externalSecrets:
           enabled: true
           store:
@@ -130,11 +156,13 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `infisical.siteUrl` | `""` | Public URL; empty → `https://<httpRoute.hostname>` |
 | `infisical.secretName` | `infisical-secrets` | Secret with `ENCRYPTION_KEY` + `AUTH_SECRET` (envFrom) |
 | `postgresql.enabled` | `true` | Deploy the bundled Bitnami PostgreSQL |
+| `postgresql.chartVersion` | `14.1.10` | `bitnamicharts/postgresql` version (ESO mode) |
 | `postgresql.{storageClass,storageSize}` | `nfs4-csi` / `8Gi` | PostgreSQL PVC |
-| `postgresql.auth.{database,username,password}` | `infisicalDB` / `infisical` / `""` | PostgreSQL credentials (password required) |
+| `postgresql.auth.{database,username,password}` | `infisicalDB` / `infisical` / `""` | PostgreSQL credentials (password: non-ESO only, then required) |
 | `redis.enabled` | `true` | Deploy the bundled Bitnami Redis |
+| `redis.chartVersion` | `18.14.1` | `bitnamicharts/redis` version (ESO mode) |
 | `redis.{storageClass,storageSize}` | `nfs4-csi` / `2Gi` | Redis PVC |
-| `redis.auth.password` | `""` | Redis password (required) |
+| `redis.auth.password` | `""` | Redis password (non-ESO only, then required) |
 | `externalSecrets.enabled` | `false` | Render the `infisical-external-secrets` sub-App (production path) |
 | `externalSecrets.store.{name,kind}` | `vault-backend` / `ClusterSecretStore` | ESO store |
 | `externalSecrets.secretPath` | `infisical` | Entry path under the store's KV mount |

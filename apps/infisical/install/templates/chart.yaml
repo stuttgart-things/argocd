@@ -1,6 +1,12 @@
 {{- $defaultName := printf "infisical-%s" (sha1sum .Values.destination.server | trunc 8) }}
 {{- $appName := .Values.applicationName | default $defaultName }}
 {{- $siteUrl := .Values.infisical.siteUrl | default (printf "https://%s" .Values.httpRoute.hostname) }}
+{{- /* ESO mode: PostgreSQL and Redis run as their own child Applications
+       (postgresql.yaml / redis.yaml) reading passwords from the ESO Secret,
+       and DB_CONNECTION_URI / REDIS_URL arrive through envFrom. The upstream
+       sub-charts stay off: enabled, they would render both URLs inline from
+       values, and an explicit env entry wins over envFrom. */}}
+{{- $bundled := not .Values.externalSecrets.enabled }}
 {{- $computed := dict
       "infisical" (dict
         "fullnameOverride" "infisical"
@@ -15,7 +21,7 @@
       )
       "ingress" (dict "enabled" false "nginx" (dict "enabled" false))
       "postgresql" (dict
-        "enabled" .Values.postgresql.enabled
+        "enabled" (and $bundled .Values.postgresql.enabled)
         "auth" (dict
           "database" .Values.postgresql.auth.database
           "username" .Values.postgresql.auth.username
@@ -28,7 +34,7 @@
         ))
       )
       "redis" (dict
-        "enabled" .Values.redis.enabled
+        "enabled" (and $bundled .Values.redis.enabled)
         "architecture" "standalone"
         "auth" (dict "password" .Values.redis.auth.password)
         "master" (dict "persistence" (dict

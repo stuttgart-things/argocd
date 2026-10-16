@@ -35,12 +35,20 @@ infisical:
   siteUrl: ""
   secretName: infisical-secrets     # pragma: allowlist secret
 
-# Bundled PostgreSQL (Bitnami sub-chart of the upstream chart). The upstream
-# chart builds DB_CONNECTION_URI from auth.password, so it must be set — keep
-# it alphanumeric (it lands in a URL). Inline only for dev — override via
-# ArgoCD Vault Plugin / SOPS, never commit a literal here.
+# Bundled PostgreSQL (Bitnami).
+#   externalSecrets.enabled: false — the upstream chart's sub-chart; it builds
+#     DB_CONNECTION_URI from auth.password, so that must be set here (dev only,
+#     alphanumeric — it lands in a URL).
+#   externalSecrets.enabled: true — its own child Application
+#     "<app>-postgresql" (bitnamicharts/postgresql at chartVersion), reading
+#     DB_PASSWORD from the ESO Secret; auth.password is ignored.
+#   enabled: false — no PostgreSQL; with ESO, DB_CONNECTION_URI comes from the
+#     store as-is.
 postgresql:
   enabled: true
+  # Same version the upstream chart pins as its sub-chart. No renovate pin on
+  # purpose: a bitnami major is a data migration, not a bump.
+  chartVersion: 14.1.10
   storageClass: nfs4-csi
   storageSize: 8Gi
   auth:
@@ -48,19 +56,27 @@ postgresql:
     username: infisical
     password: ""
 
-# Bundled Redis (Bitnami sub-chart). Same rule as postgresql.auth.password:
-# the upstream chart builds REDIS_URL from it.
+# Bundled Redis (Bitnami). Same three modes as postgresql: REDIS_URL is built
+# from auth.password (no ESO), from REDIS_PASSWORD in the ESO Secret
+# (child Application "<app>-redis"), or taken from the store as-is (enabled: false).
 redis:
   enabled: true
+  # Same version the upstream chart pins as its sub-chart (see postgresql).
+  chartVersion: 18.14.1
   storageClass: nfs4-csi
   storageSize: 2Gi
   auth:
     password: ""
 
 # externalSecrets sub-Application (opt-in, sync-wave -10) — the PRODUCTION
-# path for the root keys. Provisions the Secret named infisical.secretName via
-# the External Secrets Operator, pulling ENCRYPTION_KEY and AUTH_SECRET from
-# the referenced store. Enable EITHER externalSecrets OR secretsApp, not both.
+# path. Provisions the Secret named infisical.secretName via the External
+# Secrets Operator. Store properties read:
+#   ENCRYPTION_KEY, AUTH_SECRET                        always
+#   DB_PASSWORD     / DB_CONNECTION_URI                postgresql.enabled true / false
+#   REDIS_PASSWORD  / REDIS_URL                        redis.enabled true / false
+# With the bundled databases, DB_CONNECTION_URI and REDIS_URL are templated
+# into the Secret from the passwords — no password in values or git.
+# Enable EITHER externalSecrets OR secretsApp, not both.
 externalSecrets:
   enabled: false
   store:
