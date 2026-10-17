@@ -1,11 +1,63 @@
+{{- /* Booleans and the replica count arrive as strings when a platform
+       AppSet templates them from cluster-Secret annotations/labels: the
+       ApplicationSet controller can only emit strings. Normalise once here.
+       Anything that is not "true" is false. */ -}}
+{{- $defaultClass := eq (toString (default false .Values.defaultStorageClass)) "true" }}
+{{- $replicas := int (toString .Values.defaultClassReplicaCount) }}
+{{- if lt $replicas 1 }}
+  {{- fail (printf "defaultClassReplicaCount must be an integer >= 1, got %q" (toString .Values.defaultClassReplicaCount)) }}
+{{- end }}
+
 {{- $computed := dict }}
 {{- $_ := set $computed "preUpgradeChecker" (dict
     "jobEnabled" .Values.preUpgradeChecker.jobEnabled
     "upgradeVersionCheck" .Values.preUpgradeChecker.upgradeVersionCheck) }}
 {{- $_ := set $computed "persistence" (dict
-    "defaultClass" (default false .Values.defaultStorageClass)
-    "defaultClassReplicaCount" (int .Values.defaultClassReplicaCount)
+    "defaultClass" $defaultClass
+    "defaultClassReplicaCount" $replicas
     "volumeBindingMode" .Values.volumeBindingMode) }}
+
+{{- /* Lean profile: one replica of every cluster-wide controller instead of
+       upstream's 2-3. Safe on 1 node and on 3: all of them are leader-elected
+       (only one is ever active), so the extra replicas are warm standbys that
+       only shorten failover after a node loss. Per-node DaemonSets
+       (longhorn-manager, longhorn-csi-plugin, engine-image, instance-manager)
+       are not reducible. */ -}}
+{{- if .Values.minimalFootprint }}
+  {{- $_ := set $computed "csi" (dict
+      "attacherReplicaCount" 1
+      "provisionerReplicaCount" 1
+      "resizerReplicaCount" 1
+      "snapshotterReplicaCount" 1) }}
+  {{- $_ := set $computed "longhornUI" (dict "replicas" 1) }}
+  {{- $_ := set $computed "longhornGlobalManager" (dict "replicas" 1) }}
+  {{- /* Volumes created from the Longhorn UI follow the StorageClass's
+         replica count instead of upstream's 3; v2 (SPDK) data engine stays
+         off -- it would add a second, hugepage-hungry instance-manager per
+         node. */ -}}
+  {{- $_ := set $computed "defaultSettings" (dict
+      "defaultReplicaCount" (toString $replicas)
+      "v2DataEngine" false) }}
+{{- end }}
+
+{{- /* Longhorn UI behind a Gateway API HTTPRoute (upstream chart's own
+       `httproute` template, backend longhorn-frontend:80). */ -}}
+{{- if eq (toString (default false .Values.httpRoute.enabled)) "true" }}
+  {{- if not .Values.httpRoute.hostname }}
+    {{- fail "httpRoute.enabled is true but httpRoute.hostname is empty" }}
+  {{- end }}
+  {{- if not .Values.httpRoute.gateway.name }}
+    {{- fail "httpRoute.enabled is true but httpRoute.gateway.name is empty" }}
+  {{- end }}
+  {{- $ref := dict "name" .Values.httpRoute.gateway.name "namespace" .Values.httpRoute.gateway.namespace }}
+  {{- with .Values.httpRoute.gateway.sectionName }}
+    {{- $_ := set $ref "sectionName" . }}
+  {{- end }}
+  {{- $_ := set $computed "httproute" (dict
+      "enabled" true
+      "parentRefs" (list $ref)
+      "hostnames" (list .Values.httpRoute.hostname)) }}
+{{- end }}
 
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}

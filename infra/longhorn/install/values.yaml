@@ -14,6 +14,8 @@ chartVersion: 1.13.0
 # Mark the rendered `longhorn` StorageClass as the cluster's default
 # (sets persistence.defaultClass=true in the upstream chart, which adds
 # annotation storageclass.kubernetes.io/is-default-class: "true").
+# Boolean, or the string "true"/"false" (what a platform AppSet templates
+# from a cluster annotation); anything but "true" is false.
 #
 # Off by default: in platforms/storage, openebs-hostpath already claims
 # the default-SC slot. Two SCs claiming default = non-deterministic binding
@@ -25,10 +27,24 @@ defaultStorageClass: false
 #
 # Defaults to 1 — works on single-node test clusters (kind, k3s, single-VM
 # k8s) out of the box; PVCs would otherwise stay Pending forever waiting for
-# 3 distinct nodes. **Bump to 3** (via extraValues, or by opting out of this
-# platform's longhorn appset and running a per-cluster Application) on real
-# multi-node prod clusters — single-replica defeats Longhorn's redundancy.
+# 3 distinct nodes. **Bump to 3** on real multi-node prod clusters —
+# single-replica defeats Longhorn's redundancy. platforms/storage sets it per
+# cluster from the annotation
+# `storage-platform.stuttgart-things.com/longhorn-replica-count`.
+# Integer, or a string holding one (AppSets can only template strings).
 defaultClassReplicaCount: 1
+
+# Lean profile: run every cluster-wide Longhorn controller with ONE replica
+# instead of upstream's 2-3 — CSI attacher/provisioner/resizer/snapshotter
+# (3 each -> 1), longhorn-ui (2 -> 1), longhorn-global-manager (3 -> 1).
+# All of them are leader-elected, so the dropped replicas were idle standbys;
+# the cost is a slower failover (pod reschedule) when the node hosting one
+# dies. On a 3-node cluster this is 30 -> 19 pods. Also sets
+# defaultSettings.defaultReplicaCount (volumes created in the UI) to
+# defaultClassReplicaCount and keeps the v2 (SPDK) data engine off.
+# Set false to get upstream's replica defaults back; extraValues still wins
+# over anything set here.
+minimalFootprint: true
 
 # StorageClass volume binding mode. Upstream default is Immediate.
 # Set "WaitForFirstConsumer" if you want volume placement to follow the pod
@@ -45,6 +61,25 @@ volumeBindingMode: Immediate
 preUpgradeChecker:
   jobEnabled: false
   upgradeVersionCheck: false
+
+# Longhorn UI via a Gateway API HTTPRoute (rendered by the upstream chart's
+# `httproute` template, backend Service longhorn-frontend:80).
+#
+# WARNING: the Longhorn UI has NO authentication. Anyone who reaches the
+# hostname can delete volumes, backups and disks. Only attach it to a
+# lab-internal gateway; put OIDC (oauth2-proxy) in front before exposing it
+# anywhere else.
+httpRoute:
+  # Boolean, or the string "true"/"false".
+  enabled: false
+  # e.g. longhorn.<cluster>.<zone>. Required when enabled.
+  hostname: ""
+  gateway:
+    # Required when enabled; clusterbook clusters use `<cluster>-gateway`.
+    name: ""
+    namespace: default
+    # Listener to attach to; empty attaches to every listener of the Gateway.
+    sectionName: https
 
 # Deep-merged on top of the computed valuesObject passed to the upstream chart.
 # Use for any upstream key not exposed as a first-class value above
