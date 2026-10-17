@@ -124,7 +124,7 @@ spec:
         # on -- deliberately never auto-merged, so rolling a catalog release out
         # to every labelled cluster stays a human decision.
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.75.0
+        targetRevision: v0.77.0
         path: apps/homerun2/install
         helm:
           releaseName: 'homerun2-{{ .name }}'
@@ -259,6 +259,10 @@ spec:
               # `${TEAMS_WEBHOOK_URL}` placeholders pass through untouched --
               # the catcher expands them.
               notifyConfig: {{ toJson (default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/notification-catcher-notify-config")) }}
+              # Streams to consume, comma-separated (`messages,tabletennis`), all
+              # by the one Deployment (REDIS_STREAMS). Empty = the chart's
+              # redisStream alone, i.e. `messages`, and no new ConfigMap key.
+              redisStreams: {{ toJson (default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/notification-catcher-streams")) }}
             gitPitcher:
               enabled: {{ eq (default "" (index $l "homerun2-platform/git-pitcher")) "true" }}
               hostname: 'git-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
@@ -298,7 +302,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.75.0
+              targetRevision: v0.77.0
             # Target the labelled remote cluster, not the management one.
             destination:
               server: '{{ .server }}'
