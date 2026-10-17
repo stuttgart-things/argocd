@@ -3,42 +3,134 @@
   "title": "longhorn install app-of-apps chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["project", "destination", "chartVersion"],
+  "required": [
+    "project",
+    "destination",
+    "chartVersion"
+  ],
   "properties": {
     "applicationName": {
       "type": "string",
       "minLength": 1,
       "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
     },
-    "project": { "type": "string", "minLength": 1 },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
     "destination": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "server":    { "type": "string", "format": "uri" },
-        "namespace": { "type": "string", "minLength": 1 }
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      "required": ["server", "namespace"]
+      "required": [
+        "server",
+        "namespace"
+      ]
     },
-    "chartVersion": { "type": "string", "minLength": 1 },
-    "defaultStorageClass": { "type": "boolean" },
+    "chartVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "defaultStorageClass": {
+      "type": [
+        "boolean",
+        "string"
+      ],
+      "enum": [
+        true,
+        false,
+        "true",
+        "false"
+      ],
+      "description": "Mark the longhorn StorageClass as cluster default. Strings are accepted because platform AppSets template values from cluster annotations."
+    },
     "defaultClassReplicaCount": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 20
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        {
+          "type": "string",
+          "pattern": "^([1-9]|1[0-9]|20)$"
+        }
+      ],
+      "description": "Replica count of the default StorageClass; integer or a string holding one (1-20)."
+    },
+    "minimalFootprint": {
+      "type": "boolean",
+      "description": "One replica of every cluster-wide controller (CSI sidecars, UI, global manager); see values.yaml."
     },
     "volumeBindingMode": {
       "type": "string",
-      "enum": ["Immediate", "WaitForFirstConsumer"]
+      "enum": [
+        "Immediate",
+        "WaitForFirstConsumer"
+      ]
     },
     "preUpgradeChecker": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "jobEnabled":          { "type": "boolean" },
-        "upgradeVersionCheck": { "type": "boolean" }
+        "jobEnabled": {
+          "type": "boolean"
+        },
+        "upgradeVersionCheck": {
+          "type": "boolean"
+        }
       },
-      "required": ["jobEnabled", "upgradeVersionCheck"]
+      "required": [
+        "jobEnabled",
+        "upgradeVersionCheck"
+      ]
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "true",
+            "false"
+          ]
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sectionName": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "description": "Longhorn UI via a Gateway API HTTPRoute. The UI has no authentication -- internal gateways only."
     },
     "extraValues": {
       "type": "object",
