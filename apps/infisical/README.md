@@ -152,7 +152,7 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `destination.namespace` | `infisical` | Namespace for Infisical |
 | `chartVersion` | `1.11.0` | Upstream `infisical-standalone` chart version |
 | `replicas` | `2` | Infisical pod replicas |
-| `image.{repository,tag,pullPolicy}` | `infisical/infisical` / `v0.158.0` / `IfNotPresent` | Container image |
+| `image.{repository,tag,pullPolicy}` | `infisical/infisical` / `v0.166.6` / `IfNotPresent` | Container image |
 | `infisical.siteUrl` | `""` | Public URL; empty → `https://<httpRoute.hostname>` |
 | `infisical.secretName` | `infisical-secrets` | Secret with `ENCRYPTION_KEY` + `AUTH_SECRET` (envFrom) |
 | `postgresql.enabled` | `true` | Deploy the bundled Bitnami PostgreSQL |

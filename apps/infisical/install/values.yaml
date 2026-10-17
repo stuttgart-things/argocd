@@ -22,7 +22,7 @@ replicas: 2
 image:
   repository: infisical/infisical
   # renovate: datasource=docker depName=infisical/infisical
-  tag: v0.158.0
+  tag: v0.166.6
   pullPolicy: IfNotPresent
 
 # Infisical runtime configuration.
