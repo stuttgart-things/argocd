@@ -24,7 +24,7 @@ chartVersion: 12.2.1
 pluginAws:
   image: velero/velero-plugin-for-aws
   # renovate: datasource=docker depName=velero/velero-plugin-for-aws
-  tag: 1.14.4
+  tag: v1.14.4
 
 # Secret in the velero namespace carrying the AWS-style credentials INI
 # under key `cloud`. Provisioned out-of-band — either a static Secret
