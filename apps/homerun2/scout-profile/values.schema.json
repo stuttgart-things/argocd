@@ -33,6 +33,19 @@
             "criticalThreshold": { "type": "integer", "minimum": 0 },
             "cooldown": { "type": "string" }
           }
+        },
+        "digest": {
+          "type": "object",
+          "description": "Periodic digest scout pitches through alerting.pitcherURL (scout v0.11+).",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "timezone": { "type": "string" },
+            "hourly": { "type": "boolean" },
+            "dailyAt": { "type": "string", "description": "HH:MM in timezone." },
+            "excludeSystems": { "type": "array", "items": { "type": "string" } },
+            "topSystems": { "type": "integer", "minimum": 0 },
+            "system": { "type": "string" }
+          }
         }
       }
     }

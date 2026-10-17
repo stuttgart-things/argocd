@@ -8,8 +8,13 @@
        run - SkipDryRunOnMissingResource lets the first sync through. scout
        (v0.11.1+, homerun2-scout#81) reads the profile every SCOUT_INTERVAL and
        restarts itself when it changes. No rollout is needed from this chart,
-       and none could be ordered: sync-waves do not wait for this Application. */}}
-{{- if and .Values.scout.enabled .Values.scout.profile.enabled }}
+       and none could be ordered: sync-waves do not wait for this Application.
+
+       The spec is scout.profile.spec, or scout.profile.content (a YAML
+       string, e.g. from a cluster annotation) parsed — see
+       homerun2.scoutProfile in _helpers.tpl. */}}
+{{- $profile := include "homerun2.scoutProfile" . | fromYaml }}
+{{- if and .Values.scout.enabled $profile.render }}
 {{- $appName := include "homerun2.appName" . }}
 {{- $syncPolicy := deepCopy .Values.syncPolicy }}
 {{- $_ := set $syncPolicy "syncOptions" (append (default (list) $syncPolicy.syncOptions) "SkipDryRunOnMissingResource=true") }}
@@ -36,7 +41,7 @@ spec:
       valuesObject:
         name: {{ .Values.scout.profile.name | quote }}
         spec:
-          {{- toYaml .Values.scout.profile.spec | nindent 10 }}
+          {{- toYaml $profile.spec | nindent 10 }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}

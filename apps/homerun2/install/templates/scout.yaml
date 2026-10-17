@@ -98,8 +98,26 @@ spec:
        optional: scout still starts without it; the alerts are then answered
        401 and logged. */}}
 {{- $scoutEnv := list }}
-{{- if and .Values.scout.profile.enabled (dig "alerting" "pitcherURL" "" .Values.scout.profile.spec) }}
+{{- $profile := include "homerun2.scoutProfile" . | fromYaml }}
+{{- if and $profile.render (dig "alerting" "pitcherURL" "" $profile.spec) }}
   {{- $scoutEnv = append $scoutEnv (dict "name" "ALERT_PITCHER_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" "homerun2-omni-pitcher-token" "key" "auth-token" "optional" true))) }}
+{{- end }}
+{{- /* The ai-pitcher's own messages (one system per mode, plus the ticker)
+       stay out of scout's digests, so no digest counts an AI summary — as on
+       LabUL platform-sthings. A ScoutProfile listing digest.excludeSystems
+       wins over this env; homerun2.scoutProfile adds the same systems there. */}}
+{{- if .Values.aiPitcher.enabled }}
+  {{- $scoutEnv = append $scoutEnv (dict "name" "DIGEST_EXCLUDE_SYSTEMS" "value" (include "homerun2.aiPitcherSystems" .)) }}
+{{- end }}
+{{- /* Retention: the ai-pitcher's weekly mode compares this week with the
+       one before, so scout has to keep 15 days (360h) instead of its 48h. A
+       ScoutProfile's retention.ttl wins over this env. */}}
+{{- $ttl := .Values.scout.retentionTTL }}
+{{- if and (not $ttl) .Values.aiPitcher.enabled .Values.aiPitcher.modes.weekly.enabled }}
+  {{- $ttl = "360h" }}
+{{- end }}
+{{- with $ttl }}
+  {{- $scoutEnv = append $scoutEnv (dict "name" "SCOUT_RETENTION_TTL" "value" .) }}
 {{- end }}
         - target:
             kind: Deployment

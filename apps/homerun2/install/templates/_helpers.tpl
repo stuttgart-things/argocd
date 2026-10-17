@@ -195,3 +195,71 @@ gets an 8-character hash of the full name, so two long names cannot collide.
 {{- printf "%s-%s" (trunc 44 . | trimSuffix "-") (sha1sum . | trunc 8) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+homerun2.schedulePitcherProfile -- the schedule-pitcher's profile.yaml.
+`schedulePitcher.profileContent` verbatim when set; otherwise a minimal
+central profile: no checks of its own, delivery to the in-cluster omni-pitcher
+in grafana format (what the notification-catcher's teams-grafana outputs
+match), Europe/Berlin. It still takes findings from agents (POST /findings)
+and sends the daily heartbeat. One definition, so the ConfigMap and the Pod's
+profile-hash can never describe two different profiles.
+*/}}
+{{- define "homerun2.schedulePitcherProfile" -}}
+{{- if .Values.schedulePitcher.profileContent -}}
+{{- .Values.schedulePitcher.profileContent -}}
+{{- else -}}
+apiVersion: homerun2.sthings.io/v1alpha1
+kind: SchedulePitcherProfile
+metadata:
+  name: {{ .Values.destination.name | default "homerun2" }}
+spec:
+  pitcher:
+    addr: http://homerun2-omni-pitcher.{{ .Values.destination.namespace }}.svc.cluster.local/pitch/grafana
+    format: grafana
+  defaults:
+    timezone: Europe/Berlin
+{{- end -}}
+{{- end -}}
+
+{{/*
+homerun2.aiPitcherSystems -- every system the ai-pitcher pitches as (one per
+mode plus the LED ticker). scout leaves them out of its digests, so no digest
+counts an AI summary (homerun2-ai-pitcher README, "Modes").
+*/}}
+{{- define "homerun2.aiPitcherSystems" -}}
+ai-digest,ai-evening,ai-week-ahead,ai-weekly,ai-ticker
+{{- end -}}
+
+{{/*
+homerun2.scoutProfile -- the effective ScoutProfile as YAML
+`{render: bool, spec: map}`, for templates/scout-profile.yaml (the CR) and
+templates/scout.yaml (which env scout needs). `scout.profile.content` (a YAML
+string, what a cluster annotation carries) replaces `scout.profile.spec` and
+renders the profile on its own; otherwise `enabled` + `spec` as before.
+
+A profile's non-empty fields win over scout's env, so a profile that lists
+digest.excludeSystems would let the AI summaries back into the digest that
+DIGEST_EXCLUDE_SYSTEMS keeps them out of: with aiPitcher on, the ai-* systems
+are added to that list.
+Usage: include "homerun2.scoutProfile" . | fromYaml
+*/}}
+{{- define "homerun2.scoutProfile" -}}
+{{- $p := .Values.scout.profile -}}
+{{- $render := $p.enabled -}}
+{{- $spec := deepCopy (default (dict) $p.spec) -}}
+{{- if $p.content -}}
+  {{- $spec = fromYaml $p.content -}}
+  {{- if hasKey $spec "Error" -}}
+    {{- fail (printf "scout.profile.content must be a YAML map (the ScoutProfile spec): %s" (get $spec "Error")) -}}
+  {{- end -}}
+  {{- $render = true -}}
+{{- end -}}
+{{- if .Values.aiPitcher.enabled -}}
+  {{- $excl := dig "digest" "excludeSystems" (list) $spec -}}
+  {{- if $excl -}}
+    {{- $_ := set $spec.digest "excludeSystems" (uniq (concat $excl (splitList "," (include "homerun2.aiPitcherSystems" .)))) -}}
+  {{- end -}}
+{{- end -}}
+{{- toYaml (dict "render" $render "spec" $spec) -}}
+{{- end -}}

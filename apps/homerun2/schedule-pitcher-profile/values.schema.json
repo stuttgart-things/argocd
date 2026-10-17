@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2-schedule-pitcher-profile chart",
+  "type": "object",
+  "_comment": "additionalProperties left open so the catalog verifier (call-argocd-verify-catalog) can inject its common probe values like `destination` without tripping the schema. The chart only consumes `name`, `content`, `serviceAccount` and `secretAccess`; anything else is ignored.",
+  "additionalProperties": true,
+  "required": ["name", "content", "serviceAccount", "secretAccess"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ConfigMap name. Must match schedulePitcher.profileConfigMap in apps/homerun2/install, which the Deployment patch mounts."
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The SchedulePitcherProfile (profile.yaml) as a YAML string, passed through verbatim."
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "namespace"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      }
+    },
+    "secretAccess": {
+      "type": "array",
+      "description": "One Role + RoleBinding (get on exactly these Secrets) per namespace.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["namespace", "secrets"],
+        "properties": {
+          "namespace": { "type": "string", "minLength": 1 },
+          "secrets": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

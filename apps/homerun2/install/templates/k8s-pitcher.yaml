@@ -93,6 +93,23 @@ spec:
             name: {{ $name }}
           patch: |
 {{ toYaml $trustPatch | indent 12 }}
+{{- /* The base's ClusterRole covers its own profile (pods, nodes, events,
+       deployments, replicasets; get on secrets for the token). A profile
+       informing on anything else adds its rules here. */}}
+{{- with .Values.k8sPitcher.extraRbacRules }}
+        - target:
+            group: rbac.authorization.k8s.io
+            version: v1
+            kind: ClusterRole
+            name: {{ $name }}
+          patch: |-
+{{- range . }}
+            - op: add
+              path: /rules/-
+              value:
+                {{- toYaml . | nindent 16 }}
+{{- end }}
+{{- end }}
 {{- if not .Values.k8sPitcher.inlineProfile }}
         - target:
             kind: ConfigMap

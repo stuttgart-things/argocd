@@ -18,7 +18,7 @@ apps/homerun2/
 │       ├── omni-pitcher.yaml                  Application "...-omni-pitcher"       (sync-wave 0)
 │       ├── core-catcher.yaml                  Application "...-core-catcher"       (sync-wave 0)
 │       ├── scout.yaml                         Application "...-scout"              (sync-wave 0)
-│       ├── scout-profile.yaml                 Application "...-scout-profile"      (sync-wave 1, only with scout.profile.enabled)
+│       ├── scout-profile.yaml                 Application "...-scout-profile"      (sync-wave 1, only with scout.profile.enabled or scout.profile.content)
 │       ├── k8s-pitcher.yaml                   Application "...-k8s-pitcher"        (sync-wave 0)
 │       ├── light-catcher.yaml                 Application "...-light-catcher"      (sync-wave 0)
 │       ├── wled-mock.yaml                     Application "...-wled-mock"          (sync-wave 0)
@@ -28,10 +28,15 @@ apps/homerun2/
 │       ├── notification-catcher.yaml          Application "...-notification-catcher" (sync-wave 0, consumer only — no Service, no route)
 │       ├── notification-catcher-notify.yaml   Application "...-notification-catcher-notify" (sync-wave -10, only with notificationCatcher.notifyConfig)
 │       ├── git-pitcher.yaml                   Application "...-git-pitcher"        (sync-wave 0)
+│       ├── ai-pitcher.yaml                    Application "...-ai-pitcher"         (sync-wave 0, four CronJobs — one per mode)
+│       ├── schedule-pitcher.yaml              Application "...-schedule-pitcher"   (sync-wave 0, central instance: UI + API)
+│       ├── schedule-pitcher-profile.yaml      Application "...-schedule-pitcher-profile" (sync-wave -10, its profile ConfigMap + secret-check Roles)
+│       ├── sound-catcher.yaml                 Application "...-sound-catcher"      (sync-wave 0, browser player page, route from its base)
 │       ├── httproute.yaml                     Application "...-httproute"          (sync-wave 10, builds routes from enabled components)
 │       └── smoke-test.yaml                    Application "...-smoke-test"         (sync-wave 20, opt-in via smokeTest.enabled)
 ├── httproute/                                 multi-HTTPRoute sub-chart (driven by a values list)
 ├── notification-catcher-notify/               ConfigMap sub-chart carrying notification-catcher's config.yaml (driven by notificationCatcher.notifyConfig)
+├── schedule-pitcher-profile/                  ConfigMap sub-chart carrying schedule-pitcher's profile.yaml, plus one Role per namespace its secret checks read (driven by schedulePitcher.profileContent / secretAccess)
 ├── smoke-test/                                PostSync-hook Job that probes a deployed omni-pitcher (health, unauthenticated 401, authenticated pitch — in-cluster and through the HTTPRoute); see its README
 ├── preview-quota/                             Kyverno `ClusterPolicy` auto-generating `ResourceQuota` + `LimitRange` in every `homerun2-pr-*` namespace (PR-preview safety net; requires Kyverno installed — see `infra/kyverno/install`)
 ├── preview-secrets/                           Kyverno `ClusterPolicy` auto-generating `ExternalSecret`s in every `homerun2-pr-*` namespace (pulls per-component secrets from Vault via ESO; requires Kyverno + ESO + `ClusterSecretStore`)
@@ -66,6 +71,9 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `ledCatcher` | Redis Streams consumer → LED display | yes | no |
 | `gitPitcher` | Watches Git repos → pitches | no | no |
 | `notificationCatcher` | Redis Streams consumer → MS Teams / generic webhooks (the other half of the Alertmanager/Grafana chain) | no | no |
+| `aiPitcher` | CronJobs: AI summaries of scout's digest + the schedule-pitcher's open findings via OpenRouter, pitched to omni (morning / evening / week-ahead / weekly) | no | reads omni's + scout's |
+| `schedulePitcher` | Central schedule-pitcher: token/cert expiry checks, reminders, findings from agents → omni, web UI + API | yes | own (`schedulePitcherAuthToken`) |
+| `soundCatcher` | Redis Streams consumer → clips and spoken announcements on a browser player page (no speaker in a Pod) | yes | `/play` (`authToken`) |
 
 ## What gets deployed (per component)
 
@@ -170,9 +178,9 @@ Add to the helm.values block:
           version: v0.5.0
 ```
 
-## K8sPitcherProfile ConfigMap (NOT provisioned by this chart)
+## K8sPitcherProfile ConfigMap
 
-`k8sPitcher` references a ConfigMap named `homerun2-k8s-pitcher-profile` (override via `.Values.k8sPitcherProfileConfigMap`) that holds the cluster-specific `K8sPitcherProfile` (pitcher address, collectors, informers). Provision it out-of-band — example shape (apply to the same namespace as `k8sPitcher.namespace`):
+`k8sPitcher` references a ConfigMap named `homerun2-k8s-pitcher-profile` (override via `.Values.k8sPitcherProfileConfigMap`) that holds the cluster-specific `K8sPitcherProfile` (pitcher address, collectors, informers). Set `k8sPitcher.profileContent` to the document and the chart creates it (sub-Application `…-k8s-pitcher-profile`, sync-wave -10, in `k8sPitcher.namespace`) and rolls the Pod when it changes; `platforms/homerun2` passes it from the cluster annotation `…/k8s-pitcher-profile`. Empty, provision it out-of-band — example shape (apply to the same namespace as `k8sPitcher.namespace`):
 
 ```yaml
 apiVersion: v1
@@ -205,7 +213,60 @@ data:
         - { group: apps,  version: v1, resource: deployments, namespace: homerun2-flux, events: [add, update, delete] }
 ```
 
-For CRD watching, add the CRD API group to the ClusterRole on the calling side.
+In-cluster, point `pitcher.addr` at `http://homerun2-omni-pitcher.<namespace>.svc.cluster.local/pitch` (plain HTTP, no trust bundle needed) and take the token from `homerun2-k8s-pitcher-token` (the secrets sub-Application materializes it from `authToken`).
+
+**RBAC.** The kustomize base ships the ClusterRole `homerun2-k8s-pitcher` (get/list/watch on pods, nodes, events, deployments, replicasets; get on secrets — the token) and its binding; kustomize rewrites the binding's subject to `k8sPitcher.namespace`. That covers the shape above. A profile that informs on anything else (a CRD, jobs, …) adds its rules through `k8sPitcher.extraRbacRules`, which the chart appends to that ClusterRole.
+
+## Schedule-pitcher, ai-pitcher and scout's digest
+
+The three belong together; each one works alone, too.
+
+- **`schedulePitcher`** runs the central instance (`serve`): the checks and reminders of its
+  profile, plus findings that agents on other clusters and jobs on VMs `POST /findings`,
+  delivered in office hours to the in-cluster omni-pitcher with omni-pitcher's token
+  (`PITCHER_TOKEN` from `homerun2-omni-pitcher-token`; the base's `-pitcher` Secret is
+  dropped). State lives in this stack's redis-stack. Web UI (`/ui/`) and API on
+  `schedulePitcher.hostname`, login with its own token: Secret
+  `homerun2-schedule-pitcher-token`, from the per-cluster Vault property
+  **`schedulePitcherAuthToken`** — a token of its own because agents carry it.
+  The profile is `schedulePitcher.profileContent` (empty: a minimal profile without checks
+  that still takes findings and sends the heartbeat); the chart creates the ConfigMap
+  (sub-Application `…-schedule-pitcher-profile`, sync-wave -10) and rolls the Pod on a
+  change. Checks that read a token through `tokenFrom.secretKeyRef` need `get` on that
+  Secret: list them in `schedulePitcher.secretAccess` and the same sub-Application renders
+  one `Role` + `RoleBinding` per namespace (the base ships none). Other check types that
+  need the API (`scheduled-run`, discovery) need their RBAC added on the calling side.
+- **`aiPitcher`** v0.4 runs one CronJob per mode — `modes.{morning,evening,weekAhead,weekly}`,
+  all on by default with the base's schedules (as on LabUL platform-sthings); a disabled
+  mode's CronJob is not deployed. Each run reads scout's digest and, **when
+  `schedulePitcher` is on, its open findings** from `homerun2-schedule-pitcher` in the same
+  namespace (with its token). Without it, `aiPitcher.schedulePitcherURL` can name one
+  elsewhere; both empty skips the findings. The OpenRouter key is a **shared** entry,
+  `secrets.openrouterVaultSecretName` (property `openrouterApiKey`, e.g. `_openrouter`);
+  without it the runs still pitch the plain digest marked `[AI n/a]`.
+- **`scout`**: with `aiPitcher` on, scout gets `DIGEST_EXCLUDE_SYSTEMS=ai-digest,ai-evening,
+  ai-week-ahead,ai-weekly,ai-ticker`, so no digest counts an AI summary; a ScoutProfile that
+  lists `digest.excludeSystems` gets the same systems added (its fields win over the env).
+  The weekly mode compares this week with the one before, so scout keeps 15 days
+  (`SCOUT_RETENTION_TTL=360h`) unless `scout.retentionTTL` says otherwise — more Redis memory
+  for a busy stream. The weekly window itself needs scout v0.12+.
+
+The ScoutProfile (alerting, retention, scout's own pitched digest) is `scout.profile.spec`
+with `enabled: true`, or `scout.profile.content` as a YAML string — what a cluster
+annotation can carry (`platforms/homerun2`: `…/scout-profile`). It must parse to a map, or
+the whole chart fails to render. Scout pitches alerts and its digest to
+`alerting.pitcherURL`; the chart then hands it omni-pitcher's token.
+
+## Sound-catcher
+
+`soundCatcher` runs the catcher with the browser sink only — a Pod has no speaker. Open
+`https://<soundCatcher.hostname>/` and keep the page open; announcements (clips + Piper
+speech, the base's default rules and quiet hours) play there. The route is the one the
+kustomize base ships, patched in place, because it carries the `/api/events` rule with
+`timeouts.request: 0s` for the page's event stream (the standalone `httproute` chart has no
+per-rule timeouts). `/play`, replay and mute take the stack's `authToken` (Secret
+`homerun2-sound-catcher-api`, key `token`). Both its Secrets come from `secrets.enabled`:
+the base ships neither, only references them.
 
 ## Notify config and webhook (notification-catcher)
 
@@ -285,7 +346,12 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `httpRoute.enabled` / `gateway.{name,namespace}` | `true` / `cilium-gateway` / `default` | Render Gateway API HTTPRoutes for every enabled component that exposes one |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the redis-stack + httpRoute Applications fetch manifests from |
 | `notificationCatcher.enabled` / `version` / `redisStream` / `dryRun` / `notifyConfigMap` / `notifyConfig` / `teamsWebhookUrl` | `false` / `v3.0.3` / `messages` / `false` / `homerun2-notification-catcher-notify` / `""` / `""` | Fan-out to MS Teams / webhooks. Consumer only — no Service, no route. `notifyConfig` set → the chart creates the notify ConfigMap, empty → out-of-band; an empty `teamsWebhookUrl` deletes the base's placeholder Secret so an ESO-managed one takes over |
-| `secrets.enabled` / `clusterSecretStoreName` / `vaultSecretName` / `githubTokenVaultSecretName` / `teamsWebhookVaultSecretName` / `refreshInterval` | `false` / `vault-homerun2-pr` / `preview-env` / `""` / `""` / `1h` | ExternalSecrets sub-Application. The two `…VaultSecretName` overrides point one component at a shared entry in the same store: git-pitcher's `githubToken`, notification-catcher's `teamsWebhookUrl` (→ Secret `homerun2-notification-catcher-secrets`, key `TEAMS_WEBHOOK_URL`; rendered only when set) |
+| `secrets.enabled` / `clusterSecretStoreName` / `vaultSecretName` / `githubTokenVaultSecretName` / `teamsWebhookVaultSecretName` / `openrouterVaultSecretName` / `refreshInterval` | `false` / `vault-homerun2-pr` / `preview-env` / `""` / `""` / `""` / `1h` | ExternalSecrets sub-Application. The three `…VaultSecretName` overrides point one component at a shared entry in the same store: git-pitcher's `githubToken`, notification-catcher's `teamsWebhookUrl` (→ Secret `homerun2-notification-catcher-secrets`, key `TEAMS_WEBHOOK_URL`; rendered only when set), ai-pitcher's `openrouterApiKey` (→ `homerun2-ai-pitcher-openrouter`, key `api-key`; rendered only when set) |
+| `aiPitcher.enabled` / `version` / `modes.<mode>.{enabled,schedule}` / `timeZone` / `suspend` / `model` / `language` / `retries` / `schedulePitcherURL` / `schedulePitcherTokenSecret` | `false` / `v0.4.1` / all four on, base schedules / `Europe/Berlin` / `false` / free-model list / `German` / `2` / `""` / `homerun2-schedule-pitcher-token` | AI summaries, see above. The two `schedulePitcher…` keys only matter while `schedulePitcher` is off |
+| `schedulePitcher.enabled` / `version` / `hostname` / `inlineHttpRoute` / `profileConfigMap` / `profileContent` / `secretAccess` | `false` / `v1.10.0` / `schedule-pitcher.example.com` / `false` / `homerun2-schedule-pitcher-profile` / `""` (minimal profile) / `[]` | Central schedule-pitcher, see above |
+| `soundCatcher.enabled` / `version` / `hostname` / `redisStreams` | `false` / `v1.0.0` / `sound-catcher.example.com` / `messages` | Browser-only sound-catcher |
+| `scout.profile.content` / `scout.retentionTTL` | `""` / `""` | ScoutProfile spec as a YAML string (replaces `spec`, renders on its own); `SCOUT_RETENTION_TTL` (360h with the ai-pitcher's weekly mode) |
+| `k8sPitcher.profileContent` / `extraRbacRules` | `""` / `[]` | K8sPitcherProfile document (chart creates the ConfigMap); extra rules for the base's ClusterRole |
 | `smokeTest.enabled` / `external.*` / `extraProbes` / `events` | `false` / verify TLS via `cluster-trust-bundle`, dial the gateway Service / one fixture event | Opt-in Job asserting `/health`, an unauthenticated `POST /pitch` → 401, and an authenticated pitch — in-cluster and through the HTTPRoute — plus a `/health` probe per enabled core-catcher/scout. Needs the auth-token Secret (inline `authToken` or `secrets.enabled`). See [`smoke-test/`](./smoke-test/) |
 | `syncPolicy` | automated + retry | Applied to all rendered Applications |
 
