@@ -46,6 +46,13 @@ spec:
               REDIS_ADDR: {{ printf "redis-stack.%s.svc.cluster.local" $ns }}
               REDIS_PORT: "6379"
               REDIS_STREAM: {{ .Values.notificationCatcher.redisStream | quote }}
+              {{- /* Since v3.0.0 the catcher reads REDIS_STREAMS (comma list)
+                     first and falls back to REDIS_STREAM; one consumer, one
+                     group, every stream. Only rendered when set, so a cluster
+                     that does not use it keeps exactly the old ConfigMap. */}}
+              {{- with .Values.notificationCatcher.redisStreams }}
+              REDIS_STREAMS: {{ . | quote }}
+              {{- end }}
         - target:
             kind: Deployment
             name: {{ $name }}
