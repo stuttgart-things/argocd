@@ -104,7 +104,10 @@ spec:
     storage-platform: 'true'            # umbrella
     storage-platform/openebs: 'true'    # → appset-openebs (storage): openebs-hostpath = DEFAULT SC
                                         #   + openebs-crds owns the VolumeSnapshot CRDs
-    storage-platform/longhorn: 'false'  # → appset-longhorn
+    storage-platform/longhorn: 'false'  # → appset-longhorn [ann: longhorn-replica-count, longhorn-default-class]
+    # Longhorn UI HTTPRoute on <cluster>-gateway, host longhorn.<fqdn> -- opt-IN.
+    # The UI has NO authentication: lab-internal gateways only.
+    storage-platform/longhorn-ui-route: 'false'     # [ann: fqdn]
     storage-platform/nfs-csi-install: 'true'        # → appset-nfs-csi-install (driver + snapshot-controller)
     storage-platform/nfs-csi-storageclasses: 'true' # → appset-nfs-csi-storageclasses (the SC).
                                         #   ALSO REQUIRES the gate label below + nfs-* annotations.
@@ -257,6 +260,11 @@ spec:
     # storage-platform.stuttgart-things.com/velero-schedule-cron: '0 2 * * *'  # 'off' = no Schedule
     # storage-platform.stuttgart-things.com/velero-schedule-ttl: 720h0m0s
     # storage-platform.stuttgart-things.com/velero-ssl-cert-dir: /etc/ssl/custom  # trust-manager cluster-trust-bundle mount
+
+    # ---- [user] storage: Longhorn ----
+    # storage-platform.stuttgart-things.com/longhorn-replica-count: '3'   # default 1; '3' on 3-node clusters
+    # storage-platform.stuttgart-things.com/longhorn-default-class: 'true' # only effective together with
+    #                                     #   storage-platform/openebs: 'false' (else no-op: openebs keeps default)
 
     # ---- [user] observability: kube-prometheus-stack (needs the secrets-config gate label above) ----
     # observability-platform.stuttgart-things.com/secret-store: vault-observability   # [req] ClusterSecretStore
