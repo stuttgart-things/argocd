@@ -17,7 +17,8 @@
 #          cluster that only carries the umbrella keeps exactly that.
 #   extra  OFF unless `homerun2-platform/<component>: "true"`
 #          light-catcher, wled-mock, demo-pitcher, config-viewer,
-#          notification-catcher, git-pitcher, k8s-pitcher, smoke-test
+#          notification-catcher, git-pitcher, k8s-pitcher, smoke-test,
+#          schedule-pitcher, ai-pitcher, sound-catcher
 #          -- dev/lab tools, hardware, or things that need more than the
 #          AppSecretProfile provides (see the notes at each below). Opt-in, not
 #          opt-out: under "absent means on" every cluster carrying the umbrella
@@ -123,7 +124,7 @@ spec:
         # on -- deliberately never auto-merged, so rolling a catalog release out
         # to every labelled cluster stays a human decision.
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.73.0
+        targetRevision: v0.75.0
         path: apps/homerun2/install
         helm:
           releaseName: 'homerun2-{{ .name }}'
@@ -149,10 +150,20 @@ spec:
             #                         catcher-notify-config, else out of band)
             #   git-pitcher           the shared GitHub token entry
             #                         (…/shared-git-pat-secret-key below)
-            #   k8s-pitcher           cluster RBAC and a profile ConfigMap
-            # Without a ScoutProfile scout runs on its environment defaults and
-            # leaves alerting off -- add one through an overlay if the cluster
-            # wants alerts.
+            #   k8s-pitcher           a profile (…/k8s-pitcher-profile, else
+            #                         out of band); the base brings its
+            #                         ClusterRole
+            #   schedule-pitcher      `schedulePitcherAuthToken` in the cluster
+            #                         entry; profile (…/schedule-pitcher-
+            #                         profile) and Roles for its secret checks
+            #                         (…/schedule-pitcher-secret-access)
+            #   ai-pitcher            the shared OpenRouter entry
+            #                         (…/shared-openrouter-secret-key below),
+            #                         optional; reads schedule-pitcher's
+            #                         findings when that runs too
+            #   sound-catcher         nothing (browser player page only)
+            # Without a ScoutProfile (…/scout-profile) scout runs on its
+            # environment defaults and leaves alerting off.
             redisStack:
               enabled: {{ ne (default "" (index $l "homerun2-platform/redis-stack")) "false" }}
               persistence:
@@ -209,6 +220,12 @@ spec:
             scout:
               enabled: {{ ne (default "" (index $l "homerun2-platform/scout")) "false" }}
               hostname: 'scout.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              # The ScoutProfile spec (alerting, retention, scout's own digest)
+              # from a cluster annotation, multi-line YAML; the chart renders
+              # the CR. Empty: no ScoutProfile, as before. `toJson` for the
+              # same reason as notifyConfig below.
+              profile:
+                content: {{ toJson (default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/scout-profile")) }}
             # The catcher zaehlwerk switches onto the tabletennis stream during a
             # match. On in the flux platform profile too; harmless on a cluster
             # without tabletennis, where it just consumes `messages`.
@@ -247,6 +264,30 @@ spec:
               hostname: 'git-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             k8sPitcher:
               enabled: {{ eq (default "" (index $l "homerun2-platform/k8s-pitcher")) "true" }}
+              # The K8sPitcherProfile document (multi-line YAML); the chart
+              # creates the ConfigMap. Empty keeps it out of band.
+              profileContent: {{ toJson (default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/k8s-pitcher-profile")) }}
+            # Expiry checks, reminders and agents' findings, with a UI. Its
+            # token is `schedulePitcherAuthToken` in the cluster's entry.
+            schedulePitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/schedule-pitcher")) "true" }}
+              hostname: 'schedule-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              # The SchedulePitcherProfile (multi-line YAML). Empty: a minimal
+              # profile without checks that still takes agents' findings.
+              profileContent: {{ toJson (default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/schedule-pitcher-profile")) }}
+              # get on the Secrets the profile's checks read, as ONE-LINE JSON
+              # (or YAML flow), e.g.
+              # [{"namespace":"argocd","secrets":["argocd-repo-x"]}] -- it is
+              # inserted as is, so a block-style YAML list breaks the values.
+              secretAccess: {{ default "[]" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/schedule-pitcher-secret-access") }}
+            # AI summaries via OpenRouter; all four modes on (chart default).
+            # With schedule-pitcher on as well, they include its open findings.
+            aiPitcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/ai-pitcher")) "true" }}
+            # Browser player page only -- a Pod has no speaker.
+            soundCatcher:
+              enabled: {{ eq (default "" (index $l "homerun2-platform/sound-catcher")) "true" }}
+              hostname: 'sound-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             smokeTest:
               enabled: {{ eq (default "" (index $l "homerun2-platform/smoke-test")) "true" }}
             # ---- not component toggles: the app-of-apps wiring ----
@@ -257,7 +298,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.73.0
+              targetRevision: v0.75.0
             # Target the labelled remote cluster, not the management one.
             destination:
               server: '{{ .server }}'
@@ -293,6 +334,10 @@ spec:
               # …/shared-teams-webhook-secret-store annotation is not consulted.
               # Empty renders no ExternalSecret.
               teamsWebhookVaultSecretName: '{{ default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/shared-teams-webhook-secret-key") }}'
+              # The shared OpenRouter key (property `openrouterApiKey`, e.g.
+              # `_openrouter`) for the ai-pitcher, same store. Empty renders no
+              # ExternalSecret and the ai-pitcher pitches the plain digest.
+              openrouterVaultSecretName: '{{ default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/shared-openrouter-secret-key") }}'
               refreshInterval: 1h
       syncPolicy:
         automated:
