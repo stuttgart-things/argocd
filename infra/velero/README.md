@@ -81,7 +81,7 @@ full JSON Schema. Invalid overrides fail the sync loudly.
 | `destination.server` / `namespace` | `https://kubernetes.default.svc` / `velero` | Target workload cluster + namespace |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the `-secrets` Application loads `infra/velero/cloud-credentials` from |
 | `chartVersion` | `12.2.1` | Upstream vmware-tanzu/velero chart version |
-| `pluginAws.image` / `tag` | `velero/velero-plugin-for-aws` / `1.14.4` | Plugin image loaded into `/target` as an initContainer |
+| `pluginAws.image` / `tag` | `velero/velero-plugin-for-aws` / `v1.14.4` | Plugin image loaded into `/target` as an initContainer |
 | `credentials.existingSecret` | `cloud-credentials` | Pre-existing Secret in the velero namespace holding the AWS-style INI under key `cloud` |
 | `trustBundle.configMapName` / `mountPath` | `cluster-trust-bundle` / `/etc/ssl/custom` | Optional CA bundle mount (harmless if absent) |
 | `sslCertDir` | `""` | `SSL_CERT_DIR` env var. Empty = system CAs; set to `trustBundle.mountPath` to activate the bundle |
