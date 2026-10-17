@@ -44,7 +44,7 @@ platform tracks the released chart default rather than a second pinned copy.
 | wled-mock | extra (off) | `homerun2-platform/wled-mock: 'true'` | dev/lab |
 | demo-pitcher | extra (off) | `homerun2-platform/demo-pitcher: 'true'` | dev/lab |
 | config-viewer | extra (off) | `homerun2-platform/config-viewer: 'true'` | read-only view |
-| notification-catcher | extra (off) | `homerun2-platform/notification-catcher: 'true'` | needs its notify ConfigMap + Teams webhook, out of band |
+| notification-catcher | extra (off) | `homerun2-platform/notification-catcher: 'true'` | needs the shared Teams webhook (`…/shared-teams-webhook-secret-key`) and a notify config (`…/notification-catcher-notify-config`, else out of band); `homerun2-platform/notification-catcher-dry-run: 'true'` logs instead of posting |
 | git-pitcher | extra (off) | `homerun2-platform/git-pitcher: 'true'` | needs the shared GitHub token (`…/shared-git-pat-secret-key`) |
 | k8s-pitcher | extra (off) | `homerun2-platform/k8s-pitcher: 'true'` | needs cluster RBAC + a profile ConfigMap |
 | smoke-test | extra (off) | `homerun2-platform/smoke-test: 'true'` | |
@@ -69,6 +69,8 @@ key may be set in `valuesObject`.
 | `homerun2-platform/stack: 'false'` | **[user]** opt this cluster out |
 | `homerun2-platform.stuttgart-things.com/secrets-config: 'true'` | **[user]** gate — set it to `'true'` only once the ClusterSecretStore exists and can read the entry |
 | `clusterbook.stuttgart-things.com/allocation-ip` | *[auto]* must exist and be non-empty |
+| `homerun2-platform/<component>` | **[user]** component toggles — see *Components* above |
+| `homerun2-platform/notification-catcher-dry-run: 'true'` | **[user]** optional — `notificationCatcher.dryRun`: log what would be sent, send nothing |
 
 | Annotation | |
 |---|---|
@@ -77,6 +79,9 @@ key may be set in `valuesObject`.
 | `homerun2-platform.stuttgart-things.com/secret-key` | **[user]** optional, default = the cluster name — the Vault KV entry holding `authToken` + `redisPassword` |
 | `homerun2-platform.stuttgart-things.com/storage-class` | **[user]** optional, default `openebs-hostpath` — for redis-stack's PVC |
 | `homerun2-platform.stuttgart-things.com/redis-storage-size` | **[user]** optional, default `8Gi` |
+| `homerun2-platform.stuttgart-things.com/shared-git-pat-secret-key` | *[auto, ClusterStack]* optional — shared entry (e.g. `_git-pat`) for git-pitcher's `githubToken` → `secrets.githubTokenVaultSecretName` |
+| `homerun2-platform.stuttgart-things.com/shared-teams-webhook-secret-key` | *[auto, ClusterStack]* optional — shared entry (e.g. `_teams-webhook`) whose property `teamsWebhookUrl` becomes the notification-catcher's `TEAMS_WEBHOOK_URL` → `secrets.teamsWebhookVaultSecretName`. Read from the `secret-store` above; the ClusterStack's `…/shared-teams-webhook-secret-store` is not consulted and must name the same store |
+| `homerun2-platform.stuttgart-things.com/notification-catcher-notify-config` | **[user]** optional — the notification-catcher's `config.yaml` as multi-line YAML → `notificationCatcher.notifyConfig`; the chart creates the ConfigMap. Keep `${TEAMS_WEBHOOK_URL}` as is, the catcher expands it. Empty = ConfigMap out of band |
 
 The gate is matched on the **value** `'true'`, not merely on the label existing —
 unlike `storage-platform`'s `nfs-config`. Under `Exists` a label written as
@@ -109,7 +114,7 @@ zaehlwerk's scores land on `messages`: the pitch still returns 200, every Pod
 reports Healthy, and the tabletennis catcher watches an empty stream.
 
 **Not** included are the flux default's `/pitch/grafana → alerts` and
-`/pitch/github → github-events` rules. This profile runs no notification-catcher,
+`/pitch/github → github-events` rules. The notification-catcher is opt-in here,
 so routing Alertmanager off `messages` would only hide alerts from core-catcher
 and scout. A cluster that wants them adds both rules **and**
 `notificationCatcher.redisStream: alerts` in the same change.

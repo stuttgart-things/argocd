@@ -123,7 +123,7 @@ spec:
         # on -- deliberately never auto-merged, so rolling a catalog release out
         # to every labelled cluster stays a human decision.
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.71.0
+        targetRevision: v0.73.0
         path: apps/homerun2/install
         helm:
           releaseName: 'homerun2-{{ .name }}'
@@ -143,9 +143,10 @@ spec:
             # is off it renders nothing.
             #
             # Extras that need more than this AppSet knows:
-            #   notification-catcher  its notify ConfigMap
-            #                         (homerun2-notification-catcher-notify)
-            #                         and the Teams webhook, out of band
+            #   notification-catcher  the shared Teams webhook entry
+            #                         (…/shared-teams-webhook-secret-key below)
+            #                         and its notify config (…/notification-
+            #                         catcher-notify-config, else out of band)
             #   git-pitcher           the shared GitHub token entry
             #                         (…/shared-git-pat-secret-key below)
             #   k8s-pitcher           cluster RBAC and a profile ConfigMap
@@ -230,6 +231,17 @@ spec:
               hostname: 'config-viewer.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
             notificationCatcher:
               enabled: {{ eq (default "" (index $l "homerun2-platform/notification-catcher")) "true" }}
+              # Log instead of post. Worth setting while the notify config is
+              # new: the first wrong filter posts to a real Teams channel.
+              dryRun: {{ eq (default "" (index $l "homerun2-platform/notification-catcher-dry-run")) "true" }}
+              # The notify config (config.yaml) from a cluster annotation; the
+              # chart turns it into the ConfigMap. Empty keeps it out of band.
+              # `toJson`, not a single-quoted scalar: the annotation is multi-line
+              # YAML full of double quotes, and a JSON string is a valid
+              # one-line YAML double-quoted scalar whatever it contains. Its
+              # `${TEAMS_WEBHOOK_URL}` placeholders pass through untouched --
+              # the catcher expands them.
+              notifyConfig: {{ toJson (default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/notification-catcher-notify-config")) }}
             gitPitcher:
               enabled: {{ eq (default "" (index $l "homerun2-platform/git-pitcher")) "true" }}
               hostname: 'git-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
@@ -245,7 +257,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.71.0
+              targetRevision: v0.73.0
             # Target the labelled remote cluster, not the management one.
             destination:
               server: '{{ .server }}'
@@ -273,6 +285,14 @@ spec:
               # (xplane-cluster >= 0.18.0) publishes its entry; empty keeps it
               # on vaultSecretName.
               githubTokenVaultSecretName: '{{ default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/shared-git-pat-secret-key") }}'
+              # The shared Teams webhook (property `teamsWebhookUrl`) for the
+              # notification-catcher. The ClusterStack publishes the entry
+              # (`_teams-webhook`) once the AppSecretProfile carries
+              # `teamsWebhookUrl: {shared: teams-webhook}`. Read from the SAME
+              # store as everything else -- its
+              # …/shared-teams-webhook-secret-store annotation is not consulted.
+              # Empty renders no ExternalSecret.
+              teamsWebhookVaultSecretName: '{{ default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/shared-teams-webhook-secret-key") }}'
               refreshInterval: 1h
       syncPolicy:
         automated:
