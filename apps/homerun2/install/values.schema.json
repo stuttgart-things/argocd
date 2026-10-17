@@ -298,8 +298,17 @@
                   }
                 }
               }
+            },
+            "content": {
+              "type": "string",
+              "description": "The ScoutProfile spec as a YAML string (e.g. from a cluster annotation). Set, it replaces `spec` and renders the ScoutProfile even with enabled: false. Must parse to a map. With aiPitcher on, the ai-* systems are added to a digest.excludeSystems it lists. Never put alerting.pitcherToken in it: the token comes from homerun2-omni-pitcher-token."
             }
           }
+        },
+        "retentionTTL": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h))*$",
+          "description": "SCOUT_RETENTION_TTL env (Go duration, e.g. 360h). Empty sets nothing, except with aiPitcher's weekly mode on, which gets 360h (15 days). A ScoutProfile's retention.ttl wins."
         }
       },
       "required": [
@@ -327,6 +336,49 @@
         "profileContent": {
           "type": "string",
           "description": "K8sPitcherProfile document as a YAML string. Empty keeps the out-of-band contract; set it and the chart materializes k8sPitcherProfileConfigMap itself."
+        },
+        "extraRbacRules": {
+          "type": "array",
+          "description": "Extra rules appended to the base's ClusterRole homerun2-k8s-pitcher (which grants get/list/watch on pods, nodes, events, deployments, replicasets and get on secrets), for a profile that informs on other resources.",
+          "items": {
+            "type": "object",
+            "required": [
+              "apiGroups",
+              "resources",
+              "verbs"
+            ],
+            "properties": {
+              "apiGroups": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "resourceNames": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "verbs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "required": [
@@ -522,16 +574,98 @@
           "type": "string",
           "minLength": 1
         },
-        "schedule": {
-          "type": "string",
-          "minLength": 1
-        },
         "timeZone": {
           "type": "string",
           "minLength": 1
         },
         "suspend": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Suspends every mode's CronJob."
+        },
+        "modes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "morning",
+            "evening",
+            "weekAhead",
+            "weekly"
+          ],
+          "description": "One CronJob per mode (ai-pitcher v0.4+); a disabled mode's CronJob is not deployed. Each pitches as its own system (ai-digest, ai-evening, ai-week-ahead, ai-weekly; morning and weekly also ai-ticker).",
+          "properties": {
+            "morning": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "schedule"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CronJob homerun2-ai-pitcher (base: 45 7 * * 1-5)."
+                }
+              }
+            },
+            "evening": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "schedule"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CronJob homerun2-ai-pitcher-evening (base: 45 18 * * 1-5)."
+                }
+              }
+            },
+            "weekAhead": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "schedule"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CronJob homerun2-ai-pitcher-week-ahead (base: 50 7 * * 1)."
+                }
+              }
+            },
+            "weekly": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "schedule"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "schedule": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CronJob homerun2-ai-pitcher-weekly (base: 0 15 * * 5). Reads scout's weekly window (scout v0.12+) and needs 15 days of scout retention."
+                }
+              }
+            }
+          }
         },
         "model": {
           "type": "string",
@@ -542,21 +676,104 @@
           "type": "string",
           "minLength": 1
         },
-        "schedulePitcherURL": {
-          "type": "string",
-          "description": "In-cluster schedule-pitcher URL; empty skips the open findings."
-        },
-        "schedulePitcherTokenSecret": {
-          "type": "string",
-          "minLength": 1
-        },
         "retries": {
           "type": "integer",
           "minimum": 0
         },
-        "ticker": {
-          "type": "boolean",
-          "description": "Also pitch short ticker lines for the LED matrix (system ai-ticker)."
+        "schedulePitcherURL": {
+          "type": "string",
+          "description": "URL of a schedule-pitcher NOT installed by this chart; ignored while schedulePitcher is enabled (then the in-cluster Service is used). Empty skips the open findings."
+        },
+        "schedulePitcherTokenSecret": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Secret (key auth-token) holding that schedule-pitcher's API token; ignored while schedulePitcher is enabled."
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "description": "homerun2-ai-pitcher: CronJobs (morning, evening, week-ahead, weekly) summarising scout's digest and the schedule-pitcher's open findings via OpenRouter. Needs scout and omni-pitcher; the OpenRouter key is optional (secrets.openrouterVaultSecretName)."
+    },
+    "schedulePitcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "homerun2-schedule-pitcher, central instance: expiry checks, reminders and findings from agents, delivered through the in-cluster omni-pitcher; web UI + JSON API behind a route. Token from the per-cluster Vault property schedulePitcherAuthToken (secrets.enabled).",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inlineHttpRoute": {
+          "type": "boolean"
+        },
+        "profileConfigMap": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ConfigMap (key profile.yaml) the chart creates through apps/homerun2/schedule-pitcher-profile and the Deployment mounts."
+        },
+        "profileContent": {
+          "type": "string",
+          "description": "SchedulePitcherProfile as a YAML string. Empty = a minimal profile without checks (in-cluster omni-pitcher, grafana format, Europe/Berlin). A change rolls the Pod."
+        },
+        "secretAccess": {
+          "type": "array",
+          "description": "get on exactly these Secrets, one Role + RoleBinding per namespace, for the profile's tokenFrom.secretKeyRef checks.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "namespace",
+              "secrets"
+            ],
+            "properties": {
+              "namespace": {
+                "type": "string",
+                "minLength": 1
+              },
+              "secrets": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "soundCatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "homerun2-sound-catcher, browser sink only (no speaker in a Pod): announcements on the player page behind the route. Redis password and /play token (authToken) via secrets.enabled.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "redisStreams": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated streams to announce (REDIS_STREAMS)."
         }
       },
       "required": [
@@ -620,6 +837,10 @@
         "teamsWebhookVaultSecretName": {
           "type": "string",
           "description": "Shared entry (same store) the notification-catcher's Teams webhook URL is read from, property `teamsWebhookUrl`, e.g. `_teams-webhook`. Set (and notificationCatcher enabled, teamsWebhookUrl empty), an ExternalSecret materializes `homerun2-notification-catcher-secrets` with key TEAMS_WEBHOOK_URL. Empty = no ExternalSecret; the Secret comes from the literal or out-of-band."
+        },
+        "openrouterVaultSecretName": {
+          "type": "string",
+          "description": "Shared entry (same store) the ai-pitcher's OpenRouter key is read from, property `openrouterApiKey`, e.g. `_openrouter`. Set (and aiPitcher enabled), an ExternalSecret materializes `homerun2-ai-pitcher-openrouter` with key api-key. Empty = no ExternalSecret; the ai-pitcher then runs without AI (plain digest, \"[AI n/a]\")."
         }
       },
       "required": [

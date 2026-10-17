@@ -173,9 +173,10 @@ scout:
   # v0.8.3 re-creates its RediSearch index until it exists instead of trying
   # once at startup. v0.11.1 restarts itself when its ScoutProfile changes;
   # the chart no longer rolls scout for a changed profile, so older versions
-  # would keep the profile they started with.
+  # would keep the profile they started with. v0.12.0 adds the weekly window
+  # and /analytics/messages that aiPitcher's weekly mode and activity read.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-scout
-  version: v0.11.6
+  version: v0.12.0
   hostname: scout.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the scout kustomize OCI (parentRef +
@@ -203,6 +204,28 @@ scout:
       #   errorThreshold: 20
       #   criticalThreshold: 5
       #   cooldown: 30m
+    # The same spec as a YAML string — what a cluster annotation can carry
+    # (platforms/homerun2: …/scout-profile). Set, it REPLACES `spec` above and
+    # renders the ScoutProfile even with `enabled: false`. Empty (the default)
+    # keeps `enabled` + `spec`. With aiPitcher on, the ai-* systems are added
+    # to a `digest.excludeSystems` it lists (see aiPitcher below).
+    #
+    #   content: |
+    #     retention:
+    #       enabled: true
+    #       ttl: 360h
+    #     alerting:
+    #       pitcherURL: http://homerun2-omni-pitcher.homerun2.svc.cluster.local
+    #     digest:
+    #       enabled: true
+    #       timezone: Europe/Berlin
+    #       dailyAt: "07:00"
+    content: ""
+  # SCOUT_RETENTION_TTL env of scout (how long messages are kept; scout's own
+  # default is 48h). Empty sets nothing — except with aiPitcher's weekly mode
+  # on, which needs 15 days (this week and the one before) and gets 360h. A
+  # ScoutProfile's retention.ttl wins over this env either way.
+  retentionTTL: ""
 
 # k8s-pitcher (informers/collectors → omni-pitcher). Often deployed in a different
 # namespace from the rest of the stack; override `namespace` if needed.
@@ -231,7 +254,24 @@ k8sPitcher:
   # watches Pods and Events across ALL namespaces every 15-30s, and every one
   # of those becomes a message in the stream that core-, light- and
   # led-catcher read.
+  #
+  # The profile's pitcher is the in-cluster omni-pitcher
+  # (http://homerun2-omni-pitcher.<destination.namespace>.svc.cluster.local/pitch)
+  # and its token auth.tokenFrom.secretKeyRef homerun2-k8s-pitcher-token /
+  # auth-token in k8sPitcher.namespace — the Secret templates/secrets.yaml
+  # materializes.
   profileContent: ""
+  # Extra ClusterRole rules for the profile. The kustomize base's ClusterRole
+  # homerun2-k8s-pitcher grants get/list/watch on pods, nodes, events,
+  # deployments and replicasets and get on secrets (the profile's token), which
+  # covers the base profile. A profile that informs on anything else (a CRD,
+  # jobs, ...) needs its rule here, or the informer fails with "forbidden".
+  #
+  #   extraRbacRules:
+  #     - apiGroups: [batch]
+  #       resources: [jobs, cronjobs]
+  #       verbs: [get, list, watch]
+  extraRbacRules: []
 
 # light-catcher (Redis Streams consumer → WLED HTTP).
 lightCatcher:
@@ -376,33 +416,146 @@ gitPitcher:
   # created by this chart, the same way k8sPitcherProfileConfigMap is not.
   inlineWatchConfig: true
 
-# homerun2-ai-pitcher: CronJob, AI summary of scout's digest via OpenRouter
+# homerun2-ai-pitcher: CronJobs, AI summaries of scout's digest (and the
+# schedule-pitcher's open findings) via OpenRouter
 # (stuttgart-things/homerun2-ai-pitcher, stuttgart-things/homerun-library#135).
-# Needs scout and omni-pitcher. The OpenRouter key comes from the Vault
-# property `openrouterApiKey` (secrets.enabled); without it the run pitches
-# the plain digest marked "[AI n/a]".
+# Needs scout and omni-pitcher. Pairs with schedulePitcher below: with it on,
+# every run also reads its open findings from the in-cluster Service.
+#
+# The OpenRouter key is optional on purpose (fail-open): with
+# secrets.openrouterVaultSecretName set, an ExternalSecret reads property
+# `openrouterApiKey` from that SHARED entry (e.g. `_openrouter`); without it
+# every run still pitches the plain digest, marked "[AI n/a]".
+#
+# Each mode is its own CronJob and pitches as its own system; scout leaves
+# those systems out of its digests whenever this is on (templates/scout.yaml),
+# so no digest counts an AI summary:
+#   mode        CronJob                          system          ticker
+#   morning     homerun2-ai-pitcher              ai-digest       yes (ai-ticker)
+#   evening     homerun2-ai-pitcher-evening      ai-evening      no
+#   weekAhead   homerun2-ai-pitcher-week-ahead   ai-week-ahead   no
+#   weekly      homerun2-ai-pitcher-weekly       ai-weekly       yes (ai-ticker)
+# weekly reads scout's weekly window (scout v0.12+) and needs 15 days of
+# retention; see scout.retentionTTL.
 aiPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-ai-pitcher-kustomize
-  version: v0.2.0
-  schedule: "45 7 * * *"
+  version: v0.4.1
   timeZone: Europe/Berlin
+  # Suspends every mode at once.
   suspend: false
+  # A disabled mode's CronJob is not deployed. Defaults: all four, on the
+  # schedules the kustomize base ships (= LabUL platform-sthings).
+  modes:
+    morning:
+      enabled: true
+      schedule: "45 7 * * 1-5"
+    evening:
+      enabled: true
+      schedule: "45 18 * * 1-5"
+    weekAhead:
+      enabled: true
+      schedule: "50 7 * * 1"
+    weekly:
+      enabled: true
+      schedule: "0 15 * * 5"
   # OpenRouter model id or a comma-separated list, tried in groups of 3.
   # Most reliable free models first (local runs 2026-10-14,
   # stuttgart-things/homerun2-ai-pitcher#4); openrouter/free alone can route
-  # to tiny or classifier models.
+  # to tiny or classifier models. Applied to all modes.
   model: nvidia/nemotron-3-super-120b-a12b:free,cohere/north-mini-code:free,nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-31b-it:free,openrouter/free
   language: German
   # More tries after a failed model call (free models fail often).
   retries: 2
-  # Up to 4 short ASCII lines for the LED matrix, each pitched as its own
-  # message with system ai-ticker.
-  ticker: true
-  # schedule-pitcher is not part of this chart. Set its in-cluster URL (and
-  # the Secret holding its API token, key auth-token) to add open findings.
+  # A schedule-pitcher NOT installed by this chart (schedulePitcher.enabled
+  # false), e.g. a central one elsewhere: its URL and the Secret (key
+  # auth-token) holding its API token. Ignored while schedulePitcher is on —
+  # then the in-cluster Service and homerun2-schedule-pitcher-token are used.
+  # Both empty/absent: the findings are skipped.
   schedulePitcherURL: ""
   schedulePitcherTokenSecret: homerun2-schedule-pitcher-token
+
+# homerun2-schedule-pitcher, central instance
+# (stuttgart-things/homerun2-schedule-pitcher): token/certificate expiry
+# checks, reminders and findings reported by agents and other jobs
+# (POST /findings), delivered in office hours through the in-cluster
+# omni-pitcher. Serves a web UI and JSON API on port 80 (route below);
+# aiPitcher reads its open findings.
+#
+# Secrets (secrets.enabled): its own API/UI/findings token from the
+# per-cluster Vault property `schedulePitcherAuthToken` (a token of its own:
+# agents on other clusters carry it), the Redis password from
+# `redisPassword`. It pitches with omni-pitcher's token (homerun2-omni-pitcher-token).
+schedulePitcher:
+  enabled: false
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-schedule-pitcher
+  version: v1.10.0
+  hostname: schedule-pitcher.example.com
+  # Option B from stuttgart-things/argocd#116 — patch the HTTPRoute the
+  # kustomize OCI ships instead of rendering one in the standalone
+  # homerun2-httproute Application.
+  inlineHttpRoute: false
+  # ConfigMap the chart creates (sub-Application
+  # apps/homerun2/schedule-pitcher-profile, sync-wave -10) and the Deployment
+  # mounts as profile.yaml. The one the kustomize base ships is deleted.
+  profileConfigMap: homerun2-schedule-pitcher-profile
+  # The SchedulePitcherProfile document as a YAML string: checks, reminders,
+  # office hours. Empty renders a minimal profile — no checks of its own, the
+  # in-cluster omni-pitcher (grafana format), Europe/Berlin — which still
+  # takes findings from agents and keeps the heartbeat. A changed profile
+  # rolls the Pod (it is read at start).
+  #
+  # Pitch to the in-cluster omni-pitcher, e.g.
+  #   addr: http://homerun2-omni-pitcher.homerun2.svc.cluster.local/pitch/grafana
+  # The token is injected (PITCHER_TOKEN), so no spec.pitcher.auth.
+  #
+  #   profileContent: |
+  #     apiVersion: homerun2.sthings.io/v1alpha1
+  #     kind: SchedulePitcherProfile
+  #     metadata:
+  #       name: my-cluster
+  #     spec:
+  #       pitcher:
+  #         addr: http://homerun2-omni-pitcher.homerun2.svc.cluster.local/pitch/grafana
+  #         format: grafana
+  #       defaults:
+  #         timezone: Europe/Berlin
+  #       checks:
+  #         - id: git-pitcher-github-token
+  #           type: github-token-expiry
+  #           tokenFrom:
+  #             secretKeyRef: { name: homerun2-git-pitcher-github, namespace: homerun2, key: token }
+  profileContent: ""
+  # get on exactly these Secrets for the profile's tokenFrom.secretKeyRef
+  # checks: one Role + RoleBinding (homerun2-schedule-pitcher-secrets) per
+  # namespace for the ServiceAccount homerun2-schedule-pitcher. The kustomize
+  # base ships no Roles. The namespaces must exist.
+  #
+  #   secretAccess:
+  #     - namespace: homerun2
+  #       secrets: [homerun2-git-pitcher-github]
+  #     - namespace: argocd
+  #       secrets: [argocd-repo-stuttgart-things]
+  secretAccess: []
+
+# homerun2-sound-catcher (stuttgart-things/homerun2-sound-catcher): messages
+# as clips and spoken announcements. In a cluster there is no speaker — the
+# browser player page behind the route is where they are heard
+# (SOUND_SINKS=browser). Rules and quiet hours are the kustomize base's default
+# profile. One replica, Recreate: its history lives in the Pod.
+#
+# Secrets (secrets.enabled): the Redis password from `redisPassword`, and the
+# bearer token of /play, replay-on-speaker and mute from `authToken` — the same
+# token that can already pitch anything onto the stream it reads. Without
+# secrets.enabled neither Secret exists (both optional in the Deployment):
+# Redis then refuses the connection.
+soundCatcher:
+  enabled: false
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-sound-catcher
+  version: v1.0.0
+  hostname: sound-catcher.example.com
+  # Comma-separated streams to announce.
+  redisStreams: messages
 
 # Gateway API HTTPRoutes for every enabled component that exposes one.
 httpRoute:
@@ -440,6 +593,12 @@ secrets:
   # (key TEAMS_WEBHOOK_URL). Empty renders none: the Secret then has to come
   # from the literal or out-of-band.
   teamsWebhookVaultSecretName: ""
+  # Entry the ai-pitcher's OpenRouter key comes from (property
+  # `openrouterApiKey`), e.g. `_openrouter` — shared like the webhook, same
+  # store. Set, and with aiPitcher enabled, an ExternalSecret materializes
+  # `homerun2-ai-pitcher-openrouter` (key api-key). Empty renders none and the
+  # ai-pitcher runs without AI: it pitches the plain digest marked "[AI n/a]".
+  openrouterVaultSecretName: ""
   refreshInterval: 1h
 
 # Optional smoke-test sub-Application (apps/homerun2/smoke-test in this

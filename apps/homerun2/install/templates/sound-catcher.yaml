@@ -1,0 +1,79 @@
+{{- if .Values.soundCatcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-sound-catcher" }}
+{{- $ns := .Values.destination.namespace }}
+---
+{{- /* homerun2-sound-catcher (stuttgart-things/homerun2-sound-catcher), browser
+       sink only: a Pod has no speaker, the player page behind the route is
+       where announcements are heard. Modelled on the flux component
+       apps/homerun2/components/sound-catcher (stuttgart-things/flux).
+
+       The route is always the one the kustomize base ships, patched in place
+       (Option B, stuttgart-things/argocd#116) rather than the standalone
+       httproute Application: it carries a second rule for the player page's
+       event stream, /api/events, with `timeouts.request: 0s` — without it the
+       gateway ends the SSE response after its default and the page keeps
+       reconnecting. It also lands in the same apply as its Service. */}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-sound-catcher" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "sound-catcher" | quote }}
+    targetRevision: {{ .Values.soundCatcher.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+{{- if .Values.httpRoute.enabled }}
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |-
+{{ include "homerun2.httpRouteJSONPatch" (dict "gateway" .Values.httpRoute.gateway "hostname" .Values.soundCatcher.hostname) | indent 12 }}
+{{- else }}
+        - target:
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+{{- end }}
+        {{- /* The base ships `image: …:latest`; pin it to the artifact's tag. */}}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.soundCatcher.version "reloader" .Values.reloader) | indent 12 }}
+        {{- /* REDIS_PASSWORD (homerun2-sound-catcher-redis) and
+               SOUND_API_TOKEN (homerun2-sound-catcher-api) are referenced by
+               the base already, optional: templates/secrets.yaml creates
+               both. Only the address follows destination.namespace. */}}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" (list (dict "name" "REDIS_STREAMS" "value" .Values.soundCatcher.redisStreams) (dict "name" "SOUND_SINKS" "value" "browser"))) | indent 12 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+{{- if .Values.httpRoute.enabled }}
+  {{- include "homerun2.inlineRouteIgnoreDifferences" $name | nindent 2 }}
+{{- end }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

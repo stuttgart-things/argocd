@@ -2,21 +2,40 @@
 {{- $appName := include "homerun2.appName" . }}
 {{- $name := "homerun2-ai-pitcher" }}
 {{- $ns := .Values.destination.namespace }}
+{{- /* The schedule-pitcher the runs read open findings from: this chart's
+       own (in-cluster Service + its token Secret) while schedulePitcher is
+       on, otherwise whatever aiPitcher.schedulePitcherURL names. Empty skips
+       the findings; the base's default URL is always overwritten, so a
+       cluster without one does not dial a Service that is not there. */}}
+{{- $spURL := .Values.aiPitcher.schedulePitcherURL }}
+{{- $spSecret := .Values.aiPitcher.schedulePitcherTokenSecret }}
+{{- if .Values.schedulePitcher.enabled }}
+  {{- $spURL = printf "http://homerun2-schedule-pitcher.%s.svc.cluster.local" $ns }}
+  {{- $spSecret = "homerun2-schedule-pitcher-token" }}
+{{- end }}
+{{- /* v0.4.1 ships one CronJob per mode (homerun2-ai-pitcher#6, #9). The
+       morning one keeps the historical name. */}}
+{{- $modes := list
+      (dict "key" "morning" "cronJob" $name)
+      (dict "key" "evening" "cronJob" (printf "%s-evening" $name))
+      (dict "key" "weekAhead" "cronJob" (printf "%s-week-ahead" $name))
+      (dict "key" "weekly" "cronJob" (printf "%s-weekly" $name))
+}}
 ---
-{{- /* homerun2-ai-pitcher (stuttgart-things/homerun2-ai-pitcher): a CronJob
-       that summarises scout's digest (and, with schedulePitcherURL, the
-       schedule-pitcher's open findings) via OpenRouter and pitches it to
-       omni-pitcher as system ai-digest. Design:
-       stuttgart-things/homerun-library#135.
+{{- /* homerun2-ai-pitcher (stuttgart-things/homerun2-ai-pitcher): CronJobs
+       that summarise scout's digest (and the schedule-pitcher's open
+       findings) via OpenRouter and pitch it to omni-pitcher, one system per
+       mode. Design: stuttgart-things/homerun-library#135.
 
        The base ships one Secret homerun2-ai-pitcher with four placeholder
        keys. ESO here writes one key per Secret, so the placeholder is
-       deleted and the CronJob reads the Secrets this chart already has:
+       deleted and the CronJobs read the Secrets this chart already has:
        scout and omni-pitcher share the `authToken` Vault field, so
-       SCOUT_TOKEN and PITCHER_TOKEN come from their Secrets. Only the
-       OpenRouter key gets its own ExternalSecret (templates/secrets.yaml,
-       Vault property openrouterApiKey). It is optional: without it every run
-       pitches the plain digest marked "[AI n/a]". */}}
+       SCOUT_TOKEN and PITCHER_TOKEN come from their Secrets, the
+       schedule-pitcher token from its own. Only the OpenRouter key gets its
+       own ExternalSecret (templates/secrets.yaml, shared entry
+       secrets.openrouterVaultSecretName). It is optional: without it every
+       run pitches the plain digest marked "[AI n/a]". */}}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -42,16 +61,17 @@ spec:
             name: {{ $name }}
           patch: |
 {{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" $name) | indent 12 }}
+        # Every mode's CronJob: with a target, kustomize applies the patch to
+        # each match and keeps its name. MODE stays the base's per CronJob.
         - target:
             kind: CronJob
-            name: {{ $name }}
+            labelSelector: app.kubernetes.io/name={{ $name }}
           patch: |
             apiVersion: batch/v1
             kind: CronJob
             metadata:
               name: {{ $name }}
             spec:
-              schedule: {{ .Values.aiPitcher.schedule | quote }}
               timeZone: {{ .Values.aiPitcher.timeZone | quote }}
               suspend: {{ .Values.aiPitcher.suspend }}
               jobTemplate:
@@ -60,6 +80,7 @@ spec:
                     spec:
                       containers:
                         - name: {{ $name }}
+                          image: {{ printf "ghcr.io/stuttgart-things/%s:%s" $name .Values.aiPitcher.version | quote }}
                           env:
                             - name: SCOUT_URL
                               value: {{ printf "http://homerun2-scout.%s.svc.cluster.local" $ns | quote }}
@@ -75,14 +96,12 @@ spec:
                                 secretKeyRef:
                                   name: homerun2-omni-pitcher-token
                                   key: auth-token
-                            # Empty skips the findings: this chart does not
-                            # install a schedule-pitcher.
                             - name: SCHEDULE_PITCHER_URL
-                              value: {{ .Values.aiPitcher.schedulePitcherURL | quote }}
+                              value: {{ $spURL | quote }}
                             - name: SCHEDULE_PITCHER_TOKEN
                               valueFrom:
                                 secretKeyRef:
-                                  name: {{ .Values.aiPitcher.schedulePitcherTokenSecret | quote }}
+                                  name: {{ $spSecret | quote }}
                                   key: auth-token
                                   optional: true
                             - name: OPENROUTER_API_KEY
@@ -97,8 +116,27 @@ spec:
                               value: {{ .Values.aiPitcher.language | quote }}
                             - name: LLM_RETRIES
                               value: {{ .Values.aiPitcher.retries | toString | quote }}
-                            - name: TICKER_ENABLED
-                              value: {{ .Values.aiPitcher.ticker | toString | quote }}
+{{- range $modes }}
+{{- $mode := index $.Values.aiPitcher.modes .key }}
+{{- if $mode.enabled }}
+        - target:
+            kind: CronJob
+            name: {{ .cronJob }}
+          patch: |
+            apiVersion: batch/v1
+            kind: CronJob
+            metadata:
+              name: {{ .cronJob }}
+            spec:
+              schedule: {{ $mode.schedule | quote }}
+{{- else }}
+        - target:
+            kind: CronJob
+            name: {{ .cronJob }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "batch/v1" "kind" "CronJob" "name" .cronJob) | indent 12 }}
+{{- end }}
+{{- end }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}

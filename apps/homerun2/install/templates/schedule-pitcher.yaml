@@ -1,0 +1,142 @@
+{{- if .Values.schedulePitcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-schedule-pitcher" }}
+{{- $ns := .Values.destination.namespace }}
+{{- $profile := include "homerun2.schedulePitcherProfile" . }}
+---
+{{- /* homerun2-schedule-pitcher, central instance
+       (stuttgart-things/homerun2-schedule-pitcher): `serve` with a web UI
+       and JSON API on the Service's port 80, state in this stack's
+       redis-stack, delivery through the in-cluster omni-pitcher. Modelled on
+       LabUL platform-sthings (stuttgart-things/stuttgart-things,
+       clusters/labul/vsphere/platform-sthings/apps/homerun2-schedule-pitcher.yaml).
+
+       Its profile ConfigMap comes from the sub-Application in
+       templates/schedule-pitcher-profile.yaml (wave -10, together with the
+       Roles its secret checks need); the base's placeholder profile is
+       deleted. Of the base's three placeholder Secrets, `-token` and
+       `-redis` are patched from the literals or deleted for ESO
+       (templates/secrets.yaml), and `-pitcher` is always deleted: the
+       Deployment reads omni-pitcher's own token instead, one Secret fewer
+       to keep in step. */}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-schedule-pitcher" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "schedule-pitcher" | quote }}
+    targetRevision: {{ .Values.schedulePitcher.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+{{- if .Values.schedulePitcher.inlineHttpRoute }}
+        # Option B from stuttgart-things/argocd#116 — the kustomize OCI ships
+        # the HTTPRoute alongside the Service so they land atomically.
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |-
+{{ include "homerun2.httpRouteJSONPatch" (dict "gateway" .Values.httpRoute.gateway "hostname" .Values.schedulePitcher.hostname) | indent 12 }}
+{{- else }}
+        - target:
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+{{- end }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.schedulePitcher.version "reloader" .Values.reloader) | indent 12 }}
+{{- if .Values.authToken }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.authTokenPatch" (dict "secretName" (printf "%s-token" $name) "token" .Values.authToken) | indent 12 }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-token" $name)) | indent 12 }}
+{{- end }}
+{{- if .Values.redisPassword }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.redisPasswordPatch" (dict "secretName" (printf "%s-redis" $name) "password" .Values.redisPassword) | indent 12 }}
+{{- else }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-redis" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-redis" $name)) | indent 12 }}
+{{- end }}
+        - target:
+            kind: Secret
+            name: {{ printf "%s-pitcher" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "Secret" "name" (printf "%s-pitcher" $name)) | indent 12 }}
+        - target:
+            kind: ConfigMap
+            name: {{ printf "%s-profile" $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "v1" "kind" "ConfigMap" "name" (printf "%s-profile" $name)) | indent 12 }}
+        {{- /* The base points REDIS_ADDR at redis-stack.homerun2; follow
+               destination.namespace. PITCHER_TOKEN: omni-pitcher's own
+               Secret, so the profile needs no spec.pitcher.auth. */}}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" (list (dict "name" "PITCHER_TOKEN" "valueFrom" (dict "secretKeyRef" (dict "name" "homerun2-omni-pitcher-token" "key" "auth-token" "optional" true))))) | indent 12 }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+            spec:
+              template:
+                metadata:
+                  annotations:
+                    # The profile is read at start; kubelet updates a mounted
+                    # ConfigMap in place. Roll the Pod on a changed profile
+                    # (same as the notification-catcher's notify-config-hash).
+                    homerun2.sthings.io/profile-hash: {{ $profile | sha256sum | trunc 16 | quote }}
+                spec:
+                  volumes:
+                    - name: profile
+                      configMap:
+                        name: {{ .Values.schedulePitcher.profileConfigMap | quote }}
+                    - name: trust-bundle
+                      configMap:
+                        name: {{ .Values.trustBundleConfigMap | quote }}
+                        optional: true
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

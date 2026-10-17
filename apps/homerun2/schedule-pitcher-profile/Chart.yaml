@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: homerun2-schedule-pitcher-profile
+description: ConfigMap carrying homerun2-schedule-pitcher's profile (checks, reminders) plus the Roles its secret checks need — loaded as a sub-Application by apps/homerun2/install when `schedulePitcher.enabled`.
+type: application
+version: 0.1.0

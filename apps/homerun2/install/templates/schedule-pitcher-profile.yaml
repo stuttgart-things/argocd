@@ -1,0 +1,51 @@
+{{- /* Materializes the ConfigMap that templates/schedule-pitcher.yaml mounts
+       as profile.yaml (checks, reminders, office hours), plus one Role +
+       RoleBinding per namespace in schedulePitcher.secretAccess for the
+       profile's tokenFrom.secretKeyRef checks — the kustomize base ships no
+       Roles. Same shape as notification-catcher-notify.yaml.
+
+       The content is handed over through `valuesObject` and rendered with
+       `quote`/`indent` only, never `tpl`. */}}
+{{- if .Values.schedulePitcher.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-schedule-pitcher-profile" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # Ahead of the schedule-pitcher Application (wave 0): the container mounts
+    # this ConfigMap as a volume, and a Pod scheduled before it exists sits in
+    # ContainerCreating until Argo gets round to applying it.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/homerun2/schedule-pitcher-profile
+    helm:
+      releaseName: {{ include "homerun2.releaseName" (printf "%s-schedule-pitcher-profile" $appName) | quote }}
+      valuesObject:
+        name: {{ .Values.schedulePitcher.profileConfigMap | quote }}
+        content: {{ include "homerun2.schedulePitcherProfile" . | quote }}
+        serviceAccount:
+          name: homerun2-schedule-pitcher
+          namespace: {{ .Values.destination.namespace | quote }}
+        secretAccess:
+          {{- toYaml .Values.schedulePitcher.secretAccess | nindent 10 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

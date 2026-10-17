@@ -68,6 +68,15 @@
 {{- if .Values.configViewer.enabled }}
   {{- $probes = append $probes (dict "name" "config-viewer" "service" "homerun2-config-viewer" "port" 80 "path" "/healthz" "hostname" (ternary .Values.configViewer.hostname "" .Values.httpRoute.enabled)) }}
 {{- end }}
+{{- /* schedule-pitcher serves /health (liveness, no auth) on port 80 and
+       sound-catcher /healthz — both checked against their kustomize bases'
+       probes (v1.10.0, v1.0.0). */}}
+{{- if .Values.schedulePitcher.enabled }}
+  {{- $probes = append $probes (dict "name" "schedule-pitcher" "service" "homerun2-schedule-pitcher" "port" 80 "path" "/health" "hostname" (ternary .Values.schedulePitcher.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
+{{- if .Values.soundCatcher.enabled }}
+  {{- $probes = append $probes (dict "name" "sound-catcher" "service" "homerun2-sound-catcher" "port" 80 "path" "/healthz" "hostname" (ternary .Values.soundCatcher.hostname "" .Values.httpRoute.enabled)) }}
+{{- end }}
 {{- $probes = concat $probes .Values.smokeTest.extraProbes }}
 {{- $stValues := dict
       "name"                 (printf "%s-smoke-test" $appName)
