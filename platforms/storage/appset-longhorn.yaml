@@ -47,7 +47,14 @@ spec:
             # destination.server) so the inner Application is uniquely named
             # and won't collide with other longhorn installs on the same
             # mgmt-cluster argocd namespace.
-            applicationName: longhorn-storage-{{ .name }}
+            #
+            # NOT the parent's own name (longhorn-storage-<cluster>): with the
+            # same name the parent renders itself, Argo keeps overwriting its
+            # spec with the child's and Longhorn never reaches the cluster --
+            # seen on labda-apps-test1, the first cluster that turned it on
+            # (stuttgart-things#3715). Same shape as velero-storage-<c> ->
+            # velero-<c>.
+            applicationName: longhorn-{{ .name }}
             destination:
               server: '{{ .server }}'
               namespace: longhorn-system
