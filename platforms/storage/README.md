@@ -13,7 +13,7 @@ Catalog entries rendered:
 | ApplicationSet                  | Wave | Catalog path                      | Workload namespace | Notes |
 |---|---|---|---|---|
 | `openebs-storage`               | -10  | `infra/openebs/install`           | `openebs`          | OpenEBS umbrella; renders LocalPV-Hostpath and annotates `openebs-hostpath` as the cluster's default StorageClass |
-| `longhorn-storage`               | -10  | `infra/longhorn/install`           | `longhorn-system`  | Longhorn distributed block storage. Defaults: `defaultClassReplicaCount: 1` (single-node-safe — bump for prod), StorageClass installed but **not** annotated as default. `preUpgradeChecker.jobEnabled: false` (required for GitOps) |
+| `longhorn-storage`               | -10  | `infra/longhorn/install`           | `longhorn-system`  | Longhorn 1.13 distributed block storage, lean profile (19 pods on 3 nodes). Replica count, default-SC claim and a UI HTTPRoute per cluster — see [Longhorn](#longhorn). `preUpgradeChecker.jobEnabled: false` (required for GitOps) |
 | `nfs-csi-install-storage`       | -10  | `infra/nfs-csi/install`           | `kube-system`      | csi-driver-nfs (controller + node DaemonSet); no StorageClasses yet — those come from the next appset |
 | `nfs-csi-storageclasses-storage`|  -5  | `infra/nfs-csi/storageclasses`    | `kube-system`      | One `StorageClass` per cluster, fields sourced from cluster-Secret annotations. **Additionally gated on** the label `storage-platform.stuttgart-things.com/nfs-config` being present (any value) |
 | `cloudnative-pg-storage`        |  -5  | `infra/cloudnative-pg/install`     | `postgres`         | CloudNativePG operator + CRDs. **Opt-in**, an explicit `'true'` — a cluster with no PostgreSQL has no use for it. A singleton: `tabletennis-platform` needs it, anything else growing a Postgres uses the same one |
@@ -52,6 +52,7 @@ To skip a single component on a specific cluster, add a per-component label on t
 |---|---|
 | `storage-platform/openebs: "false"`                      | Skip `openebs-storage` |
 | `storage-platform/longhorn: "false"`                     | Skip `longhorn-storage` |
+| `storage-platform/longhorn-ui-route: "true"`             | **Opt-in**: Longhorn UI HTTPRoute (see [Longhorn](#longhorn)) |
 | `storage-platform/nfs-csi-install: "false"`              | Skip `nfs-csi-install-storage` |
 | `storage-platform/nfs-csi-storageclasses: "false"`       | Skip `nfs-csi-storageclasses-storage` |
 
@@ -174,30 +175,65 @@ Three components in this platform install a CSI provider, and only one StorageCl
 | Component | Installs StorageClass | Marked as cluster default? |
 |---|---|---|
 | `openebs-storage`               | `openebs-hostpath`           | **yes** (appset hard-codes `defaultStorageClass: true`) |
-| `longhorn-storage`              | `longhorn`                    | no |
+| `longhorn-storage`              | `longhorn`                    | no — unless `longhorn-default-class: "true"` **and** `storage-platform/openebs: "false"` |
 | `nfs-csi-storageclasses-storage`| `<nfs-name>` (default `nfs-csi`) | no |
 
 If two SCs both claim default, PVCs created without an explicit `storageClassName` bind non-deterministically to whichever the API server returns first — that's a footgun. To swap defaults:
 
-- **Make Longhorn the default**: set `storage-platform/openebs: "false"` on the cluster Secret to skip openebs, *and* override `defaultStorageClass: true` for longhorn (opt out of `storage-platform/longhorn` and run a per-cluster Application using `infra/longhorn/install` with `defaultStorageClass: true` — the platform appset doesn't expose this knob to keep the contract simple).
+- **Make Longhorn the default**: set **both** on the cluster Secret — label `storage-platform/openebs: "false"` (skip this platform's openebs) and annotation `storage-platform.stuttgart-things.com/longhorn-default-class: "true"`. The appset only claims default when both are present; the annotation alone is a deliberate no-op, because openebs-hostpath would still be default. Caveat: OpenEBS from `cicd-platform` (`openebs-cicd`) is not checked — if the cluster gets OpenEBS there, also set `cicd-platform/openebs: "false"` or you are back to two defaults. Opting out of openebs does not delete the running `openebs-hostpath` StorageClass (see "Opt-out and teardown"): remove its default annotation (or the SC) by hand.
 - **Make NFS the default**: similar — opt out of openebs, then add the `storageclass.kubernetes.io/is-default-class: "true"` annotation to your NFS StorageClass via a kustomize patch on `infra/nfs-csi/storageclasses` in a per-cluster Application.
 
-## Longhorn replica count
+## Longhorn
 
-`infra/longhorn/install` defaults `defaultClassReplicaCount: 1` so the StorageClass works on single-node clusters (kind, k3s, single-VM k8s) out of the box — three replicas need three distinct nodes and PVCs would otherwise stay `Pending` forever. **For production multi-node clusters this is the wrong default**: single-replica volumes have no redundancy.
+### Labels and annotations
 
-To run Longhorn with the production-typical `3` replicas:
+| On the cluster Secret | Kind | Default | Effect |
+|---|---|---|---|
+| `storage-platform/longhorn: "false"` | label | absent = installed | opt out |
+| `storage-platform.stuttgart-things.com/longhorn-replica-count` | annotation | `"1"` | replicas per volume of the `longhorn` StorageClass and of volumes created in the UI. **Set `"3"` on 3-node clusters** — 1 has no redundancy; 3 on fewer than 3 nodes leaves PVCs `Pending`/degraded. Schema: `1`..`20` |
+| `storage-platform.stuttgart-things.com/longhorn-default-class` | annotation | absent = no | `"true"` makes `longhorn` the default StorageClass — **only** together with `storage-platform/openebs: "false"`, see [Default StorageClass conflicts](#default-storageclass-conflicts) |
+| `storage-platform/longhorn-ui-route` | label | absent = no route | `"true"`: HTTPRoute `longhorn-httproute` in `longhorn-system`, host `longhorn.<fqdn>` on `<cluster>-gateway` (namespace `default`, listener `https`). Needs the clusterbook annotation `clusterbook.stuttgart-things.com/fqdn`; without it the render fails on purpose |
 
-1. Set `storage-platform/longhorn: "false"` on the cluster Secret to opt out of the platform's longhorn appset.
-2. Apply a per-cluster `Application` pointed at `infra/longhorn/install` with `extraValues.persistence.defaultClassReplicaCount: 3` (or whatever value fits your fleet).
+A LabDA 3-node app cluster typically sets:
 
-The `extraValues` block is deep-merged on top of the chart's computed values, so any upstream key — replica count, tolerations, ingress, backup target, etc. — can be set there without modifying the catalog chart.
+```yaml
+labels:
+  storage-platform: "true"
+  storage-platform/longhorn-ui-route: "true"   # optional, see warning below
+annotations:
+  storage-platform.stuttgart-things.com/longhorn-replica-count: "3"
+```
+
+(and drops its `storage-platform/longhorn: "false"`).
+
+> [!WARNING]
+> **The Longhorn UI has no authentication.** Anyone who can reach `longhorn.<fqdn>` can delete volumes, snapshots, backups and disks. The route is therefore opt-in and only acceptable on the lab-internal clusterbook gateway — the same reasoning [`platforms/tabletennis`](../tabletennis/) gives for zaehlwerk. Follow-up before exposing it anywhere else: OIDC via oauth2-proxy in front of `longhorn-frontend` (the upstream chart takes `httproute.filters`). Without the label, `kubectl -n longhorn-system port-forward svc/longhorn-frontend 8080:80` works too.
+
+### Pod footprint
+
+The chart's `minimalFootprint: true` (default) runs every cluster-wide controller once instead of upstream's 2–3. All of them are leader-elected, so only standbys go away; the price is a slower failover (reschedule) of a controller after a node loss — volume I/O is per-node and unaffected. 3-node cluster, steady state:
+
+| Pod | Where | upstream | lean |
+|---|---|---|---|
+| `longhorn-manager`, `longhorn-csi-plugin`, `engine-image-ei-*`, `instance-manager-*` (v1) | DaemonSet-like, every node | 4 × 3 | 4 × 3 |
+| `longhorn-driver-deployer` | any node | 1 | 1 |
+| `longhorn-global-manager` | any node | 3 | 1 |
+| `longhorn-ui` | any node | 2 | 1 |
+| `csi-attacher`, `csi-provisioner`, `csi-resizer`, `csi-snapshotter` | any node | 4 × 3 | 4 × 1 |
+| **total** | | **30** | **19** |
+
+Also off: the v2 (SPDK) data engine (would add a second, hugepage-hungry instance-manager per node), the ServiceMonitor, ingress. `share-manager-*` (RWX volumes), `backing-image-manager-*` and the support-bundle manager only appear when something needs them. The helm `post-upgrade` hook becomes an Argo PostSync Job that runs and is deleted on every sync.
+
+Upstream defaults back: `minimalFootprint: false` (per-cluster Application, see below). Anything else upstream offers — tolerations, backup target, `defaultSettings.*` — goes through `extraValues`, which is deep-merged last and wins over everything the chart computes; that needs a per-cluster Application (opt out with `storage-platform/longhorn: "false"`, point it at `infra/longhorn/install`).
 
 ## Longhorn node prerequisites
 
 Longhorn requires kernel-level prerequisites on every node in the workload cluster: `open-iscsi` installed and running, the `iscsi_tcp` kernel module loaded, NFS client utilities (`nfs-common` / `nfs-utils`) for RWX volumes. Argo CD cannot solve these — they must be present on the node image / configured by Ignition / cloud-init / Ansible / whatever provisions your nodes. If the longhorn-manager DaemonSet pods log `Failed to start: open-iscsi not found`, the cluster's node image is the problem, not this platform.
 
-Longhorn's own [`environment_check.sh`](https://raw.githubusercontent.com/longhorn/longhorn/v1.11.2/scripts/environment_check.sh) on the workload cluster is the fastest pre-flight check.
+Longhorn's own [`environment_check.sh`](https://raw.githubusercontent.com/longhorn/longhorn/v1.13.0/scripts/environment_check.sh) on the workload cluster is the fastest pre-flight check (or `longhornctl check preflight`).
+
+> [!NOTE]
+> Node images matter here. LabDA rke2 nodes (Ubuntu 26.04, e.g. `labda-apps-test1`) ship `iscsiadm`, but `iscsid` is inactive/disabled and `iscsi_tcp` is not loaded — and the `sthings.baseos` ansible collection has no playbook for it yet (only `nfs_server`). Until one exists in the ClusterStack's `ansible.stages.baseos`, enable it by hand on every node: `systemctl enable --now iscsid && modprobe iscsi_tcp && echo iscsi_tcp > /etc/modules-load.d/longhorn.conf`.
 
 ## Avoid double-installing OpenEBS
 

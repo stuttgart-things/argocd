@@ -38,7 +38,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.71.0
+        targetRevision: v0.81.0
         path: infra/longhorn/install
         helm:
           valuesObject:
@@ -52,11 +52,31 @@ spec:
               server: '{{ .server }}'
               namespace: longhorn-system
             # platforms/storage leaves openebs-hostpath as the cluster's
-            # default StorageClass. Longhorn ships its SC alongside but is
-            # NOT marked default — flip per-cluster only after also opting
-            # out of `storage-platform/openebs` to avoid two SCs claiming
-            # default. See README "Default StorageClass conflicts".
-            defaultStorageClass: false
+            # default StorageClass. Longhorn claims default only when the
+            # cluster asks for it with the annotation
+            # `storage-platform.stuttgart-things.com/longhorn-default-class:
+            # "true"` AND has opted out of this platform's openebs
+            # (`storage-platform/openebs: "false"`) -- otherwise two SCs would
+            # claim default. The annotation alone is a no-op on purpose.
+            # See README "Default StorageClass conflicts".
+            defaultStorageClass: '{{ and (eq (toString (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/longhorn-default-class")) "true") (eq (toString (index .metadata.labels "storage-platform/openebs")) "false") }}'
+            # Replicas per volume of the `longhorn` StorageClass (and for
+            # volumes created in the UI). 1 unless the cluster says otherwise;
+            # set "3" on 3-node app clusters. The chart turns the string into
+            # an int and its schema rejects anything outside 1..20.
+            defaultClassReplicaCount: '{{ index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/longhorn-replica-count" | default "1" }}'
+            # Longhorn UI on the clusterbook gateway: opt-IN with the label
+            # `storage-platform/longhorn-ui-route: "true"`, hostname
+            # longhorn.<fqdn>. THE UI HAS NO AUTHENTICATION -- lab-internal
+            # gateways only. Without the fqdn annotation the hostname is empty
+            # and the chart fails the render instead of routing nowhere.
+            httpRoute:
+              enabled: '{{ eq (toString (index .metadata.labels "storage-platform/longhorn-ui-route")) "true" }}'
+              hostname: '{{ if eq (toString (index .metadata.labels "storage-platform/longhorn-ui-route")) "true" }}{{ with (index (default (dict) .metadata.annotations) "clusterbook.stuttgart-things.com/fqdn") }}longhorn.{{ trimPrefix "*." . }}{{ end }}{{ end }}'
+              gateway:
+                name: '{{ .name }}-gateway'
+                namespace: default
+                sectionName: https
       syncPolicy:
         automated:
           prune: true
