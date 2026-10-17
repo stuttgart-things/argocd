@@ -63,10 +63,12 @@ spec:
                         - name: DRY_RUN
                           value: {{ .Values.notificationCatcher.dryRun | quote }}
         {{- /* The routing config (which stream entries go to which webhook)
-               is mounted from a ConfigMap this chart does NOT create — it is
-               cluster-specific, the same way k8s-pitcher's profile is. The
-               base names `homerun2-notification-catcher-notify`; point the
-               volume elsewhere by overriding notifyConfigMap. */}}
+               is mounted from a ConfigMap. With notificationCatcher.notifyConfig
+               set, templates/notification-catcher-notify.yaml creates it;
+               empty, somebody provisions it out-of-band, the same way
+               k8s-pitcher's profile works. The base names
+               `homerun2-notification-catcher-notify`; point the volume
+               elsewhere by overriding notifyConfigMap. */}}
         - target:
             kind: Deployment
             name: {{ $name }}
@@ -77,6 +79,15 @@ spec:
               name: {{ $name }}
             spec:
               template:
+{{- if .Values.notificationCatcher.notifyConfig }}
+                metadata:
+                  annotations:
+                    # The catcher reads config.yaml at startup; kubelet updates
+                    # a mounted ConfigMap in place. Roll the Pod on a changed
+                    # config instead of leaving the old one running while the
+                    # new one sits on disk (same as omni-pitcher's routes-hash).
+                    homerun2.sthings.io/notify-config-hash: {{ .Values.notificationCatcher.notifyConfig | sha256sum | trunc 16 | quote }}
+{{- end }}
                 spec:
                   volumes:
                     - name: notify-config
@@ -101,8 +112,10 @@ spec:
         {{- /* The base ships this Secret carrying the literal string
                `${TEAMS_WEBHOOK_URL}` — an unexpanded placeholder the catcher
                would happily POST to. Patch it from a value, or delete it so an
-               out-of-band / ESO-managed Secret of the same name takes over.
-               Never leave the base's copy standing. */}}
+               out-of-band / ESO-managed Secret of the same name takes over
+               (templates/secrets.yaml renders that ExternalSecret when
+               secrets.teamsWebhookVaultSecretName is set). Never leave the
+               base's copy standing. */}}
 {{- if .Values.notificationCatcher.teamsWebhookUrl }}
         - target:
             kind: Secret

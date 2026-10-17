@@ -1,0 +1,51 @@
+{{- /* Materializes the ConfigMap that templates/notification-catcher.yaml
+       mounts as config.yaml (which outputs exist, which stream entries reach
+       them). Only rendered when `notificationCatcher.notifyConfig` is set;
+       leaving it empty keeps the historical contract, where
+       `notificationCatcher.notifyConfigMap` names a ConfigMap somebody
+       provisioned out-of-band and the chart merely references it. Same shape
+       as omni-pitcher-routes.yaml and k8s-pitcher-profile.yaml.
+
+       The content is handed over through `valuesObject` and rendered with
+       `quote`/`indent` only, never `tpl`: the `${TEAMS_WEBHOOK_URL}`
+       placeholders in it are expanded by the catcher at runtime, and neither
+       Helm nor Argo CD (which envsubsts helm `parameters`, not values) touch
+       them on the way. */}}
+{{- if and .Values.notificationCatcher.enabled .Values.notificationCatcher.notifyConfig }}
+{{- $appName := include "homerun2.appName" . }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-notification-catcher-notify" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # Ahead of the notification-catcher Application (wave 0): the container
+    # mounts this ConfigMap as a volume, and a Pod scheduled before it exists
+    # sits in ContainerCreating until Argo gets round to applying it.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/homerun2/notification-catcher-notify
+    helm:
+      releaseName: {{ include "homerun2.releaseName" (printf "%s-notification-catcher-notify" $appName) | quote }}
+      valuesObject:
+        name: {{ .Values.notificationCatcher.notifyConfigMap | quote }}
+        content: {{ .Values.notificationCatcher.notifyConfig | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

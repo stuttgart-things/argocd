@@ -328,15 +328,32 @@ notificationCatcher:
   # a real Teams channel.
   dryRun: false
   # ConfigMap holding config.yaml — which stream entries go to which webhook,
-  # with filters. NOT created by this chart: it is cluster-specific, the same
-  # way k8sPitcherProfileConfigMap is. Provision it out-of-band; see the README
-  # for the shape.
+  # with filters. Created by this chart only when notifyConfig below is set;
+  # otherwise provision it out-of-band (cluster-specific, the same way
+  # k8sPitcherProfileConfigMap is). See the README for the shape.
   notifyConfigMap: homerun2-notification-catcher-notify
+  # The notify config itself, as a YAML string. Empty (the default) keeps the
+  # out-of-band contract above. Set it, and
+  # templates/notification-catcher-notify.yaml materializes notifyConfigMap
+  # via a sub-Application at sync-wave -10 and the Pod rolls whenever the
+  # content changes. `${TEAMS_WEBHOOK_URL}` placeholders pass through
+  # verbatim — the catcher expands them from its Secret at runtime.
+  #
+  #   notifyConfig: |
+  #     outputs:
+  #       - name: teams-grafana-alerts
+  #         type: msteams
+  #         webhook_url: "${TEAMS_WEBHOOK_URL}"
+  #         filters:
+  #           match:
+  #             author: grafana
+  notifyConfig: ""
   # Webhook URL. Empty (the default) deletes the Secret the base ships, so an
   # out-of-band or ESO-managed `homerun2-notification-catcher-secrets` takes
-  # over — which is the right way round for a credential. Setting it here
-  # inlines a literal, so only do that from an ArgoCD Vault Plugin / SOPS
-  # overlay.
+  # over — which is the right way round for a credential; the chart renders
+  # that ExternalSecret itself with secrets.teamsWebhookVaultSecretName.
+  # Setting it here inlines a literal (and suppresses the ExternalSecret), so
+  # only do that from an ArgoCD Vault Plugin / SOPS overlay.
   teamsWebhookUrl: ""                       # pragma: allowlist secret
 
 # git-pitcher (watches Git repos → Redis Streams).
@@ -416,6 +433,13 @@ secrets:
   # only, the PAT is shared (e.g. `_git-pat` in the homerun2 mount). Same store.
   # Empty reads it from vaultSecretName, as before.
   githubTokenVaultSecretName: ""
+  # Entry the notification-catcher's Teams webhook comes from (property
+  # `teamsWebhookUrl`), e.g. `_teams-webhook` — shared like the PAT, same
+  # store. Set, and with notificationCatcher enabled and its teamsWebhookUrl
+  # empty, an ExternalSecret materializes `homerun2-notification-catcher-secrets`
+  # (key TEAMS_WEBHOOK_URL). Empty renders none: the Secret then has to come
+  # from the literal or out-of-band.
+  teamsWebhookVaultSecretName: ""
   refreshInterval: 1h
 
 # Optional smoke-test sub-Application (apps/homerun2/smoke-test in this
