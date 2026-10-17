@@ -1,4 +1,10 @@
 ---
+# Reference back to this catalog repo -- used by the `-secrets` Application
+# (externalSecrets below) to load infra/velero/cloud-credentials from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
 # ArgoCD AppProject the rendered Application belongs to.
 project: default
 
@@ -48,6 +54,11 @@ backup:
   s3ForcePathStyle: true
   s3Url: http://minio.example.com
   insecureSkipTLSVerify: false
+  # Directory inside the bucket all Velero data goes under. "" = the bucket
+  # root. Several clusters can share ONE bucket with a prefix each (the
+  # storage-platform AppSet uses the cluster name) -- without one they would
+  # read each other's backups as their own and sync them in.
+  prefix: ""
 
 # Default volume-snapshot location. Snapshot creation itself is gated by
 # `snapshotsEnabled` below; this only configures the region for the
@@ -78,6 +89,27 @@ metrics:
 # (https://vmware-tanzu.github.io/helm-charts/charts/velero — `schedules`).
 schedules: {}
 
+# One recurring backup of the whole cluster, mirroring the Flux catalog's
+# infra/velero/schedule (`daily-all`). Rendered into `schedules` under `name`
+# (upstream prefixes it: Schedule `velero-<name>`), beside anything set there.
+# `cron: ""` = no schedule, which is the default -- string-valued so an
+# ApplicationSet can switch it from a cluster annotation.
+#
+# Metadata only: no volume snapshots and no file-system backup, because the
+# defaults above turn both off. Turning either on here without
+# snapshotsEnabled / deployNodeAgent gives backups that silently hold no
+# volume data.
+defaultSchedule:
+  name: daily-all
+  cron: ""
+  ttl: 720h0m0s
+  # kube-system carries per-cluster control-plane objects; the other two are
+  # recreated empty by the API server.
+  excludedNamespaces:
+    - kube-system
+    - kube-public
+    - kube-node-lease
+
 # Upstream upgrade Job — leave off for GitOps installs; the chart's
 # pre-upgrade Job races with the Helm release lifecycle under Argo CD
 # and can leave the release stuck Pending. Run the upgrade Job
@@ -98,6 +130,21 @@ kubectl:
     repository: docker.io/bitnamilegacy/kubectl
     # renovate: datasource=docker depName=docker.io/bitnamilegacy/kubectl
     tag: 1.33.4
+
+# The `cloud-credentials` Secret from a (Cluster)SecretStore, rendered as its
+# own Application (`<applicationName>-secrets`, sync-wave -5) pointing at
+# infra/velero/cloud-credentials in this catalog -- so one parent brings both.
+# Off by default: the Secret is then provisioned out of band, as before.
+externalSecrets:
+  enabled: false
+  secretStore:
+    kind: ClusterSecretStore
+    name: ""
+  # Entry name under the store's mount, flat -- never a path with /data/ in
+  # it. The store carries mount and KV version.
+  remoteKey: velero
+  accessKeyProperty: access_key
+  secretKeyProperty: secret_key
 
 # Deep-merged on top of the computed valuesObject passed to the upstream
 # chart. Use for any upstream key not exposed as a first-class value above

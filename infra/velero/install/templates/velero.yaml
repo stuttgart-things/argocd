@@ -44,6 +44,9 @@
         "name" "default"
         "provider" "aws"
         "config" (dict "region" .Values.snapshot.region)))) }}
+{{- if .Values.backup.prefix }}
+{{- $_ := set (index $computed.configuration.backupStorageLocation 0) "prefix" .Values.backup.prefix }}
+{{- end }}
 {{- $_ := set $computed "snapshotsEnabled" .Values.snapshotsEnabled }}
 {{- $_ := set $computed "deployNodeAgent" .Values.deployNodeAgent }}
 {{- $_ := set $computed "metrics" (dict
@@ -51,7 +54,24 @@
     "serviceMonitor" (dict
         "enabled" .Values.metrics.serviceMonitor.enabled
         "additionalLabels" (.Values.metrics.serviceMonitor.additionalLabels | default dict))) }}
-{{- $_ := set $computed "schedules" (.Values.schedules | default dict) }}
+{{- $schedules := deepCopy (.Values.schedules | default dict) }}
+{{- $ds := .Values.defaultSchedule }}
+{{- if $ds.cron }}
+{{- $_ := set $schedules $ds.name (dict
+    "disabled" false
+    "schedule" $ds.cron
+    "useOwnerReferencesInBackup" false
+    "labels" (dict "velero-schedule" $ds.name)
+    "template" (dict
+        "ttl" $ds.ttl
+        "includedNamespaces" (list "*")
+        "excludedNamespaces" $ds.excludedNamespaces
+        "snapshotVolumes" false
+        "defaultVolumesToFsBackup" false
+        "storageLocation" "default"
+        "metadata" (dict "labels" (dict "velero-schedule" $ds.name)))) }}
+{{- end }}
+{{- $_ := set $computed "schedules" $schedules }}
 {{- $_ := set $computed "upgradeJob" (dict "enabled" .Values.upgradeJob.enabled) }}
 {{- $_ := set $computed "cleanUpCRDs" .Values.cleanUpCRDs }}
 {{- $_ := set $computed "kubectl" (dict "image" (dict

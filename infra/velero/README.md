@@ -12,6 +12,7 @@ per piece they need.
 ```
 infra/velero/
 ├── install/             app-of-apps — renders Application "velero" → vmware-tanzu/velero
+│                        (+ optional "<name>-secrets" → cloud-credentials/, externalSecrets.enabled)
 ├── cloud-credentials/   plain Helm chart — renders an ExternalSecret that materialises `cloud-credentials`
 └── README.md
 ```
@@ -21,7 +22,7 @@ Typical combinations:
 | Want | Applications to create |
 |---|---|
 | Velero with a pre-provisioned `cloud-credentials` Secret | `install` |
-| Velero with `cloud-credentials` synced from Vault via ESO | `cloud-credentials`, `install` |
+| Velero with `cloud-credentials` synced from Vault via ESO | `install` with `externalSecrets.enabled: true` (renders the `cloud-credentials` Application itself), or both by hand |
 
 ## install/
 
@@ -77,14 +78,16 @@ full JSON Schema. Invalid overrides fail the sync loudly.
 |---|---|---|
 | `project` | `default` | ArgoCD AppProject for the rendered Application |
 | `destination.server` / `namespace` | `https://kubernetes.default.svc` / `velero` | Target workload cluster + namespace |
-| `chartVersion` | `9.0.0` | Upstream vmware-tanzu/velero chart version |
-| `pluginAws.image` / `tag` | `velero/velero-plugin-for-aws` / `1.14.0` | Plugin image loaded into `/target` as an initContainer |
+| `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the `-secrets` Application loads `infra/velero/cloud-credentials` from |
+| `chartVersion` | `12.2.1` | Upstream vmware-tanzu/velero chart version |
+| `pluginAws.image` / `tag` | `velero/velero-plugin-for-aws` / `1.14.4` | Plugin image loaded into `/target` as an initContainer |
 | `credentials.existingSecret` | `cloud-credentials` | Pre-existing Secret in the velero namespace holding the AWS-style INI under key `cloud` |
 | `trustBundle.configMapName` / `mountPath` | `cluster-trust-bundle` / `/etc/ssl/custom` | Optional CA bundle mount (harmless if absent) |
 | `sslCertDir` | `""` | `SSL_CERT_DIR` env var. Empty = system CAs; set to `trustBundle.mountPath` to activate the bundle |
 | `backup.bucket` | placeholder | **Required** — S3 bucket for the default `BackupStorageLocation` |
 | `backup.s3Url` | placeholder | **Required** — S3 endpoint (MinIO / R2 / S3) |
 | `backup.region` / `s3ForcePathStyle` / `insecureSkipTLSVerify` | `minio` / `true` / `false` | S3 config knobs |
+| `backup.prefix` | `""` | Directory inside the bucket. Several clusters share one bucket with a prefix each; without one they sync each other's backups in |
 | `snapshot.region` | `minio` | Region for the default `VolumeSnapshotLocation` |
 | `snapshotsEnabled` | `false` | Volume snapshots |
 | `deployNodeAgent` | `false` | File-system backup daemon (restic/kopia) |
@@ -92,6 +95,12 @@ full JSON Schema. Invalid overrides fail the sync loudly.
 | `metrics.serviceMonitor.enabled` | `false` | Render a `ServiceMonitor` (needs Prometheus Operator) |
 | `metrics.serviceMonitor.additionalLabels` | `{release: prometheus}` | Label used by kube-prometheus-stack's `serviceMonitorSelector` |
 | `schedules` | `{}` | Velero `Schedule` definitions rendered by the chart |
+| `defaultSchedule.cron` | `""` | One whole-cluster Schedule (`velero-<name>`), mirroring Flux's `daily-all`. Empty = none |
+| `defaultSchedule.name` / `ttl` / `excludedNamespaces` | `daily-all` / `720h0m0s` / kube-system, kube-public, kube-node-lease | Its name, retention and excluded namespaces. Metadata only: no snapshots, no file-system backup |
+| `externalSecrets.enabled` | `false` | Render `<applicationName>-secrets` (sync-wave -5) → `cloud-credentials/`, so one parent brings Velero and its Secret |
+| `externalSecrets.secretStore.kind` / `name` | `ClusterSecretStore` / `""` | Store to read from; `name` required when enabled |
+| `externalSecrets.remoteKey` | `velero` | Entry NAME under the store's mount (never a `…/data/…` path) |
+| `externalSecrets.accessKeyProperty` / `secretKeyProperty` | `access_key` / `secret_key` | Properties inside the entry |
 | `upgradeJob.enabled` | `false` | Upstream upgrade Job (off for GitOps installs — races with Helm release lifecycle) |
 | `cleanUpCRDs` | `false` | Delete CRDs on uninstall (off — keeps backup metadata around) |
 | `kubectl.image.repository` / `tag` | `docker.io/bitnamilegacy/kubectl` / `1.33.4` | kubectl image used by the chart's CRD pre-install/pre-upgrade hook (bitnami sunset their free Docker Hub catalogue) |
@@ -124,7 +133,7 @@ spec:
         secretStoreRef:
           name: vault-my-cluster
           kind: ClusterSecretStore
-        secretPath: kv/data/velero/s3
+        secretPath: velero
   destination:
     server: https://<cluster-api>:6443
     namespace: velero
@@ -141,18 +150,18 @@ spec:
 | `namespace` | `velero` | Namespace the ExternalSecret + materialised Secret live in (must match `install` `destination.namespace`) |
 | `refreshInterval` | `1h` | How often ESO re-reads Vault |
 | `secretStoreRef.name` / `kind` | `vault-cluster` / `ClusterSecretStore` | Existing (Cluster)SecretStore reference |
-| `secretPath` | `kv/data/velero/s3` | Vault KV v2 path holding the S3 credentials |
+| `secretPath` | `velero` | Entry NAME under the store's mount holding the S3 credentials. Not a path: the store composes `<mount>/data/<entry>`, so `kv/data/…` resolved to nothing (schema now refuses `/data/`) |
 | `properties.accessKey` / `secretKey` | `access_key` / `secret_key` | Property names inside the KV entry |
 
 The rendered target Secret is always called `cloud-credentials` (hard-coded —
 that is what the upstream chart's `credentials.existingSecret` defaults to and
 what this catalog's `install` chart passes through).
 
-## Fleet — one `ApplicationSet` per piece
+## Fleet — one `ApplicationSet`
 
-Each entry is a self-contained chart, so fleet mode is one `ApplicationSet` per
-piece. Install velero everywhere a cluster has `install/velero: "true"`; layer
-`cloud-credentials` with its own label.
+`install` with `externalSecrets.enabled: true` brings Velero and its Secret from
+one parent, so fleet mode is one `ApplicationSet`. Install velero everywhere a
+cluster has `install/velero: "true"`:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1

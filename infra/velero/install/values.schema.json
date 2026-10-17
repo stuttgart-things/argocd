@@ -10,6 +10,15 @@
       "minLength": 1,
       "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
     },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": { "type": "string", "format": "uri" },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      },
+      "required": ["repoURL", "targetRevision"]
+    },
     "project": { "type": "string", "minLength": 1 },
     "destination": {
       "type": "object",
@@ -56,7 +65,8 @@
         "region":                 { "type": "string", "minLength": 1 },
         "s3ForcePathStyle":       { "type": "boolean" },
         "s3Url":                  { "type": "string", "format": "uri" },
-        "insecureSkipTLSVerify":  { "type": "boolean" }
+        "insecureSkipTLSVerify":  { "type": "boolean" },
+        "prefix":                 { "type": "string", "pattern": "^([^/](.*[^/])?)?$", "description": "Directory inside the bucket; empty = bucket root. No leading/trailing slash." }
       },
       "required": ["bucket", "s3Url"]
     },
@@ -91,6 +101,18 @@
       "type": "object",
       "additionalProperties": true
     },
+    "defaultSchedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One whole-cluster Schedule rendered into `schedules`; cron empty = none.",
+      "properties": {
+        "name":               { "type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" },
+        "cron":               { "type": "string" },
+        "ttl":                { "type": "string", "minLength": 1 },
+        "excludedNamespaces": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "required": ["name", "cron", "ttl"]
+    },
     "upgradeJob": {
       "type": "object",
       "additionalProperties": false,
@@ -115,6 +137,34 @@
         }
       },
       "required": ["image"]
+    },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
+            "name": { "type": "string" }
+          },
+          "required": ["kind", "name"]
+        },
+        "remoteKey":         { "type": "string" },
+        "accessKeyProperty": { "type": "string", "minLength": 1 },
+        "secretKeyProperty": { "type": "string", "minLength": 1 }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": {
+        "required": ["secretStore", "remoteKey"],
+        "properties": {
+          "remoteKey": { "minLength": 1, "not": { "pattern": "/data/" } },
+          "secretStore": { "properties": { "name": { "minLength": 1 } } }
+        }
+      }
     },
     "extraValues": {
       "type": "object",

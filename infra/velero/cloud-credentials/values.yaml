@@ -19,8 +19,12 @@ secretStoreRef:
   name: vault-cluster
   kind: ClusterSecretStore
 
-# Vault KV path holding the S3 access/secret keys (KV v2 path).
-secretPath: kv/data/velero/s3
+# Entry NAME under the store's mount holding the S3 access/secret keys --
+# not a path. A ClusterSecretStore carries mount and KV version and composes
+# <mount>/data/<key> itself, so the old default kv/data/velero/s3 resolved to
+# <mount>/data/kv/data/velero/s3, which exists nowhere (same fix as the Flux
+# catalog's infra/velero/components/external-secret).
+secretPath: velero
 
 # Property names inside the KV entry. These are what `velero-plugin-for-aws`
 # expects when it parses the rendered INI under the `cloud` key.
