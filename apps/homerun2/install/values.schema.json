@@ -516,6 +516,10 @@
           "type": "string",
           "minLength": 1
         },
+        "redisStreams": {
+          "type": "string",
+          "description": "Comma-separated streams (REDIS_STREAMS), all consumed by the one Deployment; takes precedence over redisStream. Empty = not rendered, redisStream alone."
+        },
         "dryRun": {
           "type": "boolean"
         },

@@ -363,6 +363,11 @@ notificationCatcher:
   # everything; a cluster that routes alerts onto their own stream (the flux
   # side sends /pitch/grafana to `alerts`) sets that here instead.
   redisStream: messages
+  # Several streams, comma-separated (e.g. `messages,tabletennis`), consumed by
+  # the one Deployment: the catcher reads REDIS_STREAMS first and only falls
+  # back to redisStream above when it is empty. Empty (the default) renders no
+  # REDIS_STREAMS at all, i.e. redisStream alone.
+  redisStreams: ""
   # true = log what would be sent and send nothing. Worth leaving on until the
   # notify config below is known-good, because the first wrong filter posts to
   # a real Teams channel.
