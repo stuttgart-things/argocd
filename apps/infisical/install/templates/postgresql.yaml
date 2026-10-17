@@ -1,0 +1,47 @@
+{{- if and .Values.externalSecrets.enabled .Values.postgresql.enabled }}
+{{- $defaultName := printf "infisical-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- /* ESO mode only: the PostgreSQL the upstream chart would bundle, with
+       the same name (Service `postgresql`) and image, but reading its
+       password from the ESO Secret. No `postgres` superuser: nothing here
+       needs it, and it would be one more password to keep. */}}
+{{- $values := dict
+      "fullnameOverride" "postgresql"
+      "image" (dict "registry" "mirror.gcr.io" "repository" "bitnamilegacy/postgresql")
+      "auth" (dict
+        "enablePostgresUser" false
+        "username"           .Values.postgresql.auth.username
+        "database"           .Values.postgresql.auth.database
+        "existingSecret"     .Values.infisical.secretName
+        "secretKeys"         (dict "userPasswordKey" "DB_PASSWORD")
+      )
+      "primary" (dict "persistence" (dict
+        "enabled"      true
+        "storageClass" .Values.postgresql.storageClass
+        "size"         .Values.postgresql.storageSize
+      ))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-postgresql" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: registry-1.docker.io/bitnamicharts
+    chart: postgresql
+    targetRevision: {{ .Values.postgresql.chartVersion | quote }}
+    helm:
+      releaseName: postgresql
+      valuesObject:
+        {{- toYaml $values | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

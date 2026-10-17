@@ -1,0 +1,11 @@
+---
+namespace: infisical
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: infisical
+    hostname: infisical.example.com
+    backend:
+      name: infisical
+      port: 8080

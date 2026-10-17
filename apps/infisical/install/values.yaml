@@ -1,0 +1,122 @@
+---
+# Reference back to this catalog repo — used by the secrets / httpRoute
+# Applications to load apps/infisical/{secrets,external-secrets,httproute} from git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: infisical
+
+# Upstream Infisical chart (infisical-standalone).
+# renovate: datasource=helm depName=infisical-standalone registryUrl=https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+chartVersion: 1.11.0
+
+# Infisical server.
+replicas: 2
+image:
+  repository: infisical/infisical
+  # renovate: datasource=docker depName=infisical/infisical
+  tag: v0.158.0
+  pullPolicy: IfNotPresent
+
+# Infisical runtime configuration.
+#   siteUrl    — public URL (used in e-mails, OAuth redirects). Empty: derived
+#                as https://<httpRoute.hostname>.
+#   secretName — Secret read via envFrom; must carry ENCRYPTION_KEY and
+#                AUTH_SECRET. Provisioned by externalSecrets or secretsApp,
+#                else provide it out-of-band.
+infisical:
+  siteUrl: ""
+  secretName: infisical-secrets     # pragma: allowlist secret
+
+# Bundled PostgreSQL (Bitnami).
+#   externalSecrets.enabled: false — the upstream chart's sub-chart; it builds
+#     DB_CONNECTION_URI from auth.password, so that must be set here (dev only,
+#     alphanumeric — it lands in a URL).
+#   externalSecrets.enabled: true — its own child Application
+#     "<app>-postgresql" (bitnamicharts/postgresql at chartVersion), reading
+#     DB_PASSWORD from the ESO Secret; auth.password is ignored.
+#   enabled: false — no PostgreSQL; with ESO, DB_CONNECTION_URI comes from the
+#     store as-is.
+postgresql:
+  enabled: true
+  # Same version the upstream chart pins as its sub-chart. No renovate pin on
+  # purpose: a bitnami major is a data migration, not a bump.
+  chartVersion: 14.1.10
+  storageClass: nfs4-csi
+  storageSize: 8Gi
+  auth:
+    database: infisicalDB
+    username: infisical
+    password: ""
+
+# Bundled Redis (Bitnami). Same three modes as postgresql: REDIS_URL is built
+# from auth.password (no ESO), from REDIS_PASSWORD in the ESO Secret
+# (child Application "<app>-redis"), or taken from the store as-is (enabled: false).
+redis:
+  enabled: true
+  # Same version the upstream chart pins as its sub-chart (see postgresql).
+  chartVersion: 18.14.1
+  storageClass: nfs4-csi
+  storageSize: 2Gi
+  auth:
+    password: ""
+
+# externalSecrets sub-Application (opt-in, sync-wave -10) — the PRODUCTION
+# path. Provisions the Secret named infisical.secretName via the External
+# Secrets Operator. Store properties read:
+#   ENCRYPTION_KEY, AUTH_SECRET                        always
+#   DB_PASSWORD     / DB_CONNECTION_URI                postgresql.enabled true / false
+#   REDIS_PASSWORD  / REDIS_URL                        redis.enabled true / false
+# With the bundled databases, DB_CONNECTION_URI and REDIS_URL are templated
+# into the Secret from the passwords — no password in values or git.
+# Enable EITHER externalSecrets OR secretsApp, not both.
+externalSecrets:
+  enabled: false
+  store:
+    name: vault-backend
+    kind: ClusterSecretStore
+  secretPath: infisical
+  refreshInterval: 1h
+
+# secrets sub-Application (opt-in, sync-wave -10). Inlines the root keys in
+# git — DEV ONLY. Prefer externalSecrets above.
+secretsApp:
+  enabled: false
+  # 16 random bytes, hex (openssl rand -hex 16). Never change after first deploy.
+  encryptionKey: ""
+  # 32 random bytes, base64 (openssl rand -base64 32).
+  authSecret: ""
+
+# Gateway API HTTPRoute sub-Application (opt-in) → Service `infisical` on 8080.
+httpRoute:
+  enabled: true
+  hostname: infisical.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart.
+# Use for any upstream key not exposed as a first-class value above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

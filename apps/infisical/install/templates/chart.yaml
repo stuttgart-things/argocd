@@ -1,0 +1,71 @@
+{{- $defaultName := printf "infisical-%s" (sha1sum .Values.destination.server | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $siteUrl := .Values.infisical.siteUrl | default (printf "https://%s" .Values.httpRoute.hostname) }}
+{{- /* ESO mode: PostgreSQL and Redis run as their own child Applications
+       (postgresql.yaml / redis.yaml) reading passwords from the ESO Secret,
+       and DB_CONNECTION_URI / REDIS_URL arrive through envFrom. The upstream
+       sub-charts stay off: enabled, they would render both URLs inline from
+       values, and an explicit env entry wins over envFrom. */}}
+{{- $bundled := not .Values.externalSecrets.enabled }}
+{{- $computed := dict
+      "infisical" (dict
+        "fullnameOverride" "infisical"
+        "replicaCount"     .Values.replicas
+        "kubeSecretRef"    .Values.infisical.secretName
+        "image" (dict
+          "repository" .Values.image.repository
+          "tag"        .Values.image.tag
+          "pullPolicy" (.Values.image.pullPolicy | default "IfNotPresent")
+        )
+        "extraEnv" (list (dict "name" "SITE_URL" "value" $siteUrl))
+      )
+      "ingress" (dict "enabled" false "nginx" (dict "enabled" false))
+      "postgresql" (dict
+        "enabled" (and $bundled .Values.postgresql.enabled)
+        "auth" (dict
+          "database" .Values.postgresql.auth.database
+          "username" .Values.postgresql.auth.username
+          "password" .Values.postgresql.auth.password
+        )
+        "primary" (dict "persistence" (dict
+          "enabled"      true
+          "storageClass" .Values.postgresql.storageClass
+          "size"         .Values.postgresql.storageSize
+        ))
+      )
+      "redis" (dict
+        "enabled" (and $bundled .Values.redis.enabled)
+        "architecture" "standalone"
+        "auth" (dict "password" .Values.redis.auth.password)
+        "master" (dict "persistence" (dict
+          "enabled"      true
+          "storageClass" .Values.redis.storageClass
+          "size"         .Values.redis.storageSize
+        ))
+      )
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+    chart: infisical-standalone
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: infisical
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

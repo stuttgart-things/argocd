@@ -1,0 +1,30 @@
+---
+namespace: infisical
+
+# Secret materialized by the External Secrets Operator. Infisical reads it via
+# envFrom (infisical.kubeSecretRef), so the keys are its env var names.
+secretName: infisical-secrets       # pragma: allowlist secret
+
+# SecretStore / ClusterSecretStore the ESO ExternalSecret reads from.
+store:
+  name: vault-backend
+  kind: ClusterSecretStore
+
+# Path of the entry under the store's KV mount (e.g. Vault `kv/<secretPath>`).
+secretPath: infisical
+
+refreshInterval: 1h
+
+# Keys copied from the Vault entry into the Secret. Each list item is used as
+# both the Secret key and the Vault property name.
+keys:
+  - ENCRYPTION_KEY
+  - AUTH_SECRET
+  - DB_PASSWORD
+  - REDIS_PASSWORD
+
+# Extra Secret keys rendered by ESO from the fetched ones (ESO template
+# syntax). Empty: the Secret holds exactly `keys`.
+templateData:
+  DB_CONNECTION_URI: "postgresql://infisical:{{ .DB_PASSWORD }}@postgresql:5432/infisicalDB"
+  REDIS_URL: "redis://default:{{ .REDIS_PASSWORD }}@redis-master:6379"

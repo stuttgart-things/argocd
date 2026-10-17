@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: infisical-httproute
+description: Gateway API HTTPRoute for Infisical — loaded as a sub-Application by apps/infisical/install.
+type: application
+version: 0.1.0
