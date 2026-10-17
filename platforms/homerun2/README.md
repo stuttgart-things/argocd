@@ -38,7 +38,7 @@ platform tracks the released chart default rather than a second pinned copy.
 | redis-stack | core (on) | `homerun2-platform/redis-stack: 'false'` | every catcher/pitcher needs a Redis; off only with another one |
 | omni-pitcher | core (on) | `homerun2-platform/omni-pitcher: 'false'` | route inline (`inlineHttpRoute: true`, #518) |
 | core-catcher | core (on) | `homerun2-platform/core-catcher: 'false'` | |
-| scout | core (on) | `homerun2-platform/scout: 'false'` | no ScoutProfile: alerting off |
+| scout | core (on) | `homerun2-platform/scout: 'false'` | ScoutProfile from `…/scout-profile`; without it alerting is off. With ai-pitcher on, the ai-* systems stay out of its digest and it keeps 15 days |
 | led-catcher | core (on) | `homerun2-platform/led-catcher: 'false'` | |
 | light-catcher | extra (off) | `homerun2-platform/light-catcher: 'true'` | drives WLED; the mock unless configured |
 | wled-mock | extra (off) | `homerun2-platform/wled-mock: 'true'` | dev/lab |
@@ -46,8 +46,11 @@ platform tracks the released chart default rather than a second pinned copy.
 | config-viewer | extra (off) | `homerun2-platform/config-viewer: 'true'` | read-only view |
 | notification-catcher | extra (off) | `homerun2-platform/notification-catcher: 'true'` | needs the shared Teams webhook (`…/shared-teams-webhook-secret-key`) and a notify config (`…/notification-catcher-notify-config`, else out of band); `homerun2-platform/notification-catcher-dry-run: 'true'` logs instead of posting |
 | git-pitcher | extra (off) | `homerun2-platform/git-pitcher: 'true'` | needs the shared GitHub token (`…/shared-git-pat-secret-key`) |
-| k8s-pitcher | extra (off) | `homerun2-platform/k8s-pitcher: 'true'` | needs cluster RBAC + a profile ConfigMap |
+| k8s-pitcher | extra (off) | `homerun2-platform/k8s-pitcher: 'true'` | needs a profile (`…/k8s-pitcher-profile`, else out of band); the kustomize base brings its ClusterRole |
 | smoke-test | extra (off) | `homerun2-platform/smoke-test: 'true'` | |
+| schedule-pitcher | extra (off) | `homerun2-platform/schedule-pitcher: 'true'` | needs `schedulePitcherAuthToken` in the cluster's entry; profile from `…/schedule-pitcher-profile` (else a minimal one without checks), Roles for its secret checks from `…/schedule-pitcher-secret-access`; UI at `schedule-pitcher.<fqdn>` |
+| ai-pitcher | extra (off) | `homerun2-platform/ai-pitcher: 'true'` | four CronJobs (morning, evening, week-ahead, weekly); OpenRouter key from the shared entry `…/shared-openrouter-secret-key`, without it plain digests; includes schedule-pitcher's open findings when that runs too |
+| sound-catcher | extra (off) | `homerun2-platform/sound-catcher: 'true'` | browser player page at `sound-catcher.<fqdn>` — no speaker in a Pod |
 
 **Core** components are opt-OUT (on unless `'false'`), so a cluster that only
 carries the umbrella keeps the set this AppSet shipped before the labels
@@ -76,11 +79,16 @@ key may be set in `valuesObject`.
 |---|---|
 | `clusterbook.stuttgart-things.com/fqdn` | *[auto]* every hostname derives from it |
 | `homerun2-platform.stuttgart-things.com/secret-store` | **[user]** required — the ClusterSecretStore name (`vault-<cluster>`) |
-| `homerun2-platform.stuttgart-things.com/secret-key` | **[user]** optional, default = the cluster name — the Vault KV entry holding `authToken` + `redisPassword` |
+| `homerun2-platform.stuttgart-things.com/secret-key` | **[user]** optional, default = the cluster name — the Vault KV entry holding `authToken` + `redisPassword` (+ `schedulePitcherAuthToken` when schedule-pitcher runs) |
 | `homerun2-platform.stuttgart-things.com/storage-class` | **[user]** optional, default `openebs-hostpath` — for redis-stack's PVC |
 | `homerun2-platform.stuttgart-things.com/redis-storage-size` | **[user]** optional, default `8Gi` |
 | `homerun2-platform.stuttgart-things.com/shared-git-pat-secret-key` | *[auto, ClusterStack]* optional — shared entry (e.g. `_git-pat`) for git-pitcher's `githubToken` → `secrets.githubTokenVaultSecretName` |
 | `homerun2-platform.stuttgart-things.com/shared-teams-webhook-secret-key` | *[auto, ClusterStack]* optional — shared entry (e.g. `_teams-webhook`) whose property `teamsWebhookUrl` becomes the notification-catcher's `TEAMS_WEBHOOK_URL` → `secrets.teamsWebhookVaultSecretName`. Read from the `secret-store` above; the ClusterStack's `…/shared-teams-webhook-secret-store` is not consulted and must name the same store |
+| `homerun2-platform.stuttgart-things.com/shared-openrouter-secret-key` | *[auto, ClusterStack]* optional — shared entry (e.g. `_openrouter`) whose property `openrouterApiKey` is the ai-pitcher's OpenRouter key → `secrets.openrouterVaultSecretName`. Same store as the rest. Empty = no ExternalSecret, the ai-pitcher pitches the plain digest |
+| `homerun2-platform.stuttgart-things.com/scout-profile` | **[user]** optional — the ScoutProfile **spec** as multi-line YAML → `scout.profile.content`; the chart renders the CR. Must be a YAML map, or the whole homerun2 render fails. Empty = no ScoutProfile |
+| `homerun2-platform.stuttgart-things.com/k8s-pitcher-profile` | **[user]** optional — the K8sPitcherProfile document as multi-line YAML → `k8sPitcher.profileContent`; the chart creates the ConfigMap. Empty = ConfigMap out of band |
+| `homerun2-platform.stuttgart-things.com/schedule-pitcher-profile` | **[user]** optional — the SchedulePitcherProfile as multi-line YAML → `schedulePitcher.profileContent`. Empty = a minimal profile (no checks, in-cluster omni-pitcher) |
+| `homerun2-platform.stuttgart-things.com/schedule-pitcher-secret-access` | **[user]** optional — **one-line JSON** list `[{"namespace":"argocd","secrets":["x"]}]` → `schedulePitcher.secretAccess`: a Role (get on exactly those Secrets) per namespace for the profile's `tokenFrom.secretKeyRef` checks. Inserted as is, so block-style YAML breaks the values. Default `[]` |
 | `homerun2-platform.stuttgart-things.com/notification-catcher-notify-config` | **[user]** optional — the notification-catcher's `config.yaml` as multi-line YAML → `notificationCatcher.notifyConfig`; the chart creates the ConfigMap. Keep `${TEAMS_WEBHOOK_URL}` as is, the catcher expands it. Empty = ConfigMap out of band |
 
 The gate is matched on the **value** `'true'`, not merely on the label existing —
