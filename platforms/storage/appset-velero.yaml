@@ -1,0 +1,135 @@
+---
+# Velero for the storage platform: cluster backups to S3-compatible storage
+# (MinIO), the ArgoCD counterpart of the Flux catalog's velero-eso +
+# velero-schedule that labda-dev-a runs.
+#
+# OPT-IN, an explicit `storage-platform/velero: "true"`: a backup needs a
+# bucket, an endpoint and an S3 key pair in the cluster's store, so it is never
+# something to switch on by default. A cluster without the label renders
+# nothing here.
+#
+# ONE parent per cluster, three things on the target cluster
+# (infra/velero/install):
+#   - `velero-<cluster>-secrets` (sync-wave -5): an ExternalSecret rendering
+#     `cloud-credentials` from the store below (infra/velero/cloud-credentials);
+#   - `velero-<cluster>`: the upstream chart with the AWS plugin, one
+#     BackupStorageLocation `default` at <bucket>/<prefix>, and
+#   - the Schedule `velero-daily-all` (02:00 UTC, kept 30 days), unless the
+#     cron annotation says `off`.
+#
+# Metadata only, like the Flux base: no CSI snapshots, no node agent. Volume
+# DATA of a database is its own operator's job (see cloudnative-pg-barman).
+#
+# PRECONDITIONS, not in the selector:
+#   1. external-secrets on the cluster and the ClusterSecretStore named below
+#      (security-platform), able to read the entry -- otherwise the -secrets
+#      Application fails on a missing CRD or the ExternalSecret stays
+#      SecretSyncedError, and velero never starts (it mounts the Secret).
+#   2. for an endpoint signed by the lab PKI: trust-manager's
+#      `cluster-trust-bundle` ConfigMap in `velero` (network-platform's bundle
+#      has no namespace selector). SSL_CERT_DIR points at its mount by default;
+#      Go still loads the system CA FILE, so a public endpoint keeps working.
+#      Not caCert on the BSL: that is one more copy of the CA to keep current,
+#      while the bundle is maintained already.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: velero-storage
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # Velero and its CRDs stay on the cluster either way (cleanUpCRDs: false),
+  # and the backups in the bucket are never touched by an opt-out.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            storage-platform: "true"
+            # Opt-IN, so an explicit "true" rather than a NotIn ["false"].
+            storage-platform/velero: "true"
+  template:
+    metadata:
+      name: 'velero-storage-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "-5"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.79.0
+        path: infra/velero/install
+        helm:
+          releaseName: 'velero-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent and neither
+            # ever deploys while both report "successfully synced". The
+            # secrets Application is `<this>-secrets`.
+            applicationName: 'velero-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.79.0
+            destination:
+              server: '{{ .server }}'
+              namespace: velero
+            # `chartVersion` and the plugin tag are intentionally not set --
+            # they inherit infra/velero/install/values.yaml, which Renovate
+            # keeps bumped.
+            backup:
+              # REQUIRED: no endpoint is safe to guess across labs. Missing,
+              # it renders "" and the install chart's schema fails the sync
+              # loudly, instead of a BSL that is merely `Unavailable`.
+              s3Url: '{{ default "" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-s3-url") }}'
+              bucket: '{{ default "velero" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-bucket") }}'
+              # One bucket, one directory per cluster: without a prefix two
+              # clusters would sync each other's backups in as their own.
+              prefix: '{{ default .name (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-prefix") }}'
+            sslCertDir: '{{ default "/etc/ssl/custom" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-ssl-cert-dir") }}'
+            defaultSchedule:
+              name: daily-all
+              # `off` = no Schedule (Velero keeps running, existing backups
+              # stay). Anything else is a cron expression.
+              cron: '{{ $c := default "0 2 * * *" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-schedule-cron") }}{{ if ne $c "off" }}{{ $c }}{{ end }}'
+              ttl: '{{ default "720h0m0s" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-schedule-ttl") }}'
+            externalSecrets:
+              enabled: true
+              secretStore:
+                kind: ClusterSecretStore
+                # Explicit annotation > the SHARED entry's store a ClusterStack
+                # derives (`shared-velero-secret-store`) > `vault-<cluster>`,
+                # the per-cluster store LabDA clusters get (own OpenBao mount).
+                name: '{{ default (default (printf "vault-%s" .name) (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/shared-velero-secret-store")) (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-secret-store") }}'
+              # Same order: explicit > shared `_` entry > `velero` in the
+              # cluster's own mount (what labda-dev-a reads). An entry NAME,
+              # never a path; properties access_key / secret_key.
+              remoteKey: '{{ default (default "velero" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/shared-velero-secret-key")) (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/velero-secret-key") }}'
+            # Roll velero when cloud-credentials or the trust bundle changes:
+            # the AWS plugin reads its key once, at startup (flux#125). Inert
+            # without reloader (base-platform).
+            extraValues:
+              annotations:
+                reloader.stakater.com/auto: "true"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

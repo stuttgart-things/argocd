@@ -119,6 +119,9 @@ spec:
     # only in the operator's own namespace. Installing it does not back anything
     # up; a database still opts in with an ObjectStore + ScheduledBackup.
     storage-platform/cloudnative-pg-barman: 'false'  # → appset-cloudnative-pg-barman
+    # Velero -- opt-IN: needs an S3 endpoint annotation, external-secrets and a
+    # store holding access_key/secret_key. Metadata backups, daily-all 02:00 UTC.
+    storage-platform/velero: 'false'            # → appset-velero [ann: velero-s3-url]
 
     # ---- profile: security-platform ----
     security-platform: 'true'           # umbrella
@@ -242,6 +245,18 @@ spec:
     # storage-platform.stuttgart-things.com/nfs-name: nfs-csi            # default nfs-csi (the SC name)
     # storage-platform.stuttgart-things.com/nfs-subdir: <cluster>        # default = cluster name
     # storage-platform.stuttgart-things.com/nfs-mount-permissions: '0'   # default 0
+
+    # ---- [user] storage: velero (needs storage-platform/velero: 'true') ----
+    # storage-platform.stuttgart-things.com/velero-s3-url: https://minio.sthings-platform.4sthings.tiab.ssc.sva.de  # [req]
+    # storage-platform.stuttgart-things.com/velero-bucket: velero          # default velero (shared by the fleet)
+    # storage-platform.stuttgart-things.com/velero-prefix: <cluster>       # default = cluster name
+    # storage-platform.stuttgart-things.com/velero-secret-store: vault-<cluster>  # default shared-velero-secret-store, else vault-<cluster>
+    # storage-platform.stuttgart-things.com/velero-secret-key: velero      # default shared-velero-secret-key, else velero
+    # storage-platform.stuttgart-things.com/shared-velero-secret-store: …  # [auto, ClusterStack] shared `_` entry's store
+    # storage-platform.stuttgart-things.com/shared-velero-secret-key: …    # [auto, ClusterStack] shared `_` entry
+    # storage-platform.stuttgart-things.com/velero-schedule-cron: '0 2 * * *'  # 'off' = no Schedule
+    # storage-platform.stuttgart-things.com/velero-schedule-ttl: 720h0m0s
+    # storage-platform.stuttgart-things.com/velero-ssl-cert-dir: /etc/ssl/custom  # trust-manager cluster-trust-bundle mount
 
     # ---- [user] observability: kube-prometheus-stack (needs the secrets-config gate label above) ----
     # observability-platform.stuttgart-things.com/secret-store: vault-observability   # [req] ClusterSecretStore
