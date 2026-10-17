@@ -90,6 +90,7 @@ key may be set in `valuesObject`.
 | `homerun2-platform.stuttgart-things.com/schedule-pitcher-profile` | **[user]** optional — the SchedulePitcherProfile as multi-line YAML → `schedulePitcher.profileContent`. Empty = a minimal profile (no checks, in-cluster omni-pitcher) |
 | `homerun2-platform.stuttgart-things.com/schedule-pitcher-secret-access` | **[user]** optional — **one-line JSON** list `[{"namespace":"argocd","secrets":["x"]}]` → `schedulePitcher.secretAccess`: a Role (get on exactly those Secrets) per namespace for the profile's `tokenFrom.secretKeyRef` checks. Inserted as is, so block-style YAML breaks the values. Default `[]` |
 | `homerun2-platform.stuttgart-things.com/notification-catcher-notify-config` | **[user]** optional — the notification-catcher's `config.yaml` as multi-line YAML → `notificationCatcher.notifyConfig`; the chart creates the ConfigMap. Keep `${TEAMS_WEBHOOK_URL}` as is, the catcher expands it. Empty = ConfigMap out of band |
+| `homerun2-platform.stuttgart-things.com/notification-catcher-streams` | **[user]** optional — comma-separated Redis streams the notification-catcher consumes (e.g. `messages,tabletennis`) → `notificationCatcher.redisStreams` (`REDIS_STREAMS`, one Deployment for all). Empty = `messages` only |
 
 The gate is matched on the **value** `'true'`, not merely on the label existing —
 unlike `storage-platform`'s `nfs-config`. Under `Exists` a label written as
