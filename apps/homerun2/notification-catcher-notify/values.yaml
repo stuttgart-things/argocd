@@ -1,0 +1,19 @@
+---
+# Name of the ConfigMap to materialize. Must match
+# `notificationCatcher.notifyConfigMap` in apps/homerun2/install, which is what
+# the notification-catcher Deployment patch mounts.
+name: homerun2-notification-catcher-notify
+
+# The notify config as a YAML string: which outputs exist and which stream
+# entries reach them (stuttgart-things/homerun2-notification-catcher).
+#
+# `${TEAMS_WEBHOOK_URL}` is expanded by the catcher itself from its
+# `homerun2-notification-catcher-secrets` Secret at runtime — this chart
+# passes it through verbatim. The catcher's interpolation is regex-only, so a
+# dollar-curly inside a YAML comment counts as a placeholder too: keep them
+# out of comments in the content.
+#
+# The default below is deliberately inert: no outputs, so nothing is posted
+# anywhere. Override it.
+content: |
+  outputs: []

@@ -451,7 +451,7 @@
     "notificationCatcher": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Redis Streams consumer that fans messages out to MS Teams / generic webhooks \u2014 the other half of the Alertmanager/Grafana chain. No Service and no route. Needs the notify ConfigMap out-of-band and a Secret carrying the webhook URL.",
+      "description": "Redis Streams consumer that fans messages out to MS Teams / generic webhooks \u2014 the other half of the Alertmanager/Grafana chain. No Service and no route. Needs the notify ConfigMap (notifyConfig, or out-of-band) and a Secret carrying the webhook URL (teamsWebhookUrl, secrets.teamsWebhookVaultSecretName, or out-of-band).",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -470,6 +470,10 @@
         "notifyConfigMap": {
           "type": "string",
           "minLength": 1
+        },
+        "notifyConfig": {
+          "type": "string",
+          "description": "The notify config (config.yaml) as a YAML string. Set, the chart materializes notifyConfigMap from it through the apps/homerun2/notification-catcher-notify sub-Application (sync-wave -10) and rolls the Pod when it changes. Empty = the ConfigMap is provisioned out-of-band. `${TEAMS_WEBHOOK_URL}` placeholders are passed through verbatim; the catcher expands them."
         },
         "teamsWebhookUrl": {
           "type": "string",
@@ -612,6 +616,10 @@
         "githubTokenVaultSecretName": {
           "type": "string",
           "description": "Entry the git-pitcher's githubToken is read from (same store). Empty = vaultSecretName. A per-cluster entry has no PAT; it lives shared, e.g. `_git-pat`."
+        },
+        "teamsWebhookVaultSecretName": {
+          "type": "string",
+          "description": "Shared entry (same store) the notification-catcher's Teams webhook URL is read from, property `teamsWebhookUrl`, e.g. `_teams-webhook`. Set (and notificationCatcher enabled, teamsWebhookUrl empty), an ExternalSecret materializes `homerun2-notification-catcher-secrets` with key TEAMS_WEBHOOK_URL. Empty = no ExternalSecret; the Secret comes from the literal or out-of-band."
         }
       },
       "required": [

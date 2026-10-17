@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: homerun2-notification-catcher-notify
+description: ConfigMap carrying notification-catcher's notify config (outputs + filters) — loaded as a sub-Application by apps/homerun2/install when `notificationCatcher.notifyConfig` is set.
+type: application
+version: 0.1.0

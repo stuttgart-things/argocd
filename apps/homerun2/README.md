@@ -26,10 +26,12 @@ apps/homerun2/
 │       ├── demo-pitcher.yaml                  Application "...-demo-pitcher"       (sync-wave 0)
 │       ├── led-catcher.yaml                   Application "...-led-catcher"        (sync-wave 0)
 │       ├── notification-catcher.yaml          Application "...-notification-catcher" (sync-wave 0, consumer only — no Service, no route)
+│       ├── notification-catcher-notify.yaml   Application "...-notification-catcher-notify" (sync-wave -10, only with notificationCatcher.notifyConfig)
 │       ├── git-pitcher.yaml                   Application "...-git-pitcher"        (sync-wave 0)
 │       ├── httproute.yaml                     Application "...-httproute"          (sync-wave 10, builds routes from enabled components)
 │       └── smoke-test.yaml                    Application "...-smoke-test"         (sync-wave 20, opt-in via smokeTest.enabled)
 ├── httproute/                                 multi-HTTPRoute sub-chart (driven by a values list)
+├── notification-catcher-notify/               ConfigMap sub-chart carrying notification-catcher's config.yaml (driven by notificationCatcher.notifyConfig)
 ├── smoke-test/                                PostSync-hook Job that probes a deployed omni-pitcher (health, unauthenticated 401, authenticated pitch — in-cluster and through the HTTPRoute); see its README
 ├── preview-quota/                             Kyverno `ClusterPolicy` auto-generating `ResourceQuota` + `LimitRange` in every `homerun2-pr-*` namespace (PR-preview safety net; requires Kyverno installed — see `infra/kyverno/install`)
 ├── preview-secrets/                           Kyverno `ClusterPolicy` auto-generating `ExternalSecret`s in every `homerun2-pr-*` namespace (pulls per-component secrets from Vault via ESO; requires Kyverno + ESO + `ClusterSecretStore`)
@@ -75,7 +77,7 @@ Each enabled non-redis-stack component renders one Argo CD `Application` whose s
 4. **(omni + k8s only) Auth-token Secret patch** — patches the per-component `*-token` Secret's `auth-token` key with `.Values.authToken`
 5. **(most) Ingress + KCL HTTPRoute deletes** — the bases ship a default Ingress and/or HTTPRoute; we always strip them and ship our own through the httpRoute sub-Application
 6. **(k8s-pitcher only) trust-bundle volume + profile ConfigMap reference + webhook port + delete the KCL profile CM** — the calling side provides its own `K8sPitcherProfile` ConfigMap (cluster-specific config)
-7. **(notification-catcher only) image, Redis-in-a-ConfigMap, notify volume, both Secrets** — four things no other component needs. Its base is the only one that ships `image: …:latest` while no `latest` is published, so an unpatched install is an ImagePullBackOff, not an old version. Its Redis connection lives in the env ConfigMap rather than container env, so the usual `redisAddrPatch` does not apply. The routing config is mounted from a ConfigMap this chart does not create (see below). And its `…-secrets` Secret ships the literal string `${TEAMS_WEBHOOK_URL}` — an unexpanded placeholder the catcher would POST to — so it is always patched or deleted
+7. **(notification-catcher only) image, Redis-in-a-ConfigMap, notify volume, both Secrets** — four things no other component needs. Its base is the only one that ships `image: …:latest` while no `latest` is published, so an unpatched install is an ImagePullBackOff, not an old version. Its Redis connection lives in the env ConfigMap rather than container env, so the usual `redisAddrPatch` does not apply. The routing config is mounted from a ConfigMap the chart creates from `notifyConfig`, or that is provisioned out-of-band (see below). And its `…-secrets` Secret ships the literal string `${TEAMS_WEBHOOK_URL}` — an unexpanded placeholder the catcher would POST to — so it is always patched or deleted
 
 8. **(scout + wled-mock) Namespace delete** — scout's and wled-mock's bases ship their own `homerun2` Namespace; we strip it, because otherwise that Application owns the namespace and `prune: true` would take the whole stack down with it when scout is disabled. The parent stack manages the namespace via `CreateNamespace=true` on the destination. (git-pitcher's base used to ship one too; as of v1.0.0 it no longer does.)
 
@@ -205,13 +207,19 @@ data:
 
 For CRD watching, add the CRD API group to the ClusterRole on the calling side.
 
-## Notify config (notification-catcher, NOT provisioned by this chart)
+## Notify config and webhook (notification-catcher)
 
 `notificationCatcher` mounts `config.yaml` from a ConfigMap named
 `homerun2-notification-catcher-notify` (override via
 `.Values.notificationCatcher.notifyConfigMap`) — which outputs exist, and which stream
-entries reach them. It is cluster-specific, so provision it out-of-band, the same way
-`k8sPitcher`'s profile is:
+entries reach them. Two ways to provide it:
+
+- **From the chart:** set `notificationCatcher.notifyConfig` to the `config.yaml` content.
+  The chart renders a `…-notification-catcher-notify` sub-Application
+  ([`notification-catcher-notify/`](./notification-catcher-notify/), sync-wave -10) that
+  creates the ConfigMap in `destination.namespace`, and the catcher's Pod carries a hash of
+  the content so a changed config rolls it.
+- **Out-of-band** (`notifyConfig` empty, the default): create the ConfigMap yourself, e.g.:
 
 ```yaml
 apiVersion: v1
@@ -233,7 +241,20 @@ data:
 
 `${TEAMS_WEBHOOK_URL}` here is expanded by the catcher from its Secret at runtime. Its env
 interpolation is regex-only, so a `${…}` inside a YAML **comment** is treated as a real
-placeholder too — keep bare `$`-curlies out of comments in this file.
+placeholder too — keep bare `$`-curlies out of comments in this file. Through
+`notifyConfig` the placeholder is passed on verbatim: the chart only quotes and indents it
+(no `tpl`), and Argo CD does not envsubst Helm values.
+
+The webhook URL itself lives in the Secret `homerun2-notification-catcher-secrets`, key
+`TEAMS_WEBHOOK_URL`. The base's copy (a literal placeholder) is always replaced:
+
+- `notificationCatcher.teamsWebhookUrl` set → the base Secret is patched with the literal
+  (dev only; use an ArgoCD Vault Plugin / SOPS overlay).
+- `secrets.enabled` + `secrets.teamsWebhookVaultSecretName` set (and `teamsWebhookUrl`
+  empty) → the secrets sub-Application renders an ExternalSecret reading property
+  `teamsWebhookUrl` from that **shared** entry (e.g. `_teams-webhook`) in the same
+  ClusterSecretStore as the rest — the same pattern as `githubTokenVaultSecretName`.
+- neither → the base Secret is deleted and an out-of-band Secret of that name has to exist.
 
 Leave `dryRun: true` until the filters are known-good: the first wrong one posts to a real
 Teams channel.
@@ -263,7 +284,8 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `k8sPitcher.namespace` | `homerun2` | Optional override — k8s-pitcher often runs in a different namespace |
 | `httpRoute.enabled` / `gateway.{name,namespace}` | `true` / `cilium-gateway` / `default` | Render Gateway API HTTPRoutes for every enabled component that exposes one |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the redis-stack + httpRoute Applications fetch manifests from |
-| `notificationCatcher.enabled` / `version` / `redisStream` / `dryRun` / `notifyConfigMap` / `teamsWebhookUrl` | `false` / `v3.0.1` / `messages` / `false` / `homerun2-notification-catcher-notify` / `""` | Fan-out to MS Teams / webhooks. Consumer only — no Service, no route. Needs the notify ConfigMap out-of-band; an empty `teamsWebhookUrl` deletes the base's placeholder Secret so an ESO-managed one takes over |
+| `notificationCatcher.enabled` / `version` / `redisStream` / `dryRun` / `notifyConfigMap` / `notifyConfig` / `teamsWebhookUrl` | `false` / `v3.0.3` / `messages` / `false` / `homerun2-notification-catcher-notify` / `""` / `""` | Fan-out to MS Teams / webhooks. Consumer only — no Service, no route. `notifyConfig` set → the chart creates the notify ConfigMap, empty → out-of-band; an empty `teamsWebhookUrl` deletes the base's placeholder Secret so an ESO-managed one takes over |
+| `secrets.enabled` / `clusterSecretStoreName` / `vaultSecretName` / `githubTokenVaultSecretName` / `teamsWebhookVaultSecretName` / `refreshInterval` | `false` / `vault-homerun2-pr` / `preview-env` / `""` / `""` / `1h` | ExternalSecrets sub-Application. The two `…VaultSecretName` overrides point one component at a shared entry in the same store: git-pitcher's `githubToken`, notification-catcher's `teamsWebhookUrl` (→ Secret `homerun2-notification-catcher-secrets`, key `TEAMS_WEBHOOK_URL`; rendered only when set) |
 | `smokeTest.enabled` / `external.*` / `extraProbes` / `events` | `false` / verify TLS via `cluster-trust-bundle`, dial the gateway Service / one fixture event | Opt-in Job asserting `/health`, an unauthenticated `POST /pitch` → 401, and an authenticated pitch — in-cluster and through the HTTPRoute — plus a `/health` probe per enabled core-catcher/scout. Needs the auth-token Secret (inline `authToken` or `secrets.enabled`). See [`smoke-test/`](./smoke-test/) |
 | `syncPolicy` | automated + retry | Applied to all rendered Applications |
 
