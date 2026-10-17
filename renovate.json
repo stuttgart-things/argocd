@@ -51,6 +51,16 @@
       "allowedVersions": "<18.0.0"
     },
     {
+      "description": "Hold the minio chart at 16.x (same rule as stuttgart-things/flux). Chart 17 splits the console into its own Deployment with its own image, which apps/minio/install does not parameterise: it resolves to ghcr.io/bitnami/minio-object-browser and cannot be pulled, while the server keeps serving and the Application reports Healthy. Raising it means pointing the console repository at the mirror (ghcr.io/stuttgart-things/minio-object-browser) first -- a licence decision before a config change. Migrate deliberately, not via renovate.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/stuttgart-things/charts/minio/minio"
+      ],
+      "allowedVersions": "<17.0.0"
+    },
+    {
       "description": "Auto-merge patch and digest updates once CI passes \u2014 keeps low-risk bumps from piling up",
       "matchUpdateTypes": [
         "patch",

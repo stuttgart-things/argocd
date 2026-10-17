@@ -14,8 +14,11 @@ destination:
   namespace: minio
 
 # Upstream MinIO OCI chart version (ghcr.io/stuttgart-things/charts/minio).
+# 16.x, NOT 17: chart 17 runs the console as its own Deployment whose image
+# resolves to ghcr.io/bitnami/minio-object-browser and cannot be pulled.
+# renovate.json holds this chart below 17 ("Hold the minio chart at 16.x").
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/minio/minio
-chartVersion: 17.0.21
+chartVersion: 16.0.10
 
 # Pinned MinIO image (stuttgart-things mirror). global.security.allowInsecureImages=true
 # is set because this overrides the chart's default image digest.
