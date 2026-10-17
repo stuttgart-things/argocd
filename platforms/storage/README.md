@@ -18,6 +18,7 @@ Catalog entries rendered:
 | `nfs-csi-storageclasses-storage`|  -5  | `infra/nfs-csi/storageclasses`    | `kube-system`      | One `StorageClass` per cluster, fields sourced from cluster-Secret annotations. **Additionally gated on** the label `storage-platform.stuttgart-things.com/nfs-config` being present (any value) |
 | `cloudnative-pg-storage`        |  -5  | `infra/cloudnative-pg/install`     | `postgres`         | CloudNativePG operator + CRDs. **Opt-in**, an explicit `'true'` — a cluster with no PostgreSQL has no use for it. A singleton: `tabletennis-platform` needs it, anything else growing a Postgres uses the same one |
 | `cloudnative-pg-barman-storage` |  -5  | `infra/cloudnative-pg/barman-cloud`| `postgres`         | The Barman Cloud backup plugin, beside the operator. **Opt-in** and additionally requires the operator's own label. Needs cert-manager on the target cluster |
+| `velero-storage`                |  -5  | `infra/velero/install`            | `velero`           | Velero + its `cloud-credentials` ExternalSecret + the `daily-all` Schedule. **Opt-in** (`storage-platform/velero: 'true'`), annotation-driven — see [Velero](#velero-cluster-backups) |
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 
@@ -54,9 +55,10 @@ To skip a single component on a specific cluster, add a per-component label on t
 | `storage-platform/nfs-csi-install: "false"`              | Skip `nfs-csi-install-storage` |
 | `storage-platform/nfs-csi-storageclasses: "false"`       | Skip `nfs-csi-storageclasses-storage` |
 
-The two CloudNativePG appsets invert this: they are opt-**in**, so they match an
-explicit `storage-platform/cloudnative-pg: "true"` (and, for the plugin, also
-`storage-platform/cloudnative-pg-barman: "true"`). An absent label means *not*
+The two CloudNativePG appsets and the Velero appset invert this: they are
+opt-**in**, so they match an explicit `storage-platform/cloudnative-pg: "true"`
+(and, for the plugin, also `storage-platform/cloudnative-pg-barman: "true"`),
+respectively `storage-platform/velero: "true"`. An absent label means *not*
 installed. Removing the label is how you opt out.
 
 Semantics: each ApplicationSet selector is `storage-platform=true` AND `storage-platform/<component> NotIn ["false"]`. Absent label = included (default). Only the explicit string `"false"` opts out.
@@ -115,6 +117,55 @@ on, and why it is an overlay rather than a label.
 
 Not the in-tree `spec.backup.barmanObjectStore`: CloudNativePG 1.30 deprecates it
 and 1.31.0 removes it.
+
+## Velero: cluster backups
+
+`appset-velero.yaml` is the ArgoCD counterpart of what `labda-dev-a` runs from
+the Flux catalog (`velero-eso` + `velero-schedule`). Opt-in, one parent per
+cluster (`velero-storage-<cluster>`) rendering two children on the target
+cluster:
+
+| Application | What |
+|---|---|
+| `velero-<cluster>-secrets` (wave -5) | ExternalSecret → Secret `cloud-credentials` (AWS INI) from `access_key` / `secret_key` of one entry |
+| `velero-<cluster>` | upstream `vmware-tanzu/velero` + AWS plugin; BSL `default` at `<bucket>/<prefix>`; Schedule `velero-daily-all` |
+
+Backups are **metadata only** (no CSI snapshots, no node agent), like the Flux
+base. Database rows are the Barman Cloud plugin's job.
+
+| Annotation (`storage-platform.stuttgart-things.com/…`) | Required | Default | Meaning |
+|---|---|---|---|
+| `velero-s3-url` | **yes** | — | S3 endpoint, e.g. LabDA's `https://minio.sthings-platform.4sthings.tiab.ssc.sva.de`. Missing = the sync fails on the chart schema |
+| `velero-bucket` | no | `velero` | Bucket, shared by the fleet |
+| `velero-prefix` | no | `<cluster>` | Directory inside the bucket — one per cluster, so clusters never sync each other's backups in |
+| `velero-secret-store` | no | `shared-velero-secret-store`, else `vault-<cluster>` | ClusterSecretStore holding the S3 pair |
+| `velero-secret-key` | no | `shared-velero-secret-key`, else `velero` | Entry NAME (properties `access_key`, `secret_key`) |
+| `shared-velero-secret-store` / `shared-velero-secret-key` | no | — | *[auto, ClusterStack]* the shared `_` entry a profile derives; read when the two above are unset |
+| `velero-schedule-cron` | no | `0 2 * * *` | `daily-all` cron (UTC); `off` = no Schedule |
+| `velero-schedule-ttl` | no | `720h0m0s` | Backup retention |
+| `velero-ssl-cert-dir` | no | `/etc/ssl/custom` | `SSL_CERT_DIR` — the mount of trust-manager's `cluster-trust-bundle` |
+
+Precedence for the credentials: explicit `velero-secret-*` > the ClusterStack's
+`shared-velero-secret-*` > the cluster's own store and entry `velero` — the last
+one is exactly labda-dev-a's layout (`vault-labda-dev-a`, entry `velero`).
+
+**Preconditions** (not in the selector): external-secrets and the named
+ClusterSecretStore on the cluster (security-platform); the entry itself; and for
+a lab-PKI endpoint the `cluster-trust-bundle` ConfigMap in `velero`
+(network-platform's trust-manager bundle reaches every namespace). Go still reads
+the system CA file with `SSL_CERT_DIR` set, so a public endpoint keeps working.
+No `caCert` on the BSL: one more CA copy to keep current, while the bundle is
+maintained already. `reloader.stakater.com/auto` is set on the Deployment, so a
+rotated key rolls Velero once reloader (base-platform) runs.
+
+Opt-out (remove the label) collects both child Applications; Velero, its CRDs
+and every backup in the bucket stay.
+
+```bash
+kubectl -n argocd label secret <cluster-secret> storage-platform=true storage-platform/velero=true
+kubectl -n argocd annotate secret <cluster-secret> \
+  storage-platform.stuttgart-things.com/velero-s3-url=https://minio.sthings-platform.4sthings.tiab.ssc.sva.de
+```
 
 ## Default StorageClass conflicts
 
@@ -206,6 +257,6 @@ storage-platform/nfs-csi-storageclasses: "false"
 
 ## Related
 
-- [`infra/openebs`](../../infra/openebs/), [`infra/longhorn`](../../infra/longhorn/), [`infra/nfs-csi`](../../infra/nfs-csi/) — catalog entries rendered by these ApplicationSets.
+- [`infra/openebs`](../../infra/openebs/), [`infra/longhorn`](../../infra/longhorn/), [`infra/nfs-csi`](../../infra/nfs-csi/), [`infra/velero`](../../infra/velero/) — catalog entries rendered by these ApplicationSets.
 - [`platforms/cicd`](../cicd/) — sibling platform; ships its own `openebs-cicd` ApplicationSet (see "Avoid double-installing OpenEBS" above).
 - [`platforms/network`](../network/) — sibling platform for clusterbook-registered classic clusters; same Exists-label gating pattern (`clusterbook.stuttgart-things.com/allocation-ip`) reused here for `storage-platform.stuttgart-things.com/nfs-config`.

@@ -23,6 +23,7 @@ Typical combinations:
 |---|---|
 | Velero with a pre-provisioned `cloud-credentials` Secret | `install` |
 | Velero with `cloud-credentials` synced from Vault via ESO | `install` with `externalSecrets.enabled: true` (renders the `cloud-credentials` Application itself), or both by hand |
+| Fleet: every cluster labelled `storage-platform/velero: "true"` | nothing — [`platforms/storage/appset-velero.yaml`](../../platforms/storage/appset-velero.yaml) |
 
 ## install/
 
@@ -157,11 +158,13 @@ The rendered target Secret is always called `cloud-credentials` (hard-coded —
 that is what the upstream chart's `credentials.existingSecret` defaults to and
 what this catalog's `install` chart passes through).
 
-## Fleet — one `ApplicationSet`
+## Fleet
 
-`install` with `externalSecrets.enabled: true` brings Velero and its Secret from
-one parent, so fleet mode is one `ApplicationSet`. Install velero everywhere a
-cluster has `install/velero: "true"`:
+The catalog ships one: [`platforms/storage/appset-velero.yaml`](../../platforms/storage/appset-velero.yaml),
+opt-in per cluster with `storage-platform/velero: "true"` — bucket, endpoint,
+store, entry and schedule come from cluster annotations (see
+[`platforms/storage/README.md`](../../platforms/storage/README.md)). The sketch
+below is the shape for a fleet outside that bundle.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
