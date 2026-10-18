@@ -1,0 +1,13 @@
+---
+# Namespace the route lands in — clusterscope's own.
+namespace: clusterscope
+
+# FQDN the UI is served on.
+hostname: clusterscope.example.com
+
+# Gateway the route parents onto. Empty sectionName attaches it to every
+# listener of the Gateway.
+gateway:
+  name: cilium-gateway
+  namespace: default
+  sectionName: ""

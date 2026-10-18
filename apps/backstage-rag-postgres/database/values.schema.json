@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "backstage-rag-postgres database leaf chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namespace", "name", "instances", "imageName", "storage", "bootstrap", "externalSecrets", "backup", "veleroSchedule"],
+  "properties": {
+    "namespace": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "instances": { "type": "integer", "minimum": 1 },
+    "imageName": { "type": "string", "minLength": 1 },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size"],
+      "properties": {
+        "size": { "type": "string", "pattern": "^[0-9]+(Mi|Gi|Ti)$" },
+        "storageClass": { "type": "string" }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Kubernetes ResourceRequirements for the Postgres pods, passed through."
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["database", "owner", "secretName"],
+      "properties": {
+        "database": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "secretName": { "type": "string", "minLength": 1 }
+      }
+    },
+    "protect": { "type": "boolean" },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "refreshInterval": { "type": "string", "minLength": 1 },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
+            "name": { "type": "string" }
+          }
+        },
+        "credentials": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "remoteKey": { "type": "string" },
+            "usernameProperty": { "type": "string", "minLength": 1 },
+            "passwordProperty": { "type": "string", "minLength": 1 }
+          }
+        },
+        "s3": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "remoteKey": { "type": "string" },
+            "accessKeyProperty": { "type": "string", "minLength": 1 },
+            "secretKeyProperty": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "endpointURL": { "type": "string" },
+        "destinationPath": { "type": "string" },
+        "retentionPolicy": { "type": "string", "pattern": "^[1-9][0-9]*[dwm]$" },
+        "schedule": { "type": "string", "minLength": 1, "description": "Six fields, seconds first." },
+        "immediate": { "type": "boolean" },
+        "s3SecretName": { "type": "string", "minLength": 1 },
+        "caConfigMap": { "type": "string" },
+        "caKey": { "type": "string", "minLength": 1 }
+      },
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": {
+        "required": ["endpointURL", "destinationPath"],
+        "properties": {
+          "endpointURL": { "pattern": "^https?://" },
+          "destinationPath": { "pattern": "^s3://" }
+        }
+      }
+    },
+    "veleroSchedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "namespace": { "type": "string", "minLength": 1 },
+        "cron": { "type": "string", "minLength": 1 },
+        "ttl": { "type": "string", "minLength": 1 },
+        "storageLocation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}

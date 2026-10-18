@@ -311,6 +311,30 @@
           "type": "string",
           "minLength": 1
         },
+        "reloader": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "Annotate the Deployment for Stakater Reloader (reloader.stakater.com/auto). Needs Reloader on the cluster. String \"true\"/\"false\" accepted for AppSet templating."
+        },
+        "httpRoute": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": [
+                "string",
+                "boolean"
+              ],
+              "description": "Keep the base's HTTPRoute, patched onto `gateway` with `hostname`. Off = the route is deleted. String \"true\"/\"false\" accepted for AppSet templating."
+            }
+          }
+        },
+        "hostname": {
+          "type": "string",
+          "description": "HTTPRoute hostname. Empty = light-catcher-tabletennis.<domain>. Only used with httpRoute.enabled."
+        },
         "redisPassword": {
           "type": "string",
           "description": "Dev-only inline literal. Empty deletes the base's Secret so an ESO-managed one takes over."

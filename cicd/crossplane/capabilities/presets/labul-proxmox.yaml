@@ -1,0 +1,25 @@
+---
+# LabUL / Proxmox -- flux set capabilities/sets/labul-proxmox.
+# Use as a valueFiles entry of cicd/crossplane/capabilities; still set
+# secretStore.authMountPath (<cluster>-eso) next to it.
+#
+# NOT vSphere, and that is the point of the pair: LabUL vSphere is being
+# decommissioned -- its vCenter no longer carries the sthings templates and the
+# UUID in the vspherevm chart's labul block does not resolve. New LabUL work is
+# Proxmox; new vSphere work is LabDA.
+capabilities:
+  proxmoxvm:
+    enabled: true
+    environment: labul
+  ansibleRun:
+    enabled: true
+    environment: labul
+    # The ansible chart's labul default is vault-cicd-vsphere-labul, a store
+    # only the vspherevm chart renders -- and this preset has no vspherevm. The
+    # proxmoxvm release renders vault-cicd-proxmox-labul, whose secret `default`
+    # holds pve_api_* AND vm_ssh_* (proxmoxvm chart 0.13.0 values), i.e. the
+    # vm_ssh_user / vm_ssh_password the ansible ExternalSecret extracts.
+    # CHECK on the first cluster that the Vault path really carries vm_ssh_*.
+    secretStoreName: vault-cicd-proxmox-labul
+  packer:
+    enabled: true

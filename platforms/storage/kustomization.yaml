@@ -9,3 +9,4 @@ resources:
   - appset-longhorn.yaml
   - appset-nfs-csi-install.yaml
   - appset-nfs-csi-storageclasses.yaml
+  - appset-backstage-rag-postgres.yaml

@@ -1,0 +1,91 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "tags": ["proxmox", "pve", "infrastructure"],
+  "title": "Proxmox VE",
+  "uid": "proxmox-pve-exporter",
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "label": "Datasource"
+      },
+      {
+        "name": "node",
+        "type": "query",
+        "datasource": "${DS_PROMETHEUS}",
+        "query": "label_values(pve_node_info, id)",
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2,
+        "label": "Node"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "1m",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Nodes Online",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } } },
+      "targets": [ { "expr": "count(pve_up{id=~\"node/.*\"} == 1)", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Guests Running",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [ { "expr": "count(pve_up{id=~\"qemu/.*\"} == 1)", "refId": "A" } ]
+    },
+    {
+      "type": "stat",
+      "title": "Guests Stopped",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 } ] } } },
+      "targets": [ { "expr": "count(pve_up{id=~\"qemu/.*\"} == 0) or vector(0)", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Node CPU Usage",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [ { "expr": "pve_cpu_usage_ratio{id=~\"node/.*\", id=~\"${node}\"}", "legendFormat": "{{id}}", "refId": "A" } ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Node Memory Usage %",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [ { "expr": "pve_memory_usage_bytes{id=~\"node/.*\", id=~\"${node}\"} / pve_memory_size_bytes{id=~\"node/.*\", id=~\"${node}\"}", "legendFormat": "{{id}}", "refId": "A" } ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Storage Usage %",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.75 }, { "color": "red", "value": 0.85 } ] } } },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" },
+      "targets": [ { "expr": "pve_disk_usage_bytes{id=~\"storage/.*\"} / pve_disk_size_bytes{id=~\"storage/.*\"}", "legendFormat": "{{id}}", "refId": "A" } ]
+    },
+    {
+      "type": "table",
+      "title": "Guests",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [ { "expr": "pve_guest_info", "format": "table", "instant": true, "refId": "A" } ],
+      "transformations": [ { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "job": true, "instance": true } } } ]
+    }
+  ]
+}

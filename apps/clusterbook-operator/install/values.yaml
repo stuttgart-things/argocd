@@ -1,0 +1,95 @@
+---
+# Base name for the rendered Application. Empty means derive it from the
+# destination as `clusterbook-operator-<sha1(destination)[:8]>`, because the
+# Application lands in the `argocd` namespace of ONE management cluster: a
+# fixed name would make two clusters' deployments collide on the same object.
+applicationName: ""
+
+# AppProject the rendered Application belongs to.
+project: default
+
+# Where it deploys. Provide either `server` (cluster URL) or `name` (the
+# Argo-registered cluster name); if both are set, `name` wins.
+#
+# THIS MUST BE THE CLUSTER THAT RUNS ARGO CD. The operator writes the Argo CD
+# cluster Secrets (spec.argocdNamespace, default `argocd`) into the cluster it
+# runs on — on any other cluster it registers clusters with an Argo CD that is
+# not there. The default, the in-cluster API, is the management cluster when
+# this chart is rendered by the management cluster's own Argo CD.
+#
+# `namespace` is also the operator's namespace: it is applied as the kustomize
+# namespace, which renames the base's `clusterbook-system` Namespace and
+# rewrites the ClusterRoleBinding's ServiceAccount subject with it (checked
+# against the v0.21.0 artifact), so changing it is safe — the flux catalog's
+# CLUSTERBOOK_OPERATOR_NAMESPACE / targetNamespace equivalent.
+destination:
+  server: https://kubernetes.default.svc
+  # name: platform-sthings
+  namespace: clusterbook-system
+
+# The base ships its own Namespace, so CreateNamespace is not needed.
+# ServerSideApply because the five CRDs are too large for the client-side
+# last-applied annotation.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
+
+# Tag of the published kustomize artifact (CRDs, Namespace, RBAC,
+# ServiceAccount, Deployment). CI tags the artifact and the image with the same
+# release version — bump `version` and `image.tag` together; renovate.json
+# groups the two packages so they arrive in one PR.
+#
+# renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterbook-operator-kustomize
+version: v0.21.0
+
+# Operator image, patched over the base's `manager` container. The flux catalog
+# drives both from one CLUSTERBOOK_OPERATOR_VERSION; here they are two pins so
+# the image can be moved (e.g. to a fix build) without a new artifact.
+#
+# The network-platform AppSets gate on the `cluster-ready` label, which only
+# operator >= v0.21.0 latches (clusterbook-operator#119) — do not go below it.
+image:
+  repository: ghcr.io/stuttgart-things/clusterbook-operator
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterbook-operator
+  tag: v0.21.0
+
+# trust-manager CA bundle, mounted so the operator can verify the internal
+# clusterbook server (clusterbook.infra.sthings-vsphere…) when the
+# ClusterbookProviderConfig's spec.insecureSkipVerify is false.
+#
+# The ConfigMap is mounted `optional: true`, so a cluster without trust-manager
+# (or without the bundle published into this namespace yet) still starts the
+# operator — it then only trusts the system CAs. SSL_CERT_DIR replaces Go's
+# default CA directories, but Go still reads the system CA FILE, so public
+# endpoints keep verifying.
+trustBundle:
+  enabled: true
+  configMapName: cluster-trust-bundle
+  # Key inside the ConfigMap; also the file name under sslCertDir.
+  key: trust-bundle.pem
+  sslCertDir: /etc/ssl/custom
+
+# Mark the operator's CRDs Prune=false,Delete=false for Argo CD.
+#
+# Deleting a CRD deletes every ClusterbookCluster with it, and each of those
+# carries a finalizer through which the operator releases the IP reservation
+# and removes the Argo CD cluster Secret — i.e. one mistaken cascade on this
+# Application deregisters every cluster the platform manages. The CRDs are
+# still created and updated; Argo CD just never removes them.
+protectCRDs: true
+
+# Whether deleting the parent Application also prunes what it deployed (a
+# resources-finalizer on the child). OFF by default and in the AppSet: for a
+# long-lived operator an opt-out should stop Argo CD managing it, not uninstall
+# it, and against a deregistered cluster the prune hangs the child in
+# Terminating (stuttgart-things/argocd#324).
+cascadingDelete: false

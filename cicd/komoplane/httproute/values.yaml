@@ -1,0 +1,14 @@
+---
+# Set by cicd/komoplane/install; defaults only make the chart render standalone.
+namespace: komoplane
+hostname: komoplane.example.com
+gateway:
+  name: cilium-gateway
+  namespace: default
+  # Optional Gateway listener. Empty = all listeners.
+  sectionName: ""
+backend:
+  name: komoplane
+  port: 8090
+# Inert pass-through so the catalog verifier's probe values validate.
+destination: {}

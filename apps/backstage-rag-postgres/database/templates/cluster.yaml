@@ -1,0 +1,70 @@
+{{- if and .Values.externalSecrets.enabled (not .Values.externalSecrets.secretStore.name) }}
+{{- fail "externalSecrets.enabled is true but externalSecrets.secretStore.name is empty" }}
+{{- end }}
+---
+# CloudNativePG Cluster dedicated to the Backstage RAG-AI plugin. Single
+# instance by default (PoC -- no HA), pgvector enabled. Requires the CNPG
+# operator (infra/cloudnative-pg/install) and, with backup.enabled, the Barman
+# Cloud plugin (infra/cloudnative-pg/barman-cloud).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    backup: backstage-rag-postgres
+  {{- if .Values.protect }}
+  annotations:
+    # The PVC carries an ownerReference to this Cluster and CNPG has no
+    # retention flag -- delete the Cluster and the volume goes with it. Prune
+    # (falls out of the render) and Delete (Application deleted, finalizer
+    # cascades) are both switched off on the RESOURCE, so the protection
+    # travels with the object. The price: this database is removed by hand.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+  {{- end }}
+spec:
+  instances: {{ .Values.instances }}
+  # Custom operand image: CNPG standard images don't bundle pgvector. Built
+  # from stuttgart-things/flux apps/backstage-rag-postgres/image/Dockerfile and
+  # pulled by the kubelet, so the GHCR package must be public (or add an
+  # imagePullSecret).
+  imageName: {{ .Values.imageName | quote }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.bootstrap.database | quote }}
+      owner: {{ .Values.bootstrap.owner | quote }}
+      secret:
+        name: {{ .Values.bootstrap.secretName | quote }}
+      # Enable pgvector in the freshly bootstrapped *application* database.
+      # postInitApplicationSQL runs against the app DB; postInitSQL would run
+      # against `postgres` instead, leaving the extension absent from the
+      # database the RAG plugin actually connects to.
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS vector;
+        # The RAG-AI plugin's migration also creates uuid-ossp. It is a trusted
+        # extension, so the owner could do it itself; creating it here keeps
+        # the plugin's first start independent of that.
+        - CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+  storage:
+    size: {{ .Values.storage.size | quote }}
+    {{- with .Values.storage.storageClass }}
+    storageClass: {{ . | quote }}
+    {{- end }}
+  {{- with .Values.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if .Values.backup.enabled }}
+  # WAL archiving through the Barman Cloud plugin into the ObjectStore of the
+  # same name (templates/backup.yaml); the ScheduledBackup takes the daily base
+  # backup. Adding this to a running Cluster restarts its Postgres pod.
+  plugins:
+    {{- /* `enabled` is the CRD default, written out: `plugins` is an atomic
+           list, so a default the API server fills in inside an item is a diff
+           on every comparison and selfHeal re-applies in a loop. */}}
+    - name: barman-cloud.cloudnative-pg.io
+      enabled: true
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ .Values.name | quote }}
+  {{- end }}

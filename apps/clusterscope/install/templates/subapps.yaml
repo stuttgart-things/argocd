@@ -1,0 +1,136 @@
+{{- $name := include "clusterscope.appName" . }}
+{{- $ns := .Values.destination.namespace }}
+{{- $configOn := include "clusterscope.on" .Values.config.enabled }}
+{{- $gitAuthOn := include "clusterscope.on" .Values.vaultGitAuth.enabled }}
+{{- $kubeconfigsOn := include "clusterscope.on" .Values.vaultKubeconfigs.enabled }}
+
+{{- /* ---- -config: everything the pod mounts or reads from its namespace ---- */}}
+{{- if or $configOn $gitAuthOn $kubeconfigsOn }}
+{{- $cfg := dict "enabled" false "content" "" }}
+{{- if $configOn }}
+{{- $cfg = dict "enabled" true "content" (required "config.content is required when config.enabled" .Values.config.content) }}
+{{- end }}
+{{- $ga := .Values.vaultGitAuth }}
+{{- $gitAuth := dict "enabled" false "secretName" .Values.gitSync.authSecret }}
+{{- if $gitAuthOn }}
+{{- $gitAuth = dict
+      "enabled" true
+      "secretName" .Values.gitSync.authSecret
+      "secretStore" (dict
+        "kind" $ga.secretStore.kind
+        "name" (required "vaultGitAuth.secretStore.name is required when vaultGitAuth.enabled" $ga.secretStore.name))
+      "path" (required "vaultGitAuth.path is required when vaultGitAuth.enabled" $ga.path)
+      "usernameProperty" $ga.usernameProperty
+      "passwordProperty" $ga.passwordProperty
+}}
+{{- end }}
+{{- $configValues := dict
+      "namespace" $ns
+      "refreshInterval" .Values.esoRefreshInterval
+      "config" $cfg
+      "gitAuth" $gitAuth
+      "kubeconfigs" (dict
+        "enabled" (eq $kubeconfigsOn "true")
+        "secretStore" .Values.vaultKubeconfigs.secretStore
+        "clusters" .Values.vaultKubeconfigs.clusters)
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-config" $name | quote }}
+  namespace: argocd
+  {{- with include "clusterscope.finalizers" . }}{{ . | nindent 2 }}{{- end }}
+  annotations:
+    # Ahead of the Deployment (wave 0). It cannot WAIT for ESO — a child
+    # Application's health does not gate the parent's waves — but a head start
+    # is usually enough, and git-sync restarts on a failed first clone and then
+    # picks the Secret up.
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/clusterscope/config
+    helm:
+      releaseName: clusterscope-config
+      valuesObject:
+        {{- toYaml $configValues | nindent 8 }}
+  destination:
+    {{- include "clusterscope.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
+
+{{- /* ---- -httproute ---- */}}
+{{- if include "clusterscope.on" .Values.httpRoute.enabled }}
+{{- $routeValues := dict
+      "namespace" $ns
+      "hostname" .Values.httpRoute.hostname
+      "gateway" .Values.httpRoute.gateway
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-httproute" $name | quote }}
+  namespace: argocd
+  {{- with include "clusterscope.finalizers" . }}{{ . | nindent 2 }}{{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/clusterscope/httproute
+    helm:
+      releaseName: clusterscope-httproute
+      valuesObject:
+        {{- toYaml $routeValues | nindent 8 }}
+  destination:
+    {{- include "clusterscope.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
+
+{{- /* ---- -probes ---- */}}
+{{- if include "clusterscope.on" .Values.blackboxProbes.enabled }}
+{{- $bp := .Values.blackboxProbes }}
+{{- $probeValues := dict
+      "namespace" $bp.namespace
+      "prometheusRelease" $bp.prometheusRelease
+      "targetsURL" (printf "http://clusterscope.%s.svc:8080/api/targets" $ns)
+      "module" $bp.module
+      "address" $bp.address
+      "interval" $bp.interval
+      "sdRefresh" $bp.sdRefresh
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-probes" $name | quote }}
+  namespace: argocd
+  {{- with include "clusterscope.finalizers" . }}{{ . | nindent 2 }}{{- end }}
+  annotations:
+    # After the Service exists; the ScrapeConfig needs the Prometheus
+    # Operator's CRD, so this Application fails on a cluster without
+    # kube-prometheus-stack — and only this one.
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/clusterscope/probes
+    helm:
+      releaseName: clusterscope-probes
+      valuesObject:
+        {{- toYaml $probeValues | nindent 8 }}
+  destination:
+    {{- include "clusterscope.destination" (dict "root" . "namespace" $bp.namespace) | nindent 4 }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

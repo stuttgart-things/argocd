@@ -1,0 +1,178 @@
+---
+# Crossplane CAPABILITIES -- what a management cluster can DO, as opposed to
+# what it IS. App-of-apps: renders one ArgoCD Application per enabled
+# capability, each targeting the workload cluster.
+#
+# The Configurations (configs/) are a fleet fact. A package on its own does
+# nothing useful:
+#
+#   missing                  consequence
+#   ClusterProviderConfig    the provider runs and does not know where to connect
+#   credentials              it knows where, and may not log in
+#   EnvironmentConfig        it is logged in and does not know which node,
+#                            datastore or template to place a VM on
+#
+# Those three are CLUSTER facts -- where a VM goes and what it authenticates
+# with is per datacentre -- which is why they are here and not in configs/.
+#
+# Ported from stuttgart-things/flux, cicd/crossplane/capabilities. Two changes:
+#   - credentials come from Vault through ESO (`secretStore.backend: eso`), not
+#     from flux's sops-git GitRepository. There is no sops-git equivalent here.
+#   - flux's "sets" are presets/<set>.yaml values files (and, through the
+#     AppSet, one opt-in label per capability) instead of build roots.
+#
+# THE CHARTS ALREADY KNOW THE ENVIRONMENTS. vspherevm ships environments.labda
+# and .labul, proxmoxvm ships .labul, ansible ships both -- template UUIDs,
+# datastore and network IDs, folders, Vault coordinates. A capability here
+# passes `environment: <name>` and does not restate placement. Change a
+# datastore in the chart, not here.
+
+# ArgoCD AppProject the rendered Applications belong to.
+project: default
+
+# Where the rendered Applications deploy: the WORKLOAD (crossplane) cluster.
+# Set exactly one of `server` or `name`.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: crossplane-system
+
+# Optional prefix for the rendered Application names (<prefix>-<capability>).
+# Defaults to cxp-cap-<sha1(destination)[0:8]>. Must differ from the parent
+# Application's own name.
+# applicationName: cxp-cap-my-cluster
+
+# This catalog repo -- the harvester-vm capability has no OCI chart and is
+# rendered from ./harvester-vm in git.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# OCI Helm registry the capability charts are published to
+# (oci://ghcr.io/stuttgart-things/charts/<name>). ArgoCD form: no oci://
+# scheme, `chart: <name>` beside it.
+chartRepository: ghcr.io/stuttgart-things/charts
+
+# Namespace the Tekton PipelineRuns execute in (ansible-run, packer). The
+# ansible-credentials Secret and the packer CA bundle land here.
+tektonNamespace: tekton-ci
+
+# ESO wiring shared by the vspherevm and proxmoxvm charts. Each of those
+# charts renders its OWN ClusterSecretStore (environments.<env>.secretStore:
+# name, vaultServer, vaultPath) and authenticates with the cluster's Vault
+# Kubernetes auth backend. That mount is PER CLUSTER, not per environment --
+# the platform AppSet injects `<cluster>-eso`, same as
+# appset-crossplane-platform-baseline.yaml and the cxp-* AppSets. Required
+# whenever vspherevm or proxmoxvm is enabled; the charts' own default is the
+# literal `must-be-injected-per-cluster`.
+secretStore:
+  authMountPath: ""
+
+capabilities:
+  # The ansible runtime: the namespace PipelineRuns execute in, the SSH
+  # credentials they log into a fresh VM with, and the ansible-run
+  # EnvironmentConfig every VM Configuration composes against.
+  #
+  # IN EVERY FLUX SET, and that is not padding: vspherevm, proxmoxvm and
+  # harvester-vm all compose an AnsibleRun to bring a new VM to a usable state.
+  # Without it a VM is created and never configured -- and the failure lands on
+  # the AnsibleRun, two objects from the XR anyone is watching.
+  #
+  # ITS ENVIRONMENTCONFIG LABEL IS `default`, WHATEVER `environment` IS -- the
+  # chart hardcodes ansible-run.resources.stuttgart-things.com/environment:
+  # default. ansible-run resolves its OWN label, and fleet-wide only `default`
+  # exists there; forwarding a hypervisor environment matched nothing and
+  # silently dropped every ansible-run default including
+  # ansibleExtraCollections (crossplane-configurations#347). `environment` here
+  # selects which SSH-credentials store to read, not which label to write.
+  ansibleRun:
+    enabled: false
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/ansible
+    chartVersion: 0.9.33
+    # environments.<key> of the chart: labda | labul.
+    environment: labda
+    # environmentConfig.storageClass (the PipelineRun workspace PVC).
+    storageClass: openebs-hostpath
+    # ClusterSecretStore the ansible-credentials ExternalSecret reads
+    # vm_ssh_user / vm_ssh_password from (Vault secret `default`). Empty = the
+    # chart's environments.<env>.sshCredentials.secretStoreName, i.e.
+    # vault-cicd-vsphere-<env> -- the store the vspherevm chart renders. On a
+    # cluster WITHOUT vspherevm for that env, nothing renders that store: name
+    # one that exists (presets/labul-proxmox.yaml uses the proxmoxvm one).
+    secretStoreName: ""
+    # Deep-merged over the computed values. E.g. `managedNamespace.enabled:
+    # false` on a cluster whose Configurations do not include the `namespace`
+    # package (the flux family, configs/profiles/flux.yaml, has none) -- the
+    # chart's ManagedNamespace is an XR of that package.
+    extraValues: {}
+
+  # The packer capability: what a cluster needs to RUN PackerBuild and
+  # PackerRelease XRs -- the EnvironmentConfigs packer-build-defaults,
+  # packer-release-defaults (LabUL Proxmox) and packer-release-labda (LabDA
+  # vSphere), and the lab CA bundle packer-ca-certs in the pipeline namespace.
+  #
+  # ONE RELEASE FOR BOTH LABS, unlike vspherevm/proxmoxvm: these
+  # EnvironmentConfigs carry no credentials, and a single LabDA PackerRelease
+  # reads packer-release-labda together with packer-build-defaults, so both
+  # environments must exist on the cluster anyway.
+  #
+  # NO CREDENTIALS either. The chart only NAMES them; the cluster supplies them:
+  #   tekton-ci  vault, vault-infra, vault-labda, packer-git-basicauth,
+  #              packer-credentials, config-repo-pr-token
+  #   default    proxmox-tfvars, vsphere-tfvars-labda
+  packer:
+    enabled: false
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/packer
+    chartVersion: 0.3.1
+    extraValues: {}
+
+  # Proxmox VM capability: ClusterProviderConfig, ClusterSecretStore +
+  # proxmox-creds ExternalSecret, the cloud-init password Secret and the
+  # placement EnvironmentConfig. The chart ships environments.labul only --
+  # LabUL Proxmox is the one Proxmox this fleet builds on.
+  proxmoxvm:
+    enabled: false
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/proxmoxvm
+    chartVersion: 0.13.0
+    environment: labul
+    extraValues: {}
+
+  # vSphere VM capability: ClusterProviderConfig, ClusterSecretStore +
+  # vsphere-creds ExternalSecret and the EnvironmentConfig the vspherevm
+  # Composition resolves its placement from. The chart ships
+  # environments.labda and .labul; LabUL vSphere is being decommissioned (its
+  # template UUID no longer resolves) -- new vSphere work is LabDA.
+  vspherevm:
+    enabled: false
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/vspherevm
+    chartVersion: 0.13.0
+    environment: labda
+    extraValues: {}
+
+  # Harvester VM capability. No OCI chart exists, so this renders
+  # ./harvester-vm (one EnvironmentConfig) from git; see its values.yaml for
+  # what each field means and what is still missing (a ClusterProviderConfig
+  # for a SEPARATE Harvester). Enable ansibleRun beside it, as flux's
+  # harvester-demo set does.
+  harvesterVm:
+    enabled: false
+    environment: default
+    providerConfigRef: in-cluster
+    storageClassName: harvester-longhorn
+    namespace: vms
+    networkName: default/vms
+    imageId: default/image-ubuntu
+
+# Sync policy applied to every rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

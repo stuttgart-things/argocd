@@ -1,0 +1,28 @@
+---
+# Secret the ExternalSecret materialises, and the data key the age private key
+# lands under — what SopsSecrets reference as
+# `decryption.keyRef: {name: sops-age-key, key: age.agekey}`.
+secretName: sops-age-key
+dataKey: age.agekey
+
+# One ExternalSecret (and one Secret) per namespace: keyRef is namespace-local.
+# Each namespace must exist; the operator's own is created by its base.
+namespaces:
+  - sops-secrets-operator-system
+
+# Existing (Cluster)SecretStore. Default `vault-cluster` matches the convention
+# from infra/external-secrets/cluster-secret-store-vault; the store is named
+# per cluster (vault-<mount>), so a real install always overrides it.
+secretStoreRef:
+  kind: ClusterSecretStore
+  name: vault-cluster
+
+# Entry NAME under the store's mount and the property holding the key
+# (`AGE-SECRET-KEY-1…`). A ClusterSecretStore composes <mount>/data/<key>
+# itself, so this is never a KV path.
+remoteKey: sops-age-key
+property: age.agekey
+
+# How often ESO re-reads the entry. A rotated age key reaches the Secret within
+# this interval; the operator reads keyRef per reconcile.
+refreshInterval: 1h

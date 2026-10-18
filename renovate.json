@@ -61,6 +61,14 @@
       "allowedVersions": "<17.0.0"
     },
     {
+      "description": "clusterbook-operator: the image and the -kustomize artifact are released with one tag; apps/clusterbook-operator/install pins both (version + image.tag) and they must move together.",
+      "matchPackageNames": [
+        "ghcr.io/stuttgart-things/clusterbook-operator",
+        "ghcr.io/stuttgart-things/clusterbook-operator-kustomize"
+      ],
+      "groupName": "clusterbook-operator"
+    },
+    {
       "description": "Auto-merge patch and digest updates once CI passes \u2014 keeps low-risk bumps from piling up",
       "matchUpdateTypes": [
         "patch",

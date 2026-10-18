@@ -1,0 +1,105 @@
+---
+# FLUX-FAMILY PROFILE for cicd/crossplane/configs -- the Configuration set
+# stuttgart-things/flux installs on its cicd-platform clusters
+# (flux: cicd/crossplane/components/configs/configs.yaml). Passed as a
+# valueFiles entry, so it REPLACES the chart's default `configurations` list:
+#
+#   helm:
+#     valueFiles:
+#       - profiles/flux.yaml
+#
+# Selected per cluster by `cicd-platform/crossplane-configs-flux: "true"`
+# (platforms/cicd/appset-crossplane-configs-flux.yaml). That same label takes
+# the cluster out of appset-crossplane-configs.yaml, so a cluster gets this
+# list OR the default one, never both.
+#
+# THESE ARE ghcr.io/stuttgart-things/crossplane/*, AND THAT IS NOT THE SAME
+# FAMILY AS ghcr.io/stuttgart-things/crossplane-configurations/* (the chart
+# default). The org publishes two Configuration families under names that
+# overlap:
+#
+#   package               crossplane/*   crossplane-configurations/*
+#   cloud-config          v0.5.1         v0.5.4
+#   volume-claim          v0.1.1         v0.1.0
+#   ansible-run           v12.0.0        v0.3.2
+#   harvester-vm          v0.3.3         v0.1.12
+#   storage-platform      v0.6.0         -- does not exist --
+#   pipeline-integration  v0.1.2         -- does not exist --
+#
+# The version lines do not line up because these are not the same artifacts.
+# Every pin below is the NEWEST tag published on its own path -- a "newer"
+# number on the other path is not an upgrade.
+#
+# So do NOT rewrite these paths to crossplane-configurations to "align" them.
+# Crossplane keys its lock on the SOURCE STRING, so the two spellings are two
+# different packages to it, and swapping a path is a reinstall of a different
+# lineage under the same CR name. Converging the two families is a change to
+# the PACKAGES' own dependsOn declarations first; it cannot be done here.
+#
+# SWITCHING AN EXISTING CLUSTER between the default list and this one is NOT a
+# label flip. appset-crossplane-configs.yaml preserves resources on deletion,
+# so the default family's `volume-claim` (crossplane-configurations/volume-claim)
+# stays on the cluster, and this list then re-points that same CR name at
+# crossplane/volume-claim -- the lineage swap described above. Remove the old
+# Configurations by hand first (and expect their XRDs to go with them), or
+# pick the family when the cluster is built.
+#
+# WHAT THEY NEED BESIDE THEM (read from each package's crossplane.yaml,
+# 2026-10-18) -- all of it already comes from the shared appsets, at the
+# registry these packages declare:
+#
+#   function-auto-ready           xpkg.crossplane.io  >=v0.6.0   ansible-run, cloud-config, volume-claim
+#   function-go-templating        xpkg.crossplane.io  >=v0.11.3  cloud-config, storage-platform, volume-claim
+#   function-kcl                  xpkg.upbound.io     >=v0.12.0  ansible-run
+#   function-patch-and-transform  xpkg.upbound.io     >=v0.3.0   harvester-vm
+#     -> cicd/crossplane/functions installs all four at exactly those
+#        registries and inside those ranges; no extra functions needed.
+#   provider-helm                 xpkg.upbound.io     >=v1.0.6   pipeline-integration, storage-platform
+#     -> cicd/crossplane/providers installs it at that registry.
+#   provider-kubernetes           xpkg.upbound.io     >=v1.2.0   ansible-run, cloud-config, storage-platform, volume-claim
+#     -> deliberately NOT declared by cicd/crossplane/providers; the package
+#        manager pulls it from these dependsOn at the registry they name
+#        (xpkg.upbound.io here, xpkg.crossplane.io for the default family),
+#        which is exactly why that rule works for both families.
+configurations:
+  - name: cloud-config
+    package: ghcr.io/stuttgart-things/crossplane/cloud-config:v0.5.1
+  - name: volume-claim
+    package: ghcr.io/stuttgart-things/crossplane/volume-claim:v0.1.1
+  - name: storage-platform
+    package: ghcr.io/stuttgart-things/crossplane/storage-platform:v0.6.0
+  - name: ansible-run
+    package: ghcr.io/stuttgart-things/crossplane/ansible-run:v12.0.0
+  - name: pipeline-integration
+    package: ghcr.io/stuttgart-things/crossplane/pipeline-integration:v0.1.2
+  # The ONLY package here that depends on other packages in this same list --
+  # volume-claim and cloud-config, plus provider-kubernetes and
+  # function-patch-and-transform. All four are already installed (the two
+  # Configurations above, provider-kubernetes through the other packages'
+  # dependsOn, the function by cicd/crossplane/functions), so resolving them
+  # again gains nothing and costs the cluster its entire Crossplane:
+  #
+  # Crossplane materialises an unresolved dependency as a Configuration of its
+  # own, named after the OCI path -- stuttgart-things-crossplane-volume-claim
+  # for the same image `volume-claim` above installs. Two lock nodes then carry
+  # one source, and the resolver gives up on the WHOLE graph:
+  #
+  #   cannot initialize dependency graph from the packages in the lock:
+  #   node ghcr.io/stuttgart-things/crossplane/volume-claim already exists
+  #
+  # Every Configuration, Function and Provider goes Healthy=False with that
+  # message, including the ones that have nothing to do with harvester-vm.
+  # Installed stays True and the pods keep running, so nothing crashes and
+  # nothing restarts -- Crossplane simply reconciles no claim at all.
+  #
+  # It is a RACE, which is why it does not always happen: if the explicit
+  # volume-claim reaches the lock first, the dependency resolves onto it and no
+  # duplicate appears (flux: cicd-test1 came up clean, cicd-test2 did not, from
+  # the same manifests). ArgoCD applies the whole list in one sync, so the race
+  # is just as real here.
+  #
+  # If a dependency of harvester-vm is ever REMOVED from this list, add it back
+  # or drop this flag -- with it set, nothing will install that dependency.
+  - name: harvester-vm
+    package: ghcr.io/stuttgart-things/crossplane/harvester-vm:v0.3.3
+    skipDependencyResolution: true

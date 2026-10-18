@@ -1,0 +1,55 @@
+{{- $destKey := .Values.destination.name | default .Values.destination.server }}
+{{- $defaultName := printf "prometheus-pve-exporter-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- /* Flags arrive as booleans from a values file and as strings from an
+       ApplicationSet; the leaf chart's schema takes booleans only. */}}
+{{- $isTrue := dict
+      "es"        (eq (toString (.Values.externalSecrets.enabled | default false)) "true")
+      "verify"    (eq (toString (.Values.verifySSL | default false)) "true")
+      "reloader"  (eq (toString (.Values.reloader | default false)) "true")
+      "dashboard" (eq (toString ((.Values.dashboard | default dict).enabled | default false)) "true")
+}}
+{{- $es := deepCopy .Values.externalSecrets }}
+{{- $_ := set $es "enabled" (get $isTrue "es") }}
+{{- $leaf := dict
+      "namespace"       .Values.destination.namespace
+      "image"           .Values.image
+      "target"          .Values.target
+      "verifySSL"       (get $isTrue "verify")
+      "secretName"      .Values.secretName
+      "externalSecrets" $es
+      "scrape"          (.Values.scrape | default dict)
+      "resources"       (.Values.resources | default dict)
+      "reloader"        (get $isTrue "reloader")
+      "dashboard"       (dict "enabled" (get $isTrue "dashboard"))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # After kube-prometheus-stack (5): the PodMonitor needs its CRD. Sync
+    # waves do not order across Applications, so the retry below is what
+    # actually resolves a sync that comes first.
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: infra/prometheus-pve-exporter/exporter
+    helm:
+      releaseName: prometheus-pve-exporter
+      valuesObject:
+        {{- toYaml $leaf | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

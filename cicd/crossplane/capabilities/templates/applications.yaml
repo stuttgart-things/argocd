@@ -1,0 +1,169 @@
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $prefix := .Values.applicationName | default (printf "cxp-cap-%s" (sha1sum $destKey | trunc 8)) }}
+{{- $caps := .Values.capabilities }}
+{{- $authMount := .Values.secretStore.authMountPath }}
+{{- $tekton := .Values.tektonNamespace }}
+
+{{/*
+CONFIGURATION AND PROVIDER INSTALLS ARE OFF IN EVERY CHART, and are not values.
+
+The Configuration packages come from cicd/crossplane/configs (one family per
+cluster). A capability chart installing its package as well puts the same OCI
+path under a second CR name -- the charts default to `vspherevm`,
+`proxmoxvm`, `packer-build`, ... while a dependsOn-pulled copy carries the
+derived `stuttgart-things-crossplane-configurations-<x>` -- which is a duplicate
+lock node, and a duplicate lock node takes EVERY package on the cluster to
+Healthy=False while Installed stays True and the pods keep running. Same for
+proxmoxvm's provider.install: provider-proxmox-bpg is pulled by the proxmoxvm
+Configuration's own dependsOn.
+
+So the vspherevm / proxmoxvm / packer-* Configurations must be in the
+cluster's configs list; neither the default nor the flux-family list carries
+them today (on flux they come from the machinery profile). extraValues can
+switch an install back on for a cluster that has no other source -- knowingly.
+*/}}
+
+{{- $apps := list }}
+
+{{- if $caps.vspherevm.enabled }}
+{{- $v := dict
+      "environment" $caps.vspherevm.environment
+      "configuration" (dict "install" false)
+      "secretStore" (dict
+        "backend" "eso"
+        "authMountPath" (required "secretStore.authMountPath is required when vspherevm is enabled (the cluster's Vault k8s auth mount, <cluster>-eso)" $authMount))
+}}
+{{- $apps = append $apps (dict
+      "key" "vspherevm"
+      "wave" "1"
+      "chart" "vspherevm"
+      "version" $caps.vspherevm.chartVersion
+      "releaseName" (printf "vspherevm-%s" $caps.vspherevm.environment)
+      "values" (mergeOverwrite $v (deepCopy ($caps.vspherevm.extraValues | default dict)))) }}
+{{- end }}
+
+{{- if $caps.proxmoxvm.enabled }}
+{{- $v := dict
+      "environment" $caps.proxmoxvm.environment
+      "configuration" (dict "install" false)
+      "provider" (dict "install" false)
+      "secretStore" (dict
+        "backend" "eso"
+        "authMountPath" (required "secretStore.authMountPath is required when proxmoxvm is enabled (the cluster's Vault k8s auth mount, <cluster>-eso)" $authMount))
+}}
+{{- $apps = append $apps (dict
+      "key" "proxmoxvm"
+      "wave" "1"
+      "chart" "proxmoxvm"
+      "version" $caps.proxmoxvm.chartVersion
+      "releaseName" (printf "proxmoxvm-%s" $caps.proxmoxvm.environment)
+      "values" (mergeOverwrite $v (deepCopy ($caps.proxmoxvm.extraValues | default dict)))) }}
+{{- end }}
+
+{{- if $caps.packer.enabled }}
+{{- $v := dict
+      "namespace" $tekton
+      "configuration" (dict "install" false)
+      "caCerts" (dict "namespace" $tekton)
+}}
+{{- $apps = append $apps (dict
+      "key" "packer"
+      "wave" "1"
+      "chart" "packer"
+      "version" $caps.packer.chartVersion
+      "releaseName" "packer"
+      "values" (mergeOverwrite $v (deepCopy ($caps.packer.extraValues | default dict)))) }}
+{{- end }}
+
+{{- if $caps.ansibleRun.enabled }}
+{{- $v := dict
+      "environment" $caps.ansibleRun.environment
+      "namespace" $tekton
+      "configuration" (dict "enabled" false)
+      "environmentConfig" (dict "storageClass" $caps.ansibleRun.storageClass)
+      "sshCredentials" (dict "backend" "eso")
+}}
+{{- with $caps.ansibleRun.secretStoreName }}
+{{- $_ := set $v "environments" (dict $caps.ansibleRun.environment (dict "sshCredentials" (dict "secretStoreName" .))) }}
+{{- end }}
+{{- $apps = append $apps (dict
+      "key" "ansible-run"
+      "wave" "2"
+      "chart" "ansible"
+      "version" $caps.ansibleRun.chartVersion
+      "releaseName" "ansible-run"
+      "values" (mergeOverwrite $v (deepCopy ($caps.ansibleRun.extraValues | default dict)))) }}
+{{- end }}
+
+{{- range $apps }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $prefix .key | quote }}
+  namespace: argocd
+  annotations:
+    {{- if eq .key "ansible-run" }}
+    # Wave 2: its ExternalSecret reads the ClusterSecretStore the vspherevm /
+    # proxmoxvm charts render (wave 1). ESO retries either way; the wave only
+    # spares the first sync a round of SecretSyncedError.
+    {{- end }}
+    argocd.argoproj.io/sync-wave: {{ .wave | quote }}
+spec:
+  project: {{ $.Values.project | quote }}
+  source:
+    repoURL: {{ $.Values.chartRepository | quote }}
+    chart: {{ .chart | quote }}
+    targetRevision: {{ .version | quote }}
+    helm:
+      releaseName: {{ .releaseName | quote }}
+      valuesObject:
+        {{- toYaml .values | nindent 8 }}
+  destination:
+    {{- if $.Values.destination.name }}
+    name: {{ $.Values.destination.name | quote }}
+    {{- else }}
+    server: {{ $.Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $.Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml $.Values.syncPolicy | nindent 4 }}
+{{- end }}
+
+{{- if $caps.harvesterVm.enabled }}
+{{- $h := $caps.harvesterVm }}
+---
+# No harvester capability chart exists -- ./harvester-vm in this repo renders
+# the one EnvironmentConfig from these values.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-harvester-vm" $prefix | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: cicd/crossplane/capabilities/harvester-vm
+    helm:
+      releaseName: harvester-vm
+      valuesObject:
+        environment: {{ $h.environment | quote }}
+        providerConfigRef: {{ $h.providerConfigRef | quote }}
+        storageClassName: {{ $h.storageClassName | quote }}
+        namespace: {{ $h.namespace | quote }}
+        networkName: {{ $h.networkName | quote }}
+        imageId: {{ $h.imageId | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

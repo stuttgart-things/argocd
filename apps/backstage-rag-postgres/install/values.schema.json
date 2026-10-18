@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "backstage-rag-postgres install app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "catalog", "destination", "name", "image", "storage", "bootstrap", "externalSecrets", "backup", "veleroSchedule"],
+  "definitions": {
+    "flag": {
+      "type": ["boolean", "string"],
+      "enum": [true, false, "true", "false"],
+      "description": "Boolean, or the strings \"true\"/\"false\" an ApplicationSet template produces. Anything but true/\"true\" is off."
+    }
+  },
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered Application. Defaults to a per-cluster derived name."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repoURL", "targetRevision"],
+      "properties": {
+        "repoURL": { "type": "string", "minLength": 1 },
+        "targetRevision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Argo destination. Provide `server` or `name`; `name` wins when both are set. `namespace` must be Backstage's namespace.",
+      "properties": {
+        "server": { "type": "string", "format": "uri" },
+        "name": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["namespace"],
+      "anyOf": [{ "required": ["server"] }, { "required": ["name"] }]
+    },
+    "name": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" },
+    "instances": { "type": "integer", "minimum": 1 },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size"],
+      "properties": {
+        "size": { "type": "string", "pattern": "^[0-9]+(Mi|Gi|Ti)$" },
+        "storageClass": { "type": "string", "description": "Empty = the cluster's default StorageClass." }
+      }
+    },
+    "resources": { "type": "object", "description": "ResourceRequirements for the Postgres pods, passed through." },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["database", "owner", "secretName"],
+      "properties": {
+        "database": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "secretName": { "type": "string", "minLength": 1 }
+      }
+    },
+    "protect": { "$ref": "#/definitions/flag" },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "$ref": "#/definitions/flag" },
+        "refreshInterval": { "type": "string", "minLength": 1 },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
+            "name": { "type": "string" }
+          }
+        },
+        "credentials": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "remoteKey": { "type": "string", "description": "Empty = kv/data/<namespace>/rag-postgres (Flux default)." },
+            "usernameProperty": { "type": "string", "minLength": 1 },
+            "passwordProperty": { "type": "string", "minLength": 1 }
+          }
+        },
+        "s3": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "remoteKey": { "type": "string", "description": "Empty = kv/data/<namespace>/rag-postgres-s3 (Flux default)." },
+            "accessKeyProperty": { "type": "string", "minLength": 1 },
+            "secretKeyProperty": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Barman Cloud plugin backups. Needs infra/cloudnative-pg/barman-cloud; enabling on an existing Cluster restarts the Postgres pod.",
+      "properties": {
+        "enabled": { "$ref": "#/definitions/flag" },
+        "endpointURL": { "type": "string" },
+        "bucket": { "type": "string", "minLength": 1 },
+        "retentionPolicy": { "type": "string", "pattern": "^[1-9][0-9]*[dwm]$" },
+        "schedule": { "type": "string", "minLength": 1, "description": "Six fields, seconds first." },
+        "immediate": { "$ref": "#/definitions/flag" },
+        "s3SecretName": { "type": "string", "minLength": 1 },
+        "caConfigMap": { "type": "string" },
+        "caKey": { "type": "string", "minLength": 1 }
+      },
+      "if": { "properties": { "enabled": { "enum": [true, "true"] } }, "required": ["enabled"] },
+      "then": {
+        "required": ["endpointURL", "bucket"],
+        "properties": { "endpointURL": { "pattern": "^https?://" } }
+      }
+    },
+    "veleroSchedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "$ref": "#/definitions/flag" },
+        "namespace": { "type": "string", "minLength": 1 },
+        "cron": { "type": "string", "minLength": 1 },
+        "ttl": { "type": "string", "minLength": 1 },
+        "storageLocation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "syncPolicy": { "type": "object" }
+  }
+}

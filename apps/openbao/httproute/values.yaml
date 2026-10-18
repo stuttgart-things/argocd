@@ -1,0 +1,11 @@
+---
+namespace: openbao
+gateway:
+  name: cilium-gateway
+  namespace: default
+routes:
+  - name: openbao
+    hostname: openbao.example.com
+    backend:
+      name: openbao
+      port: 8200

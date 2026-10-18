@@ -33,6 +33,7 @@ Version columns show what the child `Application` currently pins. `—` in the V
 | [`longhorn`](./infra/longhorn/) | `install` | `1.11.2` | Longhorn distributed block storage; GitOps-friendly defaults (`preUpgradeChecker.jobEnabled: false`, `defaultClassReplicaCount: 1` for single-node-safe install) |
 | [`nfs-csi`](./infra/nfs-csi/) | `chart` / `storageclasses` | `v4.13.1` + — | kubernetes-csi NFS driver + opinionated `StorageClass` set |
 | [`openebs`](./infra/openebs/) | — (single) | `4.4.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
+| [`prometheus-pve-exporter`](./infra/prometheus-pve-exporter/) | `install` / `exporter` | `3.10.1` | Proxmox VE metrics exporter + PodMonitor + Grafana dashboard for kube-prometheus-stack; PVE token via ESO or a hand-made Secret |
 | [`trust-manager`](./infra/trust-manager/) | `install` / `bundle` | `0.22.0` + — | trust-manager chart (app-of-apps), values-driven `Bundle`s — empty by default; consumers declare which Bundles their cluster needs |
 
 </details>
@@ -43,7 +44,8 @@ Version columns show what the child `Application` currently pins. `—` in the V
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
 | [`argo-rollouts`](./cicd/argo-rollouts/) | `chart` / `httproute` | `2.40.9` + — | Argo Rollouts controller + dashboard, Gateway API `HTTPRoute` for the dashboard |
-| [`crossplane`](./cicd/crossplane/) | `install` / `functions` / `configs` | `2.2.0` + — + — | Crossplane core + 3 providers (helm / kubernetes / opentofu), 4 composition Functions, 6 stuttgart-things Configurations |
+| [`crossplane`](./cicd/crossplane/) | `install` / `providers` / `provider-configs` / `functions` / `configs` / `capabilities` | `2.2.1` + — | Crossplane core, providers (helm v1.5.0 / opentofu v1.1.9 / kubeconfig; kubernetes via dependsOn), composition Functions, Configurations (default `crossplane-configurations/*` family, or the opt-in flux family `configs/profiles/flux.yaml` — never both), capabilities app-of-apps (vspherevm / proxmoxvm / ansible / packer OCI charts + harvester-vm EnvironmentConfig, ESO credentials) |
+| [`komoplane`](./cicd/komoplane/) | `install` / `httproute` | `0.1.8` | Komoplane read-only Crossplane UI (komodorio chart) + optional HTTPRoute; no authentication, lab-internal gateways only |
 | [`dapr`](./cicd/dapr/) | — (single) | `1.17.4` | Dapr control-plane (operator, placement, scheduler, sentry, sidecar injector); HA off, JSON logs |
 | [`kargo`](./cicd/kargo/) | `chart` / `certs` / `httproute` | `1.9.6` (OCI) + — + — | Akuity Kargo (multi-stage GitOps promotion orchestrator), cert-manager Certificate for the API hostname, Gateway API HTTPRoute |
 | [`kro`](./cicd/kro/) | — (single) | `0.9.1` | Kube Resource Orchestrator (OCI Helm, CRDs replaced on sync) |
@@ -60,10 +62,15 @@ Version columns show what the child `Application` currently pins. `—` in the V
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
 | [`headlamp`](./apps/headlamp/) | `chart` / `rbac` | `0.40.0` + — | Headlamp Kubernetes dashboard + ClusterRoleBinding for SSO group |
+| [`backstage-rag-postgres`](./apps/backstage-rag-postgres/) | `install` / `database` | pgvector `16` | CNPG + pgvector Postgres for the Backstage RAG-AI plugin (optional backups via Barman Cloud / Velero) |
+| [`clusterbook-operator`](./apps/clusterbook-operator/) | `install` | `v0.21.0` (OCI kustomize) | Registers ClusterbookClusters as Argo CD cluster Secrets; runs on the Argo CD cluster; optional trust-bundle mount |
+| [`clusterscope`](./apps/clusterscope/) | `install` / `config` / `httproute` / `probes` | `v0.26.0` (OCI kustomize) | Lab visualizer: renders a git-synced cluster repo; live mode shows GitOps status, health and endpoints of the lab's clusters (kubeconfigs + git token via ESO). Optional blackbox ScrapeConfig over every endpoint it lists |
 | [`infisical`](./apps/infisical/) | `install` (+ `httproute` / `secrets` / `external-secrets` sub-charts) | `1.11.0` | Infisical secrets management (upstream `infisical-standalone` chart) with bundled PostgreSQL + Redis, all credentials via ESO (DB/Redis URLs templated) or a dev-only Secret, Gateway API HTTPRoute |
 | [`homerun2`](./apps/homerun2/) | `install` (+ `httproute` / `secrets` / `smoke-test` / `preview-*` sub-charts) | 13 components, each pinned separately — see its README | App-of-apps for the homerun2 event bus: redis-stack + omni/demo/git/k8s pitchers, core/led/light/notification catchers, scout, config-viewer, wled-mock |
 | [`minio`](./apps/minio/) | `chart` / `certs` / `httproute` | `16.0.10` (OCI) + — + — | MinIO object storage (stuttgart-things mirrored image), cert-manager Certificates for console + API, Gateway API HTTPRoutes |
+| [`openbao`](./apps/openbao/) | `install` (+ `httproute` / `external-secrets` sub-charts) | `0.30.3` | OpenBao (MPL-2.0 Vault fork), standalone raft; seal none/static/transit, single/multi-node, optional self-init (userpass), seal Secret via ESO, HTTPRoute |
 | [`schmetterpause`](./apps/schmetterpause/) | `install` / `database` / `monitoring` | `v0.8.0` + — + — | Office table tennis matchmaking, league and tournaments, over the published kustomize OCI; CloudNativePG database as its own Application; opt-in PodMonitors + alert rules |
+| [`sops-secrets-operator`](./apps/sops-secrets-operator/) | `install` (+ `age-key` sub-chart) | `v0.9.2` (OCI kustomize) | sops-secrets-operator (SopsSecret CRs) + optional age-key ExternalSecret; no webhook, no cert-manager |
 | [`tabletennis`](./apps/tabletennis/) | `install` | delegates to `schmetterpause` + `zaehlwerk` | **The tabletennis platform**, beside homerun2 rather than inside it — one Application rendering schmetterpause + zaehlwerk, plus the optional LED strip at the table. Talks to homerun2 over the event bus and knows only the namespace it runs in |
 | [`zaehlwerk`](./apps/zaehlwerk/) | `install` | `v0.3.0` | Live scorekeeping for office table tennis. Pairs with `schmetterpause`; its panel pitches scores to homerun2's omni-pitcher and takes over the led-catcher during a match |
 

@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "prometheus-pve-exporter leaf chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namespace", "image", "target", "secretName", "externalSecrets", "scrape"],
+  "properties": {
+    "namespace": { "type": "string", "minLength": 1 },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 }
+      }
+    },
+    "target": { "type": "string", "minLength": 1 },
+    "verifySSL": { "type": "boolean" },
+    "secretName": { "type": "string", "minLength": 1 },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "refreshInterval": { "type": "string", "minLength": 1 },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
+            "name": { "type": "string" }
+          }
+        },
+        "remoteKey": { "type": "string", "minLength": 1 },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "user": { "type": "string", "minLength": 1 },
+            "tokenName": { "type": "string", "minLength": 1 },
+            "tokenValue": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "scrape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "interval": { "type": "string", "minLength": 1 },
+        "scrapeTimeout": { "type": "string", "minLength": 1 }
+      }
+    },
+    "resources": { "type": "object" },
+    "reloader": { "type": "boolean" },
+    "dashboard": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}

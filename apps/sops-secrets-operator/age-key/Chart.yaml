@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: sops-secrets-operator-age-key
+description: ExternalSecret(s) that materialise the sops-secrets-operator age key Secret (default `sops-age-key`, key `age.agekey`) in one or more namespaces from an existing (Cluster)SecretStore. Rendered by apps/sops-secrets-operator/install when ageKey.externalSecret.secretStore.name is set.
+type: application
+version: 0.1.0

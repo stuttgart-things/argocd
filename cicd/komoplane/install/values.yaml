@@ -1,0 +1,82 @@
+---
+# Optional explicit name for the rendered Application. Defaults to
+# komoplane-<sha1(destination)[:8]>. The HTTPRoute Application is
+# `<this>-httproute`.
+# applicationName: komoplane-mycluster
+
+# ArgoCD AppProject the rendered Applications belong to.
+project: default
+
+# Reference back to this catalog repo -- the HTTPRoute Application loads
+# cicd/komoplane/httproute from it.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# Where Komoplane deploys. It needs Crossplane on the SAME cluster: its whole
+# UI is a view onto Crossplane CRs. Without them it starts, serves, and shows
+# an empty tree while every object reports healthy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: komoplane
+
+# Upstream Komoplane Helm chart (https://helm-charts.komodor.io).
+# Same version stuttgart-things/flux runs in cicd/komoplane.
+# renovate: datasource=helm depName=komoplane registryUrl=https://helm-charts.komodor.io
+chartVersion: 0.1.8
+
+# Komoplane backend settings (upstream `komoplane:` block).
+debug: false
+# How long the lists of managed resources (MRs) and managed resource
+# definitions (MRDs) are cached.
+mrCacheTTL: 1m
+mrdCacheTTL: 5m
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# Gateway API HTTPRoute sub-Application (sync-wave 10), backend
+# komoplane:8090.
+#
+# KOMOPLANE SHIPS NO AUTHENTICATION OF ANY KIND -- read-only is the whole
+# security model, so whatever the Gateway exposes is world-readable (every
+# claim, composite and managed resource, including connection details shown in
+# status). Attach it to a lab-internal Gateway only.
+#
+# A route whose parentRef does not resolve sits at Accepted=False without
+# explaining itself, so `hostname` and `gateway.name` are checked at render.
+httpRoute:
+  enabled: false
+  hostname: ""
+  gateway:
+    name: cilium-gateway
+    namespace: default
+    # Optional listener on the Gateway (e.g. `https`). Empty = all listeners.
+    sectionName: ""
+
+# Deep-merged on top of the computed values passed to the upstream chart
+# (image overrides, nodeSelector, tolerations, serviceAccount, ...). The
+# upstream ingress stays off; use httpRoute above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

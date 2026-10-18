@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: prometheus-pve-exporter-install
+description: App-of-apps entry for prometheus-pve-exporter (Proxmox VE metrics for kube-prometheus-stack). Renders one Argo CD Application over infra/prometheus-pve-exporter/exporter -- plain manifests, no upstream chart.
+type: application
+version: 0.1.0
+appVersion: "3.10.1"

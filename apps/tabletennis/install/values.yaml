@@ -231,6 +231,18 @@ lightCatcher:
   # "What homerun2 has to be told" in the README — nothing here can check it.
   redisStream: tabletennis
   consumerGroup: homerun2-light-catcher-tabletennis
+  # Annotate the Deployment `reloader.stakater.com/auto: "true"`, so a changed
+  # profile ConfigMap or rotated redis Secret rolls the pod — the catcher reads
+  # both at start only. Needs Stakater Reloader on the cluster (infra/reloader);
+  # without it the annotation does nothing. On, as in flux.
+  reloader: true
+  # The base's HTTPRoute, patched onto `gateway` with `hostname`. Off by
+  # default: the strip at the table has no reader. flux's bundle always applies
+  # one (homerun2-light-catcher-tabletennis-routes); turn this on for the same.
+  # Boolean, or the string "true"/"false" from a platform AppSet.
+  httpRoute:
+    enabled: false
+  hostname: ""                       # empty = light-catcher-tabletennis.<domain>
   # Dev-only inline literal for the Redis password. Empty deletes the Secret the
   # base ships, so an ESO-managed one takes over — which is what
   # `secrets.enabled` below renders.

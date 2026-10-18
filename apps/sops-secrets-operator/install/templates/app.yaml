@@ -1,0 +1,66 @@
+{{- $name := include "sopsOperator.appName" . }}
+{{- $opNs := include "sopsOperator.namespace" . }}
+{{- $ak := .Values.ageKey | default dict }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    # The `oci://` prefix is required — without it Argo treats repoURL as a git
+    # URL and fails with "failed to list refs: repository not found".
+    repoURL: oci://ghcr.io/stuttgart-things/sops-secrets-operator-kustomize
+    targetRevision: {{ .Values.version | quote }}
+    path: .
+    {{- /* No `kustomize.namespace`, on purpose: the base names
+           sops-secrets-operator-system throughout, and the flux catalog sets
+           no targetNamespace over it either. */}}
+    {{- if or $ak.global .Values.protectCRDs }}
+    kustomize:
+      patches:
+        {{- if $ak.global }}
+        {{- /* One global key for resources that omit keyRef (>= v0.9.0,
+               sops-secrets-operator#47). A resource's own keyRef still wins. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: sops-secrets-operator
+          patch: |-
+            - op: add
+              path: /spec/template/spec/containers/0/args/-
+              value: {{ printf "--global-age-key-secret=%s/%s" $opNs $ak.secretName | quote }}
+            - op: add
+              path: /spec/template/spec/containers/0/args/-
+              value: {{ printf "--global-age-key-data-key=%s" $ak.dataKey | quote }}
+        {{- end }}
+        {{- if .Values.protectCRDs }}
+        {{- /* Deleting a CRD deletes every SopsSecret with it, and the Secrets
+               they own. Argo CD still creates and updates the CRDs; it never
+               removes them. */}}
+        - target:
+            group: apiextensions.k8s.io
+            kind: CustomResourceDefinition
+          patch: |
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+            metadata:
+              name: any
+              annotations:
+                argocd.argoproj.io/sync-options: Prune=false,Delete=false
+        {{- end }}
+    {{- end }}
+  destination:
+    {{- include "sopsOperator.destination" . | nindent 4 }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

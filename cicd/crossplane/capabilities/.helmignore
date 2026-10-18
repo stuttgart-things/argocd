@@ -1,0 +1,4 @@
+# ./harvester-vm is a chart of its own, rendered by the harvester-vm child
+# Application from git -- not part of this chart's package.
+harvester-vm/
+README.md

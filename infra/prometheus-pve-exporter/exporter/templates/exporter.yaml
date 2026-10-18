@@ -1,0 +1,141 @@
+{{- $labels := dict "app.kubernetes.io/name" "prometheus-pve-exporter" "app.kubernetes.io/part-of" "kube-prometheus-stack" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-pve-exporter
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+  {{- if .Values.reloader }}
+  annotations:
+    # The token arrives through envFrom, which is read once at container
+    # start: a rotated token in the store reaches the pod only on a restart.
+    # Inert without Reloader (platforms/base).
+    reloader.stakater.com/auto: "true"
+  {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-pve-exporter
+  template:
+    metadata:
+      labels:
+        {{- toYaml $labels | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: pve-exporter
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9221
+              protocol: TCP
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            # The target Proxmox host is supplied per scrape via the ?target=
+            # param set in the PodMonitor (pull model); only the credentials
+            # live in the pod.
+            - name: PVE_VERIFY_SSL
+              value: {{ ternary "true" "false" .Values.verifySSL | quote }}
+          envFrom:
+            # No `optional`: without the Secret the pod stays in
+            # CreateContainerConfigError, which is the loud failure. The quiet
+            # one is a token without PVEAuditor -- it starts fine and returns
+            # nothing.
+            - secretRef:
+                name: {{ .Values.secretName | quote }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+---
+# ClusterIP :9221 -- debugging / port-forward only; Prometheus scrapes the pod
+# through the PodMonitor below.
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-pve-exporter
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus-pve-exporter
+  ports:
+    - name: http
+      port: 9221
+      targetPort: http
+      protocol: TCP
+---
+# Pull model: Prometheus scrapes the exporter at /pve?target=<PVE host>, and
+# the exporter queries the Proxmox API read-only and returns cluster, node,
+# guest and storage metrics.
+#
+# infra/kube-prometheus-stack/install sets podMonitorSelectorNilUsesHelmValues
+# false, so its Prometheus selects every PodMonitor; the
+# app.kubernetes.io/component: monitoring label is kept for a Prometheus that
+# narrows its selector to it (the Flux kps does).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: prometheus-pve-exporter
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-pve-exporter
+  podMetricsEndpoints:
+    - port: http
+      path: /pve
+      interval: {{ .Values.scrape.interval | quote }}
+      scrapeTimeout: {{ .Values.scrape.scrapeTimeout | quote }}
+      params:
+        # An unset target used to render `?target=` and Prometheus scraped
+        # the exporter for a host it never named: every object healthy, the
+        # target UP, the series simply absent. The `.invalid` default turns
+        # that into a scrape error somebody can see.
+        target:
+          - {{ .Values.target | quote }}
+        cluster:
+          - "1"
+        node:
+          - "1"
+      relabelings:
+        # Expose the scraped Proxmox host as the `instance` label instead of
+        # the exporter pod IP, so dashboards group by the actual PVE endpoint.
+        - sourceLabels: [__param_target]
+          targetLabel: instance

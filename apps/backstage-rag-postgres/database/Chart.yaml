@@ -1,0 +1,5 @@
+apiVersion: v2
+name: backstage-rag-postgres-database
+description: CloudNativePG Cluster with pgvector for the Backstage RAG-AI plugin, its owner/S3 ExternalSecrets, and optional Barman Cloud backups (ObjectStore + ScheduledBackup) and a Velero Schedule. Leaf chart rendered by apps/backstage-rag-postgres/install; requires the CNPG operator (infra/cloudnative-pg/install) and, for backups, the Barman Cloud plugin (infra/cloudnative-pg/barman-cloud).
+type: application
+version: 0.1.0

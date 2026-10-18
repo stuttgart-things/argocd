@@ -1,0 +1,74 @@
+---
+# Every field is set by apps/backstage-rag-postgres/install, which documents
+# them; the defaults here only make the chart render standalone. Read
+# ../install/values.yaml for the why of each one.
+
+# Namespace everything lands in -- Backstage's own, so the RAG plugin reaches
+# the database as <name>-rw without a cross-namespace hop.
+namespace: portal
+
+# CNPG Cluster name. Drives the Services CNPG creates (<name>-rw, -ro, -r) and
+# the server directory backups archive under.
+name: rag-postgres
+
+instances: 1
+
+# pgvector operand image (CNPG's standard images don't bundle pgvector).
+imageName: ghcr.io/stuttgart-things/postgresql-pgvector:16
+
+storage:
+  size: 5Gi
+  storageClass: nfs4-csi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+bootstrap:
+  database: backstage_rag
+  owner: rag
+  secretName: rag-postgres-creds
+
+# Prune=false + Delete=false on the Cluster object: the PVC hangs off it by
+# ownerReference.
+protect: true
+
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  secretStore:
+    kind: ClusterSecretStore
+    name: vault-cluster
+  credentials:
+    remoteKey: kv/data/portal/rag-postgres
+    usernameProperty: username
+    passwordProperty: password
+  s3:
+    remoteKey: kv/data/portal/rag-postgres-s3
+    accessKeyProperty: access_key
+    secretKeyProperty: secret_key
+
+backup:
+  enabled: false
+  endpointURL: ""
+  destinationPath: s3://backstage-rag-backups/
+  retentionPolicy: 7d
+  schedule: "0 0 2 * * *"
+  immediate: true
+  s3SecretName: rag-postgres-s3-creds
+  caConfigMap: ""
+  caKey: trust-bundle.pem
+
+veleroSchedule:
+  enabled: false
+  namespace: velero
+  cron: "0 1 * * *"
+  ttl: 168h0m0s
+  storageLocation: default
+
+# Inert pass-through so the catalog verifier's probe values validate.
+destination: {}

@@ -19,6 +19,7 @@ Catalog entries rendered:
 | `cloudnative-pg-storage`        |  -5  | `infra/cloudnative-pg/install`     | `postgres`         | CloudNativePG operator + CRDs. **Opt-in**, an explicit `'true'` — a cluster with no PostgreSQL has no use for it. A singleton: `tabletennis-platform` needs it, anything else growing a Postgres uses the same one |
 | `cloudnative-pg-barman-storage` |  -5  | `infra/cloudnative-pg/barman-cloud`| `postgres`         | The Barman Cloud backup plugin, beside the operator. **Opt-in** and additionally requires the operator's own label. Needs cert-manager on the target cluster |
 | `velero-storage`                |  -5  | `infra/velero/install`            | `velero`           | Velero + its `cloud-credentials` ExternalSecret + the `daily-all` Schedule. **Opt-in** (`storage-platform/velero: 'true'`), annotation-driven — see [Velero](#velero-cluster-backups) |
+| `backstage-rag-postgres-storage` |  5  | `apps/backstage-rag-postgres/install` | Backstage ns (`portal`) | CNPG `Cluster` + pgvector for the Backstage RAG-AI plugin. **Opt-in** (`storage-platform/backstage-rag-postgres: 'true'`) and additionally requires `storage-platform/cloudnative-pg: 'true'`. Backups (barman plugin) and the Velero Schedule off unless annotated; backups also need `cloudnative-pg-barman` |
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 

@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: clusterscope-probes
+description: Prometheus Operator ScrapeConfig that blackbox-probes every HTTPRoute URL clusterscope lists at /api/targets (http_sd) — loaded as the `-probes` sub-Application by apps/clusterscope/install.
+type: application
+version: 0.1.0

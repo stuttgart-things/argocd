@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: crossplane-capabilities
+description: App-of-apps rendering one ArgoCD Application per enabled Crossplane capability (ansible-run, packer, proxmoxvm, vspherevm from ghcr.io/stuttgart-things/charts; harvester-vm from ./harvester-vm)
+type: application
+version: 0.1.0
+appVersion: "2.2.1"

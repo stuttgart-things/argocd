@@ -1,0 +1,31 @@
+---
+# Rendered by apps/clusterscope/install, which passes every value; the defaults
+# here render nothing.
+namespace: clusterscope
+
+# refreshInterval of both ExternalSecrets.
+refreshInterval: 1h
+
+# ConfigMap `clusterscope-config`, key config.yaml: the -config file.
+config:
+  enabled: false
+  content: ""
+
+# ExternalSecret → `secretName` with keys username / password for git-sync.
+gitAuth:
+  enabled: false
+  secretName: git-sync-auth  # pragma: allowlist secret -- names a Secret, holds none
+  secretStore:
+    kind: ClusterSecretStore
+    name: ""
+  path: ""
+  usernameProperty: username
+  passwordProperty: password
+
+# ExternalSecret → `clusterscope-kubeconfigs`, one key per cluster.
+kubeconfigs:
+  enabled: false
+  secretStore:
+    kind: ClusterSecretStore
+    name: vault-kubeconfigs
+  clusters: ^$

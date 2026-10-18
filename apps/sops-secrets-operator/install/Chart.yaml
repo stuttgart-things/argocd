@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: sops-secrets-operator-install
+description: App-of-apps entry for sops-secrets-operator — the operator that turns a SopsSecret (an age-encrypted blob committed to git) into a real Kubernetes Secret. Renders one Argo CD Application over the published kustomize OCI artifact (ghcr.io/stuttgart-things/sops-secrets-operator-kustomize, rendered from the operator repo's kcl/ profile) and, optionally, a second one with an ExternalSecret that materialises the age key Secret from a (Cluster)SecretStore.
+type: application
+version: 0.1.0
+appVersion: "v0.9.2"

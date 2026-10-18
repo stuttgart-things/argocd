@@ -1,0 +1,21 @@
+---
+# Harvester demo lab -- flux set capabilities/sets/harvester-demo.
+#
+# The only preset whose main capability is written out rather than rendered
+# from an OCI chart -- see ../harvester-vm/values.yaml for why, and for what it
+# still cannot do (reach a SEPARATE Harvester cluster; today it composes onto
+# the cluster itself). The harvesterVm defaults only fit a Harvester that IS
+# the cluster; a management cluster building on a separate one has to set all
+# of them.
+capabilities:
+  harvesterVm:
+    enabled: true
+  ansibleRun:
+    enabled: true
+    # No vspherevm/proxmoxvm here, so NOTHING in this preset renders the
+    # ansible chart's default store (vault-cicd-vsphere-labda). Name a
+    # ClusterSecretStore that exists on the cluster and serves vm_ssh_user /
+    # vm_ssh_password under secret `default`, or set
+    # extraValues.sshCredentials.backend: none and supply the
+    # `ansible-credentials` Secret in the tekton namespace yourself.
+    secretStoreName: ""

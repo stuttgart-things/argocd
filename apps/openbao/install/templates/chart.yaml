@@ -1,0 +1,138 @@
+{{- $appName := include "openbao-install.appName" . }}
+{{- $seal := include "openbao-install.sealSecret" . | fromJson }}
+{{- $selfInit := eq .Values.init.mode "self-init-userpass" }}
+{{- $singleNode := eq .Values.topology "single-node" }}
+{{- /* The schema already rejects these; the fail keeps the chart honest when
+       it is rendered with --skip-schema-validation. */}}
+{{- if and $selfInit (eq .Values.seal.type "none") }}
+{{- fail "init.mode self-init-userpass needs an auto-unseal (seal.type static or transit): OpenBao refuses self-init with shamir" }}
+{{- end }}
+{{- if and (eq .Values.seal.type "static") (not .Values.seal.static.keyId) }}
+{{- fail "seal.type static needs seal.static.keyId" }}
+{{- end }}
+{{- if and (eq .Values.seal.type "transit") (not .Values.seal.transit.address) }}
+{{- fail "seal.type transit needs seal.transit.address" }}
+{{- end }}
+
+{{- /* THE SERVER CONFIG. In flux the seal had to be a kustomize component
+       because it is a block in an HCL document and no substitution can omit
+       a stanza; here the chart renders the whole document, so the seal is
+       just a value -- and a half-written stanza (static without keyId,
+       transit without address) fails the render instead of starting an
+       instance nobody can unseal. */}}
+{{- $config := `ui = true
+
+listener "tcp" {
+  tls_disable     = 1
+  address         = "[::]:8200"
+  cluster_address = "[::]:8201"
+}
+
+storage "raft" {
+  path = "/openbao/data"
+}
+
+service_registration "kubernetes" {}
+` }}
+{{- if eq .Values.seal.type "static" }}
+{{- $config = printf `%s
+seal "static" {
+  current_key_id = %q
+  current_key    = "env://OPENBAO_SEAL_STATIC_KEY"
+}
+` $config .Values.seal.static.keyId }}
+{{- else if eq .Values.seal.type "transit" }}
+{{- $config = printf `%s
+seal "transit" {
+  address     = %q
+  key_name    = %q
+  mount_path  = %q
+  tls_ca_cert = %q
+}
+` $config .Values.seal.transit.address .Values.seal.transit.keyName .Values.seal.transit.mountPath (printf "/etc/ssl/custom/%s" .Values.seal.transit.trustBundle.key) }}
+{{- end }}
+{{- /* Self-init: appended to the same document. Flux needed a second config
+       file (ConfigMap + extraVolumes + -config) because a JSON patch cannot
+       append to the string the seal component replaced; rendered here there
+       is nothing to work around, and `bao server` reads the initialize
+       stanzas from the one file just the same. */}}
+{{- if $selfInit }}
+{{- $config = printf "%s\n%s" $config (.Files.Get "files/self-init.hcl") }}
+{{- end }}
+
+{{- /* Secret env. The seal material and the passwords via env, never in the
+       config: the chart renders that config into a ConfigMap. */}}
+{{- $env := list }}
+{{- if eq .Values.seal.type "static" }}
+  {{- $env = append $env (dict "envName" "OPENBAO_SEAL_STATIC_KEY" "secretName" $seal.name "secretKey" $seal.key) }}
+{{- else if eq .Values.seal.type "transit" }}
+  {{- $env = append $env (dict "envName" "BAO_TOKEN" "secretName" $seal.name "secretKey" $seal.key) }}
+{{- end }}
+{{- if $selfInit }}
+  {{- /* A missing key keeps the pod in CreateContainerConfigError before
+         anything is initialised (add the key, done). An EMPTY password fails
+         the self-init: the server exits and refuses to unseal from then on --
+         set the password, delete PVC data-openbao-0 and the pod. */}}
+  {{- $env = append $env (dict "envName" "OPENBAO_TERRAFORM_PASSWORD" "secretName" $seal.name "secretKey" "terraform-password") }}
+  {{- $env = append $env (dict "envName" "OPENBAO_ADMIN_PASSWORD" "secretName" $seal.name "secretKey" "admin-password") }}
+{{- end }}
+
+{{- $server := dict
+      "image"   (dict "repository" .Values.image.repository)
+      "resources" (ternary .Values.singleNode.resources .Values.resources $singleNode)
+      "ingress" (dict "enabled" false)
+      "dataStorage" (dict
+        "enabled"      true
+        "size"         .Values.storage.size
+        "storageClass" .Values.storage.storageClass
+      )
+      "standalone" (dict "enabled" true "config" $config)
+}}
+{{- if $env }}
+  {{- $_ := set $server "extraSecretEnvironmentVars" $env }}
+{{- end }}
+{{- if eq .Values.seal.type "transit" }}
+  {{- $_ := set $server "volumes" (list (dict "name" "trust-bundle" "configMap" (dict "name" .Values.seal.transit.trustBundle.configMap))) }}
+  {{- $_ := set $server "volumeMounts" (list (dict "name" "trust-bundle" "mountPath" "/etc/ssl/custom" "readOnly" true)) }}
+{{- end }}
+{{- $computed := dict "server" $server }}
+{{- if $singleNode }}
+  {{- $_ := set $computed "injector" (dict "enabled" .Values.singleNode.injectorEnabled "affinity" "") }}
+{{- end }}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # After the seal Secret's ExternalSecret (-10), before the route (10).
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://openbao.github.io/openbao-helm
+    chart: openbao
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      # releaseName openbao: the Service is `openbao`, the PVC data-openbao-0.
+      releaseName: openbao
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  # The agent injector generates its own CA and patches it into the webhook's
+  # caBundle at runtime; the chart renders it empty. Without this, selfHeal
+  # writes "" back and every injection fails TLS until the injector patches it
+  # again -- a loop that looks like a flapping OutOfSync.
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      name: openbao-agent-injector-cfg
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

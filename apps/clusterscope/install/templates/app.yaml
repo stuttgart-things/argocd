@@ -1,0 +1,310 @@
+{{- $name := include "clusterscope.appName" . }}
+{{- $ns := .Values.destination.namespace }}
+{{- $cs := .Values.clusterscope }}
+{{- $gs := .Values.gitSync }}
+{{- $gitSyncImage := printf "%s:%s" $gs.image.repository $gs.image.tag }}
+{{- $configOn := include "clusterscope.on" .Values.config.enabled }}
+{{- $extraOn := include "clusterscope.on" .Values.gitSyncExtra.enabled }}
+{{- $kubeconfigsOn := include "clusterscope.on" .Values.vaultKubeconfigs.enabled }}
+{{- $liveOn := include "clusterscope.on" $cs.live }}
+{{- if and (include "clusterscope.on" .Values.blackboxProbes.enabled) (not $liveOn) }}
+{{- fail "blackboxProbes.enabled needs clusterscope.live: /api/targets lists the endpoints of the live HTTPRoute inventory, and is empty without it" }}
+{{- end }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name | quote }}
+  namespace: argocd
+  {{- with include "clusterscope.finalizers" . }}{{ . | nindent 2 }}{{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    # The `oci://` prefix is required — without it Argo treats repoURL as a git
+    # URL and fails with "failed to list refs: repository not found".
+    repoURL: oci://ghcr.io/stuttgart-things/clusterscope-kustomize
+    targetRevision: {{ .Values.version | quote }}
+    path: .
+    kustomize:
+      # Renames the base's own Namespace `clusterscope` and rewrites the
+      # ClusterRoleBinding subject along with it.
+      namespace: {{ $ns | quote }}
+      patches:
+        {{- /* The args. Strategic merge by container name; `args` is not a
+               merge-keyed list, so this replaces the base's -root=/data
+               -tech=flux -serve=:8080 wholesale. Every flag uses the
+               -flag=value form: an empty value then stays a valid flag instead
+               of an empty positional argument that would end flag parsing. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterscope
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterscope
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: clusterscope
+                      args:
+                        - {{ printf "-root=%s" $gs.dir | quote }}
+                        - {{ printf "-tech=%s" $cs.tech | quote }}
+                        - "-serve=:8080"
+                        - {{ printf "-lab=%s" $cs.lab | quote }}
+                        {{- /* Several repos / name + lab overrides; replaces
+                               -root when set. */}}
+                        - {{ printf "-config=%s" (ternary (include "clusterscope.configFile" .) "" (eq $configOn "true")) | quote }}
+                        - {{ printf "-live=%s" (ternary "true" "false" (eq $liveOn "true")) | quote }}
+                        - {{ printf "-self-cluster=%s" $cs.selfCluster | quote }}
+                        - {{ printf "-kubeconfig-dir=%s" (include "clusterscope.kubeconfigDir" .) | quote }}
+                        - {{ printf "-probe=%s" (ternary "true" "false" (eq (include "clusterscope.on" $cs.probe) "true")) | quote }}
+                        - {{ printf "-refresh=%v" $cs.refresh | quote }}
+        {{- /* Trust the lab CAs for the endpoint probes (-probe): the
+               trust-manager bundle via SSL_CERT_DIR. Optional — without
+               trust-manager the image's own CA file still applies (Go loads it
+               regardless of SSL_CERT_DIR). */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterscope
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterscope
+            spec:
+              template:
+                spec:
+                  volumes:
+                    - name: trust-bundle
+                      configMap:
+                        name: {{ .Values.trustBundle.configMap | quote }}
+                        optional: true
+                  containers:
+                    - name: clusterscope
+                      env:
+                        - name: SSL_CERT_DIR
+                          value: /etc/ssl/custom
+                      volumeMounts:
+                        - name: trust-bundle
+                          mountPath: {{ printf "/etc/ssl/custom/%s" .Values.trustBundle.key | quote }}
+                          subPath: {{ .Values.trustBundle.key | quote }}
+                          readOnly: true
+        {{- /* The git-sync sidecar, sharing the base's `gitdata` emptyDir at
+               /data. Auth is optional on both keys: without the Secret
+               git-sync clones anonymously (public repos). */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterscope
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterscope
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: git-sync
+                      image: {{ $gitSyncImage | quote }}
+                      args:
+                        - {{ printf "--repo=%s" $gs.repo | quote }}
+                        - {{ printf "--ref=%s" $gs.branch | quote }}
+                        - "--root=/data"
+                        - {{ printf "--period=%s" $gs.period | quote }}
+                        - "--depth=1"
+                      env:
+                        - name: GITSYNC_ONE_TIME
+                          value: "false"
+                        - name: GITSYNC_USERNAME
+                          valueFrom:
+                            secretKeyRef:
+                              name: {{ $gs.authSecret | quote }}
+                              key: username
+                              optional: true
+                        - name: GITSYNC_PASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: {{ $gs.authSecret | quote }}
+                              key: password
+                              optional: true
+                      resources:
+                        limits:
+                          cpu: 100m
+                          memory: 128Mi
+                        requests:
+                          cpu: 10m
+                          memory: 32Mi
+                      securityContext:
+                        readOnlyRootFilesystem: true
+                        runAsNonRoot: true
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsUser: 65533
+                      volumeMounts:
+                        - name: gitdata
+                          mountPath: /data
+                        - name: git-sync-tmp
+                          mountPath: /tmp
+                  volumes:
+                    - name: git-sync-tmp
+                      emptyDir: {}
+        {{- if $extraOn }}
+        {{- /* A second repository: its own git-sync on its own emptyDir at
+               /data-extra. Two git-syncs must not share a --root — each
+               manages the directory and cleans it when its checks fail. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterscope
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterscope
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: clusterscope
+                      volumeMounts:
+                        - name: gitdata-extra
+                          mountPath: /data-extra
+                    - name: git-sync-extra
+                      image: {{ $gitSyncImage | quote }}
+                      args:
+                        - {{ printf "--repo=%s" (required "gitSyncExtra.repo is required when gitSyncExtra.enabled" .Values.gitSyncExtra.repo) | quote }}
+                        - {{ printf "--ref=%s" .Values.gitSyncExtra.branch | quote }}
+                        - "--root=/data-extra"
+                        - {{ printf "--period=%s" .Values.gitSyncExtra.period | quote }}
+                        - "--depth=1"
+                      env:
+                        - name: GITSYNC_USERNAME
+                          valueFrom:
+                            secretKeyRef:
+                              name: {{ $gs.authSecret | quote }}
+                              key: username
+                              optional: true
+                        - name: GITSYNC_PASSWORD
+                          valueFrom:
+                            secretKeyRef:
+                              name: {{ $gs.authSecret | quote }}
+                              key: password
+                              optional: true
+                      resources:
+                        limits:
+                          cpu: 100m
+                          memory: 128Mi
+                        requests:
+                          cpu: 10m
+                          memory: 32Mi
+                      securityContext:
+                        readOnlyRootFilesystem: true
+                        runAsNonRoot: true
+                        allowPrivilegeEscalation: false
+                        capabilities:
+                          drop:
+                            - ALL
+                        runAsUser: 65533
+                      volumeMounts:
+                        - name: gitdata-extra
+                          mountPath: /data-extra
+                        - name: git-sync-extra-tmp
+                          mountPath: /tmp
+                  volumes:
+                    - name: gitdata-extra
+                      emptyDir: {}
+                    - name: git-sync-extra-tmp
+                      emptyDir: {}
+        {{- end }}
+        {{- if $configOn }}
+        {{- /* The -config file from the `-config` sub-Application's
+               ConfigMap. Not optional: -config pointing at a missing file is a
+               startup error, and the ConfigMap is synced a wave earlier. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterscope
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterscope
+              {{- if .Values.reloader }}
+              annotations:
+                configmap.reloader.stakater.com/reload: clusterscope-config
+              {{- end }}
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: clusterscope
+                      volumeMounts:
+                        - name: config
+                          mountPath: /etc/clusterscope
+                          readOnly: true
+                  volumes:
+                    - name: config
+                      configMap:
+                        name: clusterscope-config
+        {{- end }}
+        {{- if $kubeconfigsOn }}
+        {{- /* Kubeconfigs of the lab's other clusters. Optional volume:
+               clusterscope starts without it, and kubelet fills it once ESO
+               has synced. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterscope
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterscope
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: clusterscope
+                      volumeMounts:
+                        - name: kubeconfigs
+                          mountPath: /kubeconfigs
+                          readOnly: true
+                  volumes:
+                    - name: kubeconfigs
+                      secret:
+                        secretName: clusterscope-kubeconfigs  # pragma: allowlist secret -- names a Secret, holds none
+                        optional: true
+        {{- end }}
+        {{- /* The flux app deletes a KCL-generated HTTPRoute from the base; the
+               route here is the `-httproute` sub-Application's. v0.26.0 ships
+               none, so this is a no-op kept as a guard should a base ship one
+               again — it would otherwise fight the sub-Application's route. */}}
+        - target:
+            group: gateway.networking.k8s.io
+            kind: HTTPRoute
+            name: clusterscope
+          patch: |
+            apiVersion: gateway.networking.k8s.io/v1
+            kind: HTTPRoute
+            metadata:
+              name: clusterscope
+            $patch: delete
+  destination:
+    {{- include "clusterscope.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

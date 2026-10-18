@@ -1,0 +1,19 @@
+---
+# LabDA / vSphere -- flux set capabilities/sets/labda-vsphere.
+# Use as a valueFiles entry of cicd/crossplane/capabilities; still set
+# secretStore.authMountPath (<cluster>-eso) next to it.
+#
+# The preset is the CHOICE OF CAPABILITIES plus the environment each one is
+# pinned to. Both halves move together: vspherevm with environment labul would
+# deploy the LabUL placement (whose template UUID no longer resolves).
+capabilities:
+  vspherevm:
+    enabled: true
+    environment: labda
+  ansibleRun:
+    enabled: true
+    # Reads vm_ssh_* through vault-cicd-vsphere-labda -- the store the
+    # vspherevm release above renders.
+    environment: labda
+  packer:
+    enabled: true

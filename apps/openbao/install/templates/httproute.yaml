@@ -1,0 +1,37 @@
+{{- if .Values.httpRoute.enabled }}
+{{- $appName := include "openbao-install.appName" . }}
+{{- $routesValues := dict
+      "namespace" .Values.destination.namespace
+      "gateway" .Values.httpRoute.gateway
+      "routes" (list
+        (dict "name" "openbao" "hostname" .Values.httpRoute.hostname "backend" (dict "name" "openbao" "port" 8200))
+      )
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-httproute" $appName | quote }}
+  namespace: argocd
+  annotations:
+    # Its own Application, after openbao (0). Cilium resolves a route's
+    # backendRefs ONCE: a route applied before its Service exists serves HTTP
+    # 500 for good while everything reports Synced/Healthy -- the reason flux
+    # split it into openbao-httproute with dependsOn: openbao.
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/openbao/httproute
+    helm:
+      releaseName: openbao-httproute
+      valuesObject:
+        {{- toYaml $routesValues | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

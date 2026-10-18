@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: openbao-httproute
+description: Gateway API HTTPRoute for OpenBao -- loaded as a sub-Application by apps/openbao/install.
+type: application
+version: 0.1.0

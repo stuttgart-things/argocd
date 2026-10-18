@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: crossplane-capability-harvester-vm
+description: Harvester VM capability -- the harvester-vm-defaults EnvironmentConfig, rendered from values (there is no published harvester capability chart)
+type: application
+version: 0.1.0
+appVersion: "2.2.1"

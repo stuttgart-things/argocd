@@ -1,0 +1,23 @@
+{{- if .Values.dashboard.enabled }}
+---
+# Imported by the kube-prometheus-stack Grafana sidecar, which picks up any
+# ConfigMap labelled grafana_dashboard: "1" (the kps chart default).
+#
+# files/proxmox-pve.json carries Grafana's own ${DS_PROMETHEUS} / ${node}
+# variables UNESCAPED. In the Flux catalog they are written $${...} because
+# Flux's postBuild envsubst cannot tell them from its own variables (written
+# bare, all eleven were blanked and the dashboard drew nothing). Helm's
+# .Files.Get does not template the file, so here they stay as Grafana expects
+# -- do not copy the $$ escape back in.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pve-exporter-dashboard
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: kube-prometheus-stack
+data:
+  proxmox-pve.json: |-
+    {{- .Files.Get "files/proxmox-pve.json" | nindent 4 }}
+{{- end }}

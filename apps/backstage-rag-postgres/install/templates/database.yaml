@@ -1,0 +1,81 @@
+{{- $destKey := .Values.destination.name | default .Values.destination.server }}
+{{- $defaultName := printf "backstage-rag-postgres-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $ns := .Values.destination.namespace }}
+{{- /* Flags arrive as booleans from a values file and as the strings
+       "true"/"false" from an ApplicationSet; the leaf chart's schema takes
+       booleans only. */}}
+{{- $flag := dict
+      "protect"   (eq (toString (.Values.protect | default false)) "true")
+      "es"        (eq (toString (.Values.externalSecrets.enabled | default false)) "true")
+      "backup"    (eq (toString (.Values.backup.enabled | default false)) "true")
+      "immediate" (eq (toString (.Values.backup.immediate | default false)) "true")
+      "velero"    (eq (toString (.Values.veleroSchedule.enabled | default false)) "true")
+}}
+{{- if and (get $flag "backup") (not .Values.backup.endpointURL) }}
+{{- fail "backup.enabled is true but backup.endpointURL is empty" }}
+{{- end }}
+{{- $es := deepCopy .Values.externalSecrets }}
+{{- $_ := set $es "enabled" (get $flag "es") }}
+{{- $creds := $es.credentials | default dict }}
+{{- $_ := set $creds "remoteKey" ($creds.remoteKey | default (printf "kv/data/%s/rag-postgres" $ns)) }}
+{{- $_ := set $es "credentials" $creds }}
+{{- $s3 := $es.s3 | default dict }}
+{{- $_ := set $s3 "remoteKey" ($s3.remoteKey | default (printf "kv/data/%s/rag-postgres-s3" $ns)) }}
+{{- $_ := set $es "s3" $s3 }}
+{{- $backup := dict
+      "enabled"         (get $flag "backup")
+      "endpointURL"     .Values.backup.endpointURL
+      "destinationPath" (printf "s3://%s/" .Values.backup.bucket)
+      "retentionPolicy" .Values.backup.retentionPolicy
+      "schedule"        .Values.backup.schedule
+      "immediate"       (get $flag "immediate")
+      "s3SecretName"    .Values.backup.s3SecretName
+      "caConfigMap"     .Values.backup.caConfigMap
+      "caKey"           .Values.backup.caKey
+}}
+{{- $velero := deepCopy .Values.veleroSchedule }}
+{{- $_ := set $velero "enabled" (get $flag "velero") }}
+{{- $dbValues := dict
+      "namespace"       $ns
+      "name"            .Values.name
+      "instances"       (int (.Values.instances | default 1))
+      "imageName"       (printf "%s:%s" .Values.image.repository .Values.image.tag)
+      "storage"         .Values.storage
+      "resources"       (.Values.resources | default dict)
+      "bootstrap"       .Values.bootstrap
+      "protect"         (get $flag "protect")
+      "externalSecrets" $es
+      "backup"          $backup
+      "veleroSchedule"  $velero
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # After the CNPG operator (-10) and Backstage itself (0, owns the
+    # namespace). Informational across Applications -- retry is what resolves
+    # a sync that beats the operator's CRDs.
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/backstage-rag-postgres/database
+    helm:
+      releaseName: backstage-rag-postgres
+      valuesObject:
+        {{- toYaml $dbValues | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

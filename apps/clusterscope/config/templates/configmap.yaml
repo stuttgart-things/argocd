@@ -1,0 +1,15 @@
+{{- if .Values.config.enabled }}
+---
+# The -config file: several roots (repos) and per-directory cluster name / lab
+# overrides. Mounted at /etc/clusterscope by the install chart's Deployment
+# patch; clusterscope reads it at startup, and Reloader rolls the pod when it
+# changes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clusterscope-config
+  namespace: {{ .Values.namespace | quote }}
+data:
+  config.yaml: |
+    {{- .Values.config.content | nindent 4 }}
+{{- end }}

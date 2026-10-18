@@ -1,0 +1,32 @@
+{{- /* Fields the API server defaults are spelled out: left implicit they come
+       back on the live object, and Argo reports the route OutOfSync forever
+       while it works (group/kind/weight on the refs). */}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: clusterscope
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name | quote }}
+      namespace: {{ .Values.gateway.namespace | quote }}
+      group: gateway.networking.k8s.io
+      kind: Gateway
+      {{- with .Values.gateway.sectionName }}
+      sectionName: {{ . | quote }}
+      {{- end }}
+  hostnames:
+    - {{ .Values.hostname | quote }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        # The base's Service; its port is fixed at 8080.
+        - name: clusterscope
+          port: 8080
+          group: ""
+          kind: Service
+          weight: 1

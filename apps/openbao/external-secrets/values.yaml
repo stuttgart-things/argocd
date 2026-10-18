@@ -1,0 +1,22 @@
+---
+namespace: openbao
+
+# The Secret the seal reads (seal.static.secretName / seal.transit.secretName
+# of the install chart).
+secretName: openbao-static-seal     # pragma: allowlist secret
+
+# SecretStore / ClusterSecretStore the ExternalSecret reads from.
+store:
+  name: vault-backend
+  kind: ClusterSecretStore
+
+# Entry under the store (e.g. Vault `<mount>/openbao`).
+remoteKey: openbao
+
+# "0" = fetch once, never refresh (see the install chart's values.yaml).
+refreshInterval: "0"
+
+# Keys copied from the entry into the Secret; each one is both the Secret key
+# and the store property name.
+keys:
+  - key

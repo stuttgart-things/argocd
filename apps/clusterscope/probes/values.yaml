@@ -1,0 +1,20 @@
+---
+# Namespace of the ScrapeConfig — the Prometheus' namespace.
+namespace: monitoring
+
+# `release` label the Prometheus' scrapeConfigSelector matches
+# (infra/kube-prometheus-stack: `release: kube-prometheus-stack`).
+prometheusRelease: kube-prometheus-stack
+
+# clusterscope's target list (Prometheus http_sd format).
+targetsURL: http://clusterscope.clusterscope.svc:8080/api/targets
+
+# Blackbox module every endpoint is probed with.
+module: http_2xx
+
+# The blackbox exporter's Service (infra/blackbox-exporter in `monitoring`).
+address: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc:9115
+
+# Probe interval, and how often the target list is re-read.
+interval: 60s
+sdRefresh: 5m

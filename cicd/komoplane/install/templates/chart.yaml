@@ -1,0 +1,46 @@
+{{- $destKey := .Values.destination.name | default .Values.destination.server }}
+{{- $defaultName := printf "komoplane-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $computed := dict
+      "komoplane" (dict
+        "debug"       .Values.debug
+        "mrCacheTTL"  .Values.mrCacheTTL
+        "mrdCacheTTL" .Values.mrdCacheTTL
+      )
+      "replicaCount" (int (.Values.replicaCount | default 1))
+      "resources"    (.Values.resources | default dict)
+      "ingress"      (dict "enabled" false)
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # After Crossplane (cicd-platform, wave 0): komoplane does not fail
+    # without it, it just shows an empty tree.
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://helm-charts.komodor.io
+    chart: komoplane
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      # Fixed: the upstream fullname -- and with it the Service the HTTPRoute
+      # points at (komoplane:8090) -- derives from the release name.
+      releaseName: komoplane
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

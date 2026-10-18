@@ -1,0 +1,158 @@
+---
+# Optional explicit name for the rendered Application. Defaults to
+# backstage-rag-postgres-<sha1(destination)[:8]>, so two clusters' instances
+# never collide in the management cluster's argocd namespace.
+# applicationName: backstage-rag-postgres-mycluster
+
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Reference back to this catalog repo -- the rendered Application loads
+# apps/backstage-rag-postgres/database from it.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# Where the database lands. The namespace is BACKSTAGE'S OWN (apps/backstage
+# defaults to `portal`), not one of its own: the RAG plugin connects to
+# <name>-rw in its own namespace and reads the owner Secret from there.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: portal
+
+# CNPG Cluster name. CNPG derives the Services from it (<name>-rw / -ro / -r)
+# and the Barman server directory (s3://<bucket>/<name>/). Renaming it creates
+# a NEW, empty Cluster and starts a new backup path.
+name: rag-postgres
+
+# Instances. 1 = PoC, no HA: an instance failure is downtime.
+instances: 1
+
+# Custom operand image: CNPG's standard images don't bundle pgvector. Built
+# from stuttgart-things/flux apps/backstage-rag-postgres/image/Dockerfile and
+# pushed to GHCR by hand (no CI yet). The kubelet pulls it, not ArgoCD, so the
+# GHCR package must be PUBLIC -- otherwise the pod sits in ErrImagePull. The
+# tag is the PostgreSQL major.
+image:
+  repository: ghcr.io/stuttgart-things/postgresql-pgvector
+  tag: "16"
+
+# PGDATA volume. `nfs4-csi` is the Flux default and exists in one lab only --
+# a StorageClass that is merely absent leaves the PVC Pending without saying
+# why. Set it per cluster.
+storage:
+  size: 5Gi
+  storageClass: nfs4-csi
+
+# Resource requests/limits for the Postgres pods.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# initdb bootstrap: the application database and its owner role. The owner's
+# username/password come from the basic-auth Secret `secretName`.
+bootstrap:
+  database: backstage_rag
+  owner: rag
+  secretName: rag-postgres-creds
+
+# Prune=false + Delete=false on the Cluster object. The PVC hangs off the
+# Cluster by ownerReference, so an accidental prune or a deleted Application
+# takes the data with it. Switch off only where the database is meant to die
+# with its Application.
+protect: true
+
+# ExternalSecrets (ESO) for the owner credentials and, with backup.enabled,
+# the S3 key pair. With `enabled: false` the chart renders no ExternalSecret
+# and expects `bootstrap.secretName` (keys username/password, type
+# kubernetes.io/basic-auth) and `backup.s3SecretName` (keys ACCESS_KEY_ID /
+# SECRET_ACCESS_KEY, plus `backup.caKey` when caConfigMap is set) to exist.
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  secretStore:
+    kind: ClusterSecretStore
+    name: vault-cluster
+  # Remote keys. EMPTY = the Flux default, kv/data/<namespace>/rag-postgres
+  # (and .../rag-postgres-s3) -- a full KV v2 API path, which only resolves
+  # against a store WITHOUT a mount path set. A store mounted on its KV path
+  # (every per-cluster `vault-<cluster>` store here) wants a flat entry name
+  # instead, e.g. `rag-postgres`; platforms/storage/appset-backstage-rag-postgres.yaml
+  # passes exactly that.
+  credentials:
+    remoteKey: ""
+    usernameProperty: username
+    passwordProperty: password
+  s3:
+    remoteKey: ""
+    accessKeyProperty: access_key
+    secretKeyProperty: secret_key
+
+# Backups through the Barman Cloud plugin: continuous WAL archiving plus a
+# daily base backup into S3-compatible storage. OFF by default (Flux has them
+# always on), because here:
+#   - the plugin is its own opt-in (platforms/storage appset-cloudnative-pg-barman.yaml);
+#     without its ObjectStore CRD the database Application does not sync at all;
+#   - it needs a pre-created bucket and a bucket-scoped key pair in the store;
+#   - switching it on for an EXISTING Cluster adds spec.plugins, which
+#     restarts the Postgres pod.
+# "Working" is two facts, and a green sync is neither: the Cluster's
+# ContinuousArchiving condition is True, and a Backup reaches phase completed.
+backup:
+  enabled: false
+  # S3 endpoint. Flux derives https://artifacts.<INGRESS_DOMAIN>; there is no
+  # domain value here, so it is required when enabled (the platforms AppSet
+  # derives the same default from the cluster's fqdn annotation).
+  endpointURL: ""
+  # Pre-created bucket (mc mb myminio/backstage-rag-backups). Becomes
+  # destinationPath s3://<bucket>/.
+  bucket: backstage-rag-backups
+  retentionPolicy: 7d
+  # Six fields, seconds first: CloudNativePG's cron format, not the usual five.
+  schedule: "0 0 2 * * *"
+  # One backup immediately on creation, so a fresh cluster has something to
+  # recover from before the first night. Set false when enabling backups on an
+  # existing Cluster -- the immediate backup fires while the pod restarts.
+  immediate: true
+  # Secret holding ACCESS_KEY_ID / SECRET_ACCESS_KEY.
+  s3SecretName: rag-postgres-s3-creds
+  # Optional: trust-manager ConfigMap (e.g. `cluster-trust-bundle`) whose CA
+  # the ObjectStore verifies the endpoint with -- for an endpoint signed by a
+  # lab PKI. Empty = system CAs (the Flux behaviour). The S3 ExternalSecret
+  # copies it in, because endpointCA must name a Secret.
+  caConfigMap: ""
+  caKey: trust-bundle.pem
+
+# Velero Schedule for the Kubernetes OBJECTS (Cluster CR, ExternalSecrets,
+# ObjectStore), selected by label backup=backstage-rag-postgres. OFF by default
+# here (Flux deploys it unconditionally): it needs Velero's CRDs, and without
+# them the whole database Application fails its dry-run.
+veleroSchedule:
+  enabled: false
+  namespace: velero
+  cron: "0 1 * * *"
+  ttl: 168h0m0s
+  storageLocation: default
+
+# Sync policy applied to the rendered Application.
+#
+# The retry block is load-bearing: syncing against a cluster whose CNPG
+# operator (or barman plugin) is not up yet fails the dry-run on the unknown
+# kind, and sync waves do not order across Applications. Retry recovers it.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

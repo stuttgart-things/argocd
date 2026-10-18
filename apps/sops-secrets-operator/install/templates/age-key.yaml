@@ -1,0 +1,47 @@
+{{- $ak := .Values.ageKey | default dict }}
+{{- $es := $ak.externalSecret | default dict }}
+{{- $store := $es.secretStore | default dict }}
+{{- if $store.name }}
+{{- $name := include "sopsOperator.appName" . }}
+{{- $opNs := include "sopsOperator.namespace" . }}
+{{- $esValues := dict
+      "secretName"      $ak.secretName
+      "dataKey"         $ak.dataKey
+      "namespaces"      $es.namespaces
+      "secretStoreRef"  (dict "kind" ($store.kind | default "ClusterSecretStore") "name" $store.name)
+      "remoteKey"       $es.remoteKey
+      "property"        $es.property
+      "refreshInterval" $es.refreshInterval
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-age-key" $name | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # After the operator (0): its base creates sops-secrets-operator-system,
+    # which this Application deliberately does not (no CreateNamespace) — a
+    # second owner of the namespace is how a prune takes it out from under the
+    # other. Until the namespace exists the sync retries.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/sops-secrets-operator/age-key
+    helm:
+      releaseName: sops-age-key
+      valuesObject:
+        {{- toYaml $esValues | nindent 8 }}
+  destination:
+    {{- include "sopsOperator.destination" . | nindent 4 }}
+    namespace: {{ $opNs | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
