@@ -4,4 +4,4 @@ name: infisical-install
 description: App-of-apps chart packaging Infisical (upstream infisical-standalone Helm chart) with bundled PostgreSQL + Redis, opt-in root-key provisioning (ExternalSecrets or a dev-only Secret), and a Gateway API HTTPRoute sub-Application.
 type: application
 version: 0.1.0
-appVersion: "v0.158.0"
+appVersion: "v0.166.6"
