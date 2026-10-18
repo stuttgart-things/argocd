@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: clusterscope-install
+description: App-of-apps entry for clusterscope — a lab visualizer that renders the cluster directories of a GitOps repository (synced in by a git-sync sidecar) and, in live mode, the GitOps status, workload health and HTTPRoute endpoints of every cluster of the lab. Renders one Argo CD Application over the published kustomize OCI artifact (ghcr.io/stuttgart-things/clusterscope-kustomize) with the args and the git-sync sidecar patched in, plus opt-in sub-Applications for the -config ConfigMap and the Vault ExternalSecrets (git credentials, kubeconfigs of the lab's clusters), the HTTPRoute, and a Prometheus Operator ScrapeConfig that blackbox-probes every endpoint clusterscope lists.
+type: application
+version: 0.1.0
+appVersion: "v0.26.0"

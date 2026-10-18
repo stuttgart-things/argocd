@@ -1,0 +1,448 @@
+# Crossplane CAPABILITIES -- what a management cluster can DO (ported from
+# stuttgart-things/flux cicd/crossplane/capabilities). One ApplicationSet per
+# capability, each rendering cicd/crossplane/capabilities (app-of-apps) with
+# exactly that capability enabled; the chart renders one child Application per
+# capability onto the workload cluster:
+#
+#   capability     label (opt-IN, explicit "true")            source
+#   vspherevm      cicd-platform/crossplane-cap-vspherevm      oci ghcr.io/stuttgart-things/charts/vspherevm
+#   proxmoxvm      cicd-platform/crossplane-cap-proxmoxvm      oci ghcr.io/stuttgart-things/charts/proxmoxvm
+#   ansible-run    cicd-platform/crossplane-cap-ansible-run    oci ghcr.io/stuttgart-things/charts/ansible
+#   packer         cicd-platform/crossplane-cap-packer         oci ghcr.io/stuttgart-things/charts/packer
+#   harvester-vm   cicd-platform/crossplane-cap-harvester-vm   ./harvester-vm in this repo (no chart exists)
+#
+# OPT-IN, not opt-out: a capability is a cluster fact (which hypervisor, which
+# lab, which Vault), and enabling one on a cluster that lacks the Vault auth
+# mount or the Configurations renders stores that never become Ready.
+#
+# flux's SETS map onto label combinations (and onto presets/<set>.yaml for
+# consumers that do not go through this file):
+#   labda-vsphere                vspherevm + ansible-run + packer
+#   labul-proxmox                proxmoxvm + ansible-run + packer   (+ ann ansible-run-environment: labul,
+#                                                                     ansible-run-secret-store: vault-cicd-proxmox-labul)
+#   labda-vsphere-labul-proxmox  vspherevm + proxmoxvm + ansible-run + packer
+#   harvester-demo               harvester-vm + ansible-run          (+ ann ansible-run-secret-store)
+# ansible-run is ONE Application per cluster whatever the combination, so the
+# two-environment set cannot end with two owners of it.
+#
+# THE OLD MONOREPO PATH STAYS (appset-cxp-{ansible,proxmoxvm,vspherevm}.yaml,
+# untouched). For the same capability a cluster gets ONE of the two: the
+# AppSets below exclude a cluster that carries the old label
+# (cicd-platform/crossplane-{ansible,proxmoxvm,vspherevm}: "true"). Migrating
+# a cluster = drop the old label, then set the new one. Note the old path also
+# carries the per-cluster XRs (cxp-xr-*); this one does not -- XRs stay with
+# the monorepo AppSets / the cluster's own repo.
+#
+# CREDENTIALS VIA ESO (secretStore.backend: eso), not flux's sops-git. vspherevm
+# and proxmoxvm render their own ClusterSecretStore against the cluster's Vault
+# k8s auth mount `<cluster>-eso` (needs ESO, the `eso` role, and the
+# vault-pki-ca Secret in cert-manager). Configurations are NOT installed by
+# these charts (configuration.install: false) -- see the chart's
+# templates/applications.yaml for why and where they come from.
+#
+# Annotations (cicd-platform.stuttgart-things.com/<key>), all optional:
+#   crossplane-cap-vspherevm-environment     default labda
+#   crossplane-cap-proxmoxvm-environment     default labul (the chart ships only labul)
+#   crossplane-cap-ansible-run-environment   default labda
+#   crossplane-cap-ansible-run-secret-store  default "" = chart's vault-cicd-vsphere-<env>
+#   crossplane-cap-vault-auth-mount          default <cluster>-eso
+#   crossplane-cap-storage-class             default openebs-hostpath (ansible-run PipelineRun PVC)
+#   crossplane-cap-tekton-namespace          default tekton-ci (ansible-run, packer)
+#   crossplane-cap-harvester-environment     default default
+#   crossplane-cap-harvester-provider-config default in-cluster
+#   crossplane-cap-harvester-storage-class   default harvester-longhorn
+#   crossplane-cap-harvester-namespace       default vms
+#   crossplane-cap-harvester-network         default default/vms
+#   crossplane-cap-harvester-image           default default/image-ubuntu
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-cap-vspherevm-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: app-of-apps parent, so the
+  # flag would preserve child Applications, which then block their AppProject
+  # (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/crossplane-cap-vspherevm: "true"
+          matchExpressions:
+            - key: cicd-platform/crossplane
+              operator: NotIn
+              values: ["false"]
+            # NOT BOTH PATHS FOR ONE CAPABILITY. appset-cxp-*.yaml installs the
+            # same objects (ClusterSecretStore, ClusterProviderConfig,
+            # EnvironmentConfig, ...) from the monorepo chart under another
+            # Application; two owners rewrite each other every sync. A cluster
+            # still carrying the old label stays on the old path until it is
+            # removed -- that AppSet is untouched and keeps working.
+            - key: cicd-platform/crossplane-vspherevm
+              operator: NotIn
+              values: ["true"]
+  template:
+    metadata:
+      name: 'crossplane-cap-vspherevm-{{ .name }}'
+      annotations:
+        # Wave 1: after providers/functions/configs (wave 0) and baseline.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: cicd/crossplane/capabilities
+        helm:
+          releaseName: 'crossplane-cap-vspherevm-{{ .name }}'
+          valuesObject:
+            # Children are cxp-cap-<cluster>-<capability>; MUST differ from
+            # this template's own name, or the parent applies the child spec
+            # over itself and nothing deploys.
+            applicationName: 'cxp-cap-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: crossplane-system
+            # Per-CLUSTER Vault auth mount, same convention as the baseline and
+            # cxp-* AppSets; annotation only for a cluster that deviates.
+            secretStore:
+              authMountPath: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-vault-auth-mount" | default (printf "%s-eso" .name) }}'
+            # chartVersion is NOT set here: it inherits the chart's values.yaml,
+            # which Renovate keeps bumped.
+            capabilities:
+              vspherevm:
+                enabled: true
+                environment: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-vspherevm-environment" | default "labda" }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-cap-proxmoxvm-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: app-of-apps parent, so the
+  # flag would preserve child Applications, which then block their AppProject
+  # (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/crossplane-cap-proxmoxvm: "true"
+          matchExpressions:
+            - key: cicd-platform/crossplane
+              operator: NotIn
+              values: ["false"]
+            # NOT BOTH PATHS FOR ONE CAPABILITY. appset-cxp-*.yaml installs the
+            # same objects (ClusterSecretStore, ClusterProviderConfig,
+            # EnvironmentConfig, ...) from the monorepo chart under another
+            # Application; two owners rewrite each other every sync. A cluster
+            # still carrying the old label stays on the old path until it is
+            # removed -- that AppSet is untouched and keeps working.
+            - key: cicd-platform/crossplane-proxmoxvm
+              operator: NotIn
+              values: ["true"]
+  template:
+    metadata:
+      name: 'crossplane-cap-proxmoxvm-{{ .name }}'
+      annotations:
+        # Wave 1: after providers/functions/configs (wave 0) and baseline.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: cicd/crossplane/capabilities
+        helm:
+          releaseName: 'crossplane-cap-proxmoxvm-{{ .name }}'
+          valuesObject:
+            # Children are cxp-cap-<cluster>-<capability>; MUST differ from
+            # this template's own name, or the parent applies the child spec
+            # over itself and nothing deploys.
+            applicationName: 'cxp-cap-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: crossplane-system
+            # Per-CLUSTER Vault auth mount, same convention as the baseline and
+            # cxp-* AppSets; annotation only for a cluster that deviates.
+            secretStore:
+              authMountPath: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-vault-auth-mount" | default (printf "%s-eso" .name) }}'
+            # chartVersion is NOT set here: it inherits the chart's values.yaml,
+            # which Renovate keeps bumped.
+            capabilities:
+              proxmoxvm:
+                enabled: true
+                environment: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-proxmoxvm-environment" | default "labul" }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-cap-ansible-run-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: app-of-apps parent, so the
+  # flag would preserve child Applications, which then block their AppProject
+  # (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/crossplane-cap-ansible-run: "true"
+          matchExpressions:
+            - key: cicd-platform/crossplane
+              operator: NotIn
+              values: ["false"]
+            # NOT BOTH PATHS FOR ONE CAPABILITY. appset-cxp-*.yaml installs the
+            # same objects (ClusterSecretStore, ClusterProviderConfig,
+            # EnvironmentConfig, ...) from the monorepo chart under another
+            # Application; two owners rewrite each other every sync. A cluster
+            # still carrying the old label stays on the old path until it is
+            # removed -- that AppSet is untouched and keeps working.
+            - key: cicd-platform/crossplane-ansible
+              operator: NotIn
+              values: ["true"]
+  template:
+    metadata:
+      name: 'crossplane-cap-ansible-run-{{ .name }}'
+      annotations:
+        # Wave 1: after providers/functions/configs (wave 0) and baseline.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: cicd/crossplane/capabilities
+        helm:
+          releaseName: 'crossplane-cap-ansible-run-{{ .name }}'
+          valuesObject:
+            # Children are cxp-cap-<cluster>-<capability>; MUST differ from
+            # this template's own name, or the parent applies the child spec
+            # over itself and nothing deploys.
+            applicationName: 'cxp-cap-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: crossplane-system
+            tektonNamespace: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-tekton-namespace" | default "tekton-ci" }}'
+            # chartVersion is NOT set here: it inherits the chart's values.yaml,
+            # which Renovate keeps bumped.
+            capabilities:
+              ansibleRun:
+                enabled: true
+                environment: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-ansible-run-environment" | default "labda" }}'
+                storageClass: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-storage-class" | default "openebs-hostpath" }}'
+                secretStoreName: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-ansible-run-secret-store" | default "" }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-cap-packer-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: app-of-apps parent, so the
+  # flag would preserve child Applications, which then block their AppProject
+  # (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/crossplane-cap-packer: "true"
+          matchExpressions:
+            - key: cicd-platform/crossplane
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: 'crossplane-cap-packer-{{ .name }}'
+      annotations:
+        # Wave 1: after providers/functions/configs (wave 0) and baseline.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: cicd/crossplane/capabilities
+        helm:
+          releaseName: 'crossplane-cap-packer-{{ .name }}'
+          valuesObject:
+            # Children are cxp-cap-<cluster>-<capability>; MUST differ from
+            # this template's own name, or the parent applies the child spec
+            # over itself and nothing deploys.
+            applicationName: 'cxp-cap-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: crossplane-system
+            tektonNamespace: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-tekton-namespace" | default "tekton-ci" }}'
+            # chartVersion is NOT set here: it inherits the chart's values.yaml,
+            # which Renovate keeps bumped.
+            capabilities:
+              packer:
+                enabled: true
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-cap-harvester-vm-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: app-of-apps parent, so the
+  # flag would preserve child Applications, which then block their AppProject
+  # (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/crossplane-cap-harvester-vm: "true"
+          matchExpressions:
+            - key: cicd-platform/crossplane
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: 'crossplane-cap-harvester-vm-{{ .name }}'
+      annotations:
+        # Wave 1: after providers/functions/configs (wave 0) and baseline.
+        argocd.argoproj.io/sync-wave: "1"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: cicd/crossplane/capabilities
+        helm:
+          releaseName: 'crossplane-cap-harvester-vm-{{ .name }}'
+          valuesObject:
+            # Children are cxp-cap-<cluster>-<capability>; MUST differ from
+            # this template's own name, or the parent applies the child spec
+            # over itself and nothing deploys.
+            applicationName: 'cxp-cap-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: crossplane-system
+            # ./harvester-vm is read from git at the same release as this chart.
+            catalog:
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.82.2
+            # chartVersion is NOT set here: it inherits the chart's values.yaml,
+            # which Renovate keeps bumped.
+            capabilities:
+              harvesterVm:
+                enabled: true
+                environment: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-harvester-environment" | default "default" }}'
+                providerConfigRef: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-harvester-provider-config" | default "in-cluster" }}'
+                storageClassName: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-harvester-storage-class" | default "harvester-longhorn" }}'
+                namespace: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-harvester-namespace" | default "vms" }}'
+                networkName: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-harvester-network" | default "default/vms" }}'
+                imageId: '{{ index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/crossplane-cap-harvester-image" | default "default/image-ubuntu" }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

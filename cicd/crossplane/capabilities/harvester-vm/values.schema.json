@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "crossplane harvester-vm capability chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["environment", "providerConfigRef", "storageClassName", "namespace", "networkName", "imageId"],
+  "properties": {
+    "environment": { "type": "string", "minLength": 1, "description": "Value of the harvester-vm.resources.stuttgart-things.com/environment selector label." },
+    "providerConfigRef": { "type": "string", "minLength": 1, "description": "provider-kubernetes ClusterProviderConfig for the Harvester API." },
+    "storageClassName": { "type": "string", "minLength": 1 },
+    "namespace": { "type": "string", "minLength": 1 },
+    "networkName": { "type": "string", "minLength": 1 },
+    "imageId": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}

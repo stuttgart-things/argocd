@@ -1,0 +1,503 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "clusterscope app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "catalog",
+    "destination",
+    "version",
+    "clusterscope",
+    "gitSync"
+  ],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "description": "Empty = derive from the destination (clusterscope-<sha1[:8]>), so two clusters cannot collide in the management cluster's argocd namespace. Must differ from an AppSet parent's own name."
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "targetRevision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ]
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "namespace"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "server"
+          ]
+        },
+        {
+          "required": [
+            "name"
+          ]
+        }
+      ],
+      "description": "`server` or `name`; `name` wins when both are set."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tag of the published kustomize artifact; the base pins the clusterscope image of the same version. -config needs >= v0.24.0."
+    },
+    "clusterscope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tech": {
+          "type": "string",
+          "enum": [
+            "flux",
+            "argocd"
+          ],
+          "description": "GitOps tech of the cluster directories clusterscope reads."
+        },
+        "lab": {
+          "type": "string"
+        },
+        "live": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ],
+          "description": "Live mode: GitOps status, workload health, endpoints."
+        },
+        "selfCluster": {
+          "type": "string"
+        },
+        "kubeconfigDir": {
+          "type": "string",
+          "description": "Empty = /kubeconfigs when vaultKubeconfigs is enabled."
+        },
+        "probe": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ],
+          "description": "Probe every HTTPRoute URL on each refresh."
+        },
+        "refresh": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*$"
+            }
+          ],
+          "description": "Live refresh interval (seconds)."
+        }
+      },
+      "required": [
+        "tech",
+        "live",
+        "probe",
+        "refresh"
+      ]
+    },
+    "trustBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "configMap": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "configMap",
+        "key"
+      ]
+    },
+    "gitSync": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1,
+          "description": "REQUIRED. Repository URL without .git; the checkout link is /data/<last URL segment>."
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "period": {
+          "type": "string",
+          "pattern": "^[0-9]+(ms|s|m|h)$"
+        },
+        "dir": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "repository",
+            "tag"
+          ]
+        },
+        "authSecret": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional Secret with username/password for git-sync."
+        }
+      },
+      "required": [
+        "repo",
+        "branch",
+        "period",
+        "dir",
+        "image",
+        "authSecret"
+      ]
+    },
+    "gitSyncExtra": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ]
+        },
+        "repo": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "period": {
+          "type": "string",
+          "pattern": "^[0-9]+(ms|s|m|h)$"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "description": "A second repository at /data-extra, own git-sync on its own emptyDir. Needs config to scan it."
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ]
+        },
+        "content": {
+          "type": "string",
+          "description": "The -config file: YAML or one line of JSON (clusterscope docs/lab.md)."
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "vaultGitAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ]
+        },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ]
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "usernameProperty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "passwordProperty": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "description": "ExternalSecret into gitSync.authSecret. secretStore.name and path are required when enabled."
+    },
+    "vaultKubeconfigs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ]
+        },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ]
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ]
+        },
+        "clusters": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Regexp over the Vault entry names."
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "esoRefreshInterval": {
+      "type": "string",
+      "pattern": "^[0-9]+(ms|s|m|h)$"
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ]
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sectionName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "namespace"
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "blackboxProbes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          ]
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prometheusRelease": {
+          "type": "string",
+          "minLength": 1
+        },
+        "module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "address": {
+          "type": "string",
+          "pattern": "^[^/:]+:[0-9]+$"
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+(ms|s|m|h)$"
+        },
+        "sdRefresh": {
+          "type": "string",
+          "pattern": "^[0-9]+(ms|s|m|h)$"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "description": "ScrapeConfig probing /api/targets via blackbox. Needs clusterscope.live, the ScrapeConfig CRD and a blackbox exporter."
+    },
+    "reloader": {
+      "type": "boolean",
+      "description": "configmap.reloader annotation for the -config ConfigMap. No-op without the controller."
+    },
+    "cascadingDelete": {
+      "type": "boolean",
+      "description": "resources-finalizer on every child Application. The platforms/ AppSet sets false (argocd#324)."
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

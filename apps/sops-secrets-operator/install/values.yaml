@@ -1,0 +1,115 @@
+---
+# Reference back to this catalog repo -- used by the `-age-key` Application
+# (ageKey.externalSecret below) to load apps/sops-secrets-operator/age-key.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# Base name for the rendered Applications. Empty means derive it from the
+# destination as `sops-secrets-operator-<sha1(destination)[:8]>`, because the
+# Applications land in the `argocd` namespace of ONE management cluster: a
+# fixed name would make two clusters' deployments collide on the same object.
+# The age key Application is `<this>-age-key`.
+applicationName: ""
+
+# AppProject the rendered Applications belong to.
+project: default
+
+# Where it deploys. Provide either `server` (cluster URL) or `name` (the
+# Argo-registered cluster name); if both are set, `name` wins.
+#
+# `namespace` DOES NOT MOVE THE OPERATOR. The base names
+# `sops-secrets-operator-system` on every object (Namespace, Deployment,
+# ServiceAccount, ClusterRoleBinding subject), and this chart deliberately sets
+# no kustomize namespace over it — the flux catalog sets no targetNamespace for
+# the same reason. It is only Argo CD's default for namespace-less objects, of
+# which the base has none; leave it at the base's namespace.
+destination:
+  server: https://kubernetes.default.svc
+  # name: platform-sthings
+  namespace: sops-secrets-operator-system
+
+# The base creates `sops-secrets-operator-system` itself, so no
+# CreateNamespace: a second owner of the namespace is how a prune takes it out
+# from under the other (the flux catalog's "Namespace ownership" note).
+#
+# The retry is longer than the catalog default — the ArgoCD stand-in for flux's
+# `timeout: 10m`. Flux's comment gives a webhook waiting on cert-manager as the
+# reason; the published artifact has no webhook (see README, Preconditions), so
+# here it is only headroom for a first sync of five CRDs plus the rollout.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - ServerSideApply=true
+  retry:
+    limit: 10
+    backoff:
+      duration: 15s
+      factor: 2
+      maxDuration: 5m
+
+# Tag of the published kustomize artifact — KEEP THE `v`. The artifact pins its
+# own image (the repo writes config/manager/kustomization.yaml before it tags),
+# so no image patch is needed and this pins the operator version too.
+#
+# Do not go below v0.9.0: earlier tags carry an off-by-one — ref=v0.8.5 built a
+# bundle running image v0.8.4 (fixed in stuttgart-things/sops-secrets-operator#90).
+# The schema refuses anything older.
+#
+# renovate: datasource=docker depName=ghcr.io/stuttgart-things/sops-secrets-operator-kustomize
+version: v0.9.2
+
+# The age key. The operator carries none: it resolves the key per resource
+# through `spec.decryption.keyRef` (a Secret in the resource's namespace), so
+# installing the operator alone decrypts nothing.
+ageKey:
+  # Name and data key of the Secret — what the SopsSecret manifests in the
+  # fleet reference (`keyRef: {name: sops-age-key, key: age.agekey}`) and what
+  # the machinery play creates by hand today.
+  secretName: sops-age-key
+  dataKey: age.agekey
+
+  # OPTIONAL ExternalSecret that materialises the Secret above from a store.
+  # OFF while `secretStore.name` is empty (the default) — then the Secret is
+  # provisioned out of band, as the flux catalog leaves it. Set, the chart
+  # renders `<app>-age-key` (sync-wave 1, after the operator) from
+  # apps/sops-secrets-operator/age-key. Needs external-secrets on the cluster
+  # and the store able to read the entry.
+  externalSecret:
+    secretStore:
+      kind: ClusterSecretStore
+      name: ""
+    # Entry NAME under the store's mount (not a KV path) and the property
+    # holding the age private key (`AGE-SECRET-KEY-1…`).
+    remoteKey: sops-age-key
+    property: age.agekey
+    refreshInterval: 1h
+    # Namespaces that get a copy. keyRef is namespace-local, so every
+    # namespace with SopsSecrets that omit a global key needs its own. Every
+    # namespace listed must already exist — except the operator's own, which
+    # the base creates (the age key Application syncs after it).
+    namespaces:
+      - sops-secrets-operator-system
+
+  # ONE global key for resources that omit `keyRef` (operator >= v0.9.0,
+  # sops-secrets-operator#47): adds --global-age-key-secret /
+  # --global-age-key-data-key to the manager, pointing at the Secret above in
+  # the operator's namespace. Opt-in. It does not remove per-namespace copies:
+  # a resource's own keyRef always wins over the global default.
+  global: false
+
+# Mark the operator's CRDs Prune=false,Delete=false for Argo CD. Deleting a CRD
+# deletes every SopsSecret / SopsSecretManifest with it — and with them any
+# Secret the operator generated with an ownerReference back to its resource:
+# fleet-wide credentials gone in one mistaken cascade. Argo CD still creates and updates the CRDs; it never
+# removes them.
+protectCRDs: true
+
+# Whether deleting the parent Application also prunes what it deployed (a
+# resources-finalizer on the children). OFF by default and in the AppSet: an
+# opt-out should stop Argo CD managing the operator, not uninstall it, and
+# against a deregistered cluster the prune hangs the children in Terminating
+# (stuttgart-things/argocd#324).
+cascadingDelete: false

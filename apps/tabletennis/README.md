@@ -8,7 +8,8 @@ towards. A cluster that wants one almost always wants both. Optionally a third p
 strip at the table.
 
 The Argo CD counterpart to `flux/apps/tabletennis`, plus the tabletennis light-catcher that
-lives on the flux side as `apps/platform/components/homerun2-light-catcher-tabletennis`.
+lives on the flux side as `apps/homerun2/components/light-catcher-tabletennis` (bundled by
+`apps/platform/components/homerun2-light-catcher-tabletennis`).
 
 ## Layout
 
@@ -132,6 +133,12 @@ each pointed at `wledEndpoint`. They match on the tags zaehlwerk v0.3.0+ emits, 
 first rule takes every set *and* match and side a's colour every point. `profileContent`
 replaces the whole file.
 
+| value | default | |
+|---|---|---|
+| `lightCatcher.reloader` | `true` | annotates the Deployment `reloader.stakater.com/auto: "true"`, so a changed profile or rotated redis Secret rolls the pod (the catcher reads both at start only). Needs Stakater Reloader (`infra/reloader`) on the cluster |
+| `lightCatcher.httpRoute.enabled` | `false` | keep the base's HTTPRoute, patched onto `gateway` with `hostname`, instead of deleting it. Patched in place, so route and Service land in one apply (Cilium resolves backendRefs once) |
+| `lightCatcher.hostname` | `""` | the route's hostname; empty = `light-catcher-tabletennis.<domain>` |
+
 ## The piezo board simulator (`piezoSim`)
 
 `piezoSim.enabled: true` (platform: cluster label `tabletennis-platform/piezo-sim: 'true'`)
@@ -235,6 +242,8 @@ Hostnames come out as `schmetterpause.tabletennis.sthings.lab` and
 | The pair | `apps/tabletennis/profiles/base` (a kustomize component list) | one app-of-apps chart delegating to two catalog entries |
 | Panel on/off | two components (`zaehlwerk-panel-homerun2` / `-off`), because an empty Flux substitution renders as YAML `null` and fails the whole apps layer | `zaehlwerk.panel` + `homerun2.namespace` — Helm can express "absent" |
 | The tabletennis light-catcher | a homerun2 platform component (`apps/platform/components/homerun2-light-catcher-tabletennis`) | part of this platform, since it exists for the table |
+| The light-catcher's route | always, from a routes Kustomization that `dependsOn` the catcher (`light-catcher-tabletennis.<domain>`) | opt-in `lightCatcher.httpRoute.enabled`; the base's own route patched in place, same hostname default |
+| The light-catcher's Vault property | `redis-password` | `redisPassword` — the property every homerun2 component reads on the Argo side |
 | DB backups | a component of its own (`schmetterpause-db-backup`), selected as the alternative bundle `tabletennis-backup` | `schmetterpause.values.database.backup` |
 | Monitoring | three components (`schmetterpause-monitoring-off` / `-on` / `-backup`) | `schmetterpause.values.monitoring` |
 | The scoreboard token | a component pair (`schmetterpause-scoreboard-off` / `-on`), because ESO fails the whole app secret over one missing Vault property | `schmetterpause.scoreboard.enabled` |

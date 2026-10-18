@@ -15,6 +15,8 @@ Catalog entries rendered:
 | `external-secrets-install-security`    | -10  | `infra/external-secrets/install`      | `external-secrets` | External Secrets Operator (ESO) controller + webhook + cert-controller + CRDs (`ClusterSecretStore`, `ExternalSecret`, …). Controller only — `ClusterSecretStore`s are cluster-specific and live in each cluster's overlay |
 | `external-secrets-stores-security`     | -5   | `infra/external-secrets/cluster-secret-store-vault` | `external-secrets` | One `ClusterSecretStore` per KV mount listed in the cluster Secret's `external-secrets.stuttgart-things.com/kv-mounts` annotation, named `vault-<mount>`. **Opt-IN** via `security-platform/external-secrets-stores: 'true'`, unlike every other entry here: a store whose Vault role cannot read the mount reports `Valid` / `Ready=True` while every ExternalSecret under it fails with a 400. Replaces the hand-written per-mount Applications in the monorepo |
 | `kyverno-install-security`             | -10  | `infra/kyverno/install`               | `kyverno`          | Kyverno admission controller + background-scan controller + cleanup controller + CRDs (`ClusterPolicy`, `Policy`, `PolicyException`, …). Controller only — actual `ClusterPolicy` / `Policy` resources are cluster-specific and live in each cluster's overlay (same split as ESO above) |
+| `sops-secrets-operator-security`       | -5   | `apps/sops-secrets-operator/install`  | `sops-secrets-operator-system` | **Opt-IN** via `security-platform/sops-secrets-operator: 'true'`. Optional age-key ExternalSecret (`…/sops-age-key-store`). The v0.9.2 base ships no webhook, so no cert-manager dependency |
+| `openbao-security`                     | 0    | `apps/openbao/install`                | `openbao`          | OpenBao standalone raft + seal Secret ExternalSecret (-10) + HTTPRoute (10). **Opt-IN** via `security-platform/openbao: 'true'`. Seal from `…/openbao-seal` (`transit` default \| `static` \| `none`); needs `…/openbao-storage-class`, plus `…/openbao-seal-address` (transit) or `…/openbao-seal-key-id` (static). Store entry `…/openbao-secret-key` (def `openbao`) in `…/openbao-secret-store` (def `vault-<cluster>`) |
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
 
@@ -46,6 +48,8 @@ Why: ESO needs Vault-side prerequisites (Kubernetes auth backend mounted at the 
 |---|---|
 | `security-platform/external-secrets: "true"`             | Enrol the cluster in `external-secrets-install-security` |
 | `security-platform/kyverno: "true"`                      | Enrol the cluster in `kyverno-install-security` |
+| `security-platform/sops-secrets-operator: "true"`        | Enrol the cluster in `sops-secrets-operator-security` |
+| `security-platform/openbao: "true"`                      | Enrol the cluster in `openbao-security` |
 
 Selector logic — opt-in appsets:
 

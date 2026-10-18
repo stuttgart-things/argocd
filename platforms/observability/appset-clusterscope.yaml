@@ -1,0 +1,186 @@
+---
+# clusterscope — the lab visualizer: it renders the cluster directories of a
+# GitOps repository and, in live mode, the GitOps status, workload health and
+# HTTPRoute endpoints of every cluster of the lab. Optionally every endpoint it
+# lists becomes a blackbox probe in this cluster's Prometheus.
+#
+# Fans out across clusters labelled `observability-platform: "true"` AND
+# `observability-platform/clusterscope: "true"`. One parent app-of-apps per
+# cluster, rendering apps/clusterscope/install.
+#
+# OPT-IN, not opt-out like kube-prometheus-stack: clusterscope is a per-lab
+# tool, not a per-cluster one — a lab wants ONE instance that reads the others
+# (live mode via kubeconfigs), and it has a value no default can supply, the
+# repository to render (`clusterscope-git-repo`). An opt-out would put a
+# git-sync crash-looping on a placeholder URL on every observability cluster.
+#
+# The optional parts are switched by the annotation that parameterises them —
+# one annotation per part instead of a label plus an annotation that can
+# disagree:
+#   clusterscope-git-auth-path         → git-sync credentials from Vault
+#   clusterscope-kubeconfig-clusters   → the lab's kubeconfigs from Vault
+#   clusterscope-config                → -config ConfigMap (several repos, overrides)
+#   clusterscope-git-extra-repo        → second repository (/data-extra)
+# The blackbox probes are a LABEL (`observability-platform/clusterscope-blackbox-probes`)
+# because they need other components rather than a parameter: the ScrapeConfig
+# CRD from kube-prometheus-stack, and a blackbox exporter in `monitoring`
+# (infra/blackbox-exporter, which no platform AppSet installs yet).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: clusterscope-observability
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # `cascadingDelete: false` below is the other half.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            observability-platform: "true"
+          matchExpressions:
+            - key: observability-platform/clusterscope
+              operator: In
+              values: ["true"]
+            # The UI is routed through the cluster's own gateway, whose
+            # hostname comes from the reservation. The operator stamps
+            # allocation-ip="" on registration-only kind clusters, so Exists
+            # alone over-matches.
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
+  template:
+    metadata:
+      name: 'clusterscope-observability-{{ .name }}'
+      annotations:
+        # Informational only; after kube-prometheus-stack (5), whose CRD the
+        # optional ScrapeConfig needs. The retries cover the race.
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      # The parent renders Application CRs, which land in the argocd ns on the
+      # management cluster. The children target the remote cluster via
+      # valuesObject.destination.server below.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: apps/clusterscope/install
+        helm:
+          # Fixed, not derived: Helm caps release names at 53 characters, and
+          # the chart does not use .Release.Name (same reason as
+          # appset-kube-prometheus-stack).
+          releaseName: clusterscope
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent: the parent
+            # server-side-applies the child spec over itself, the ApplicationSet
+            # controller puts its own back, and nothing ever deploys -- while
+            # both report "successfully synced". The -config / -httproute /
+            # -probes children derive from this name.
+            applicationName: 'clusterscope-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.82.2
+            destination:
+              server: '{{ .server }}'
+              namespace: clusterscope
+            cascadingDelete: false
+
+            # `version` (the kustomize artifact, which pins the image) is
+            # intentionally NOT set -- it inherits
+            # apps/clusterscope/install/values.yaml, which Renovate keeps bumped.
+            # A copy here would win and pin it silently.
+
+            # Every optional annotation below goes through `default`: `index`
+            # on an absent key returns an untyped nil, and a bare substitution
+            # prints it as the literal string "<no value>". `default (dict)`
+            # survives a cluster without any annotations.
+            clusterscope:
+              # GitOps tech of the REPOSITORY clusterscope renders (flux or
+              # argocd), not of the tool deploying clusterscope.
+              tech: '{{ default "flux" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-tech") }}'
+              lab: '{{ default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-lab") }}'
+              # Strings "true"/"false" -- an AppSet cannot produce a boolean;
+              # the chart compares them with toString.
+              live: '{{ default "false" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-live") }}'
+              # The cluster directory clusterscope reads in-cluster. Defaults to
+              # the Argo cluster name; set it where the repository's directory
+              # is named differently.
+              selfCluster: '{{ default .name (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-self-cluster") }}'
+              probe: '{{ default "false" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-probe") }}'
+              refresh: '{{ default "60" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-refresh") }}'
+            gitSync:
+              # REQUIRED. The placeholder fails loudly (git-sync DNS error
+              # naming it) instead of rendering someone else's repository.
+              repo: '{{ default "https://set-clusterscope-git-repo.invalid" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-repo") }}'
+              branch: '{{ default "main" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-branch") }}'
+              period: 60s
+              dir: '{{ default "/data/repo/clusters" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-sync-dir") }}'
+              image:
+                repository: registry.k8s.io/git-sync/git-sync
+                # renovate: datasource=docker depName=registry.k8s.io/git-sync/git-sync
+                tag: v4.4.0
+              authSecret: git-sync-auth
+            gitSyncExtra:
+              enabled: '{{ if (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-extra-repo") }}true{{ else }}false{{ end }}'
+              repo: '{{ default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-extra-repo") }}'
+              branch: '{{ default "main" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-extra-branch") }}'
+              period: 120s
+            # ONE line of JSON in the annotation (JSON is YAML); format:
+            # clusterscope docs/lab.md.
+            config:
+              enabled: '{{ if (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-config") }}true{{ else }}false{{ end }}'
+              content: '{{ default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-config") }}'
+            vaultGitAuth:
+              enabled: '{{ if (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-auth-path") }}true{{ else }}false{{ end }}'
+              secretStore:
+                kind: ClusterSecretStore
+                name: '{{ default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-auth-store") }}'
+              path: '{{ default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-auth-path") }}'
+              usernameProperty: '{{ default "username" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-auth-username-property") }}'
+              passwordProperty: '{{ default "password" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-auth-password-property") }}'
+            vaultKubeconfigs:
+              enabled: '{{ if (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-kubeconfig-clusters") }}true{{ else }}false{{ end }}'
+              secretStore:
+                kind: ClusterSecretStore
+                name: '{{ default "vault-kubeconfigs" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-kubeconfig-store") }}'
+              clusters: '{{ default "^$" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-kubeconfig-clusters") }}'
+            httpRoute:
+              enabled: true
+              hostname: 'clusterscope.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              gateway:
+                name: '{{ .name }}-gateway'
+                namespace: default
+            # Needs clusterscope-live "true" -- the chart refuses to render
+            # probes without live mode, whose inventory /api/targets serves.
+            blackboxProbes:
+              enabled: '{{ if eq (toString (index (default (dict) .metadata.labels) "observability-platform/clusterscope-blackbox-probes")) "true" }}true{{ else }}false{{ end }}'
+              # infra/blackbox-exporter ships http_2xx and http_2xx_untrusted_ca
+              # only; http_2xx pages for routes answering 401/403/404.
+              module: '{{ default "http_2xx" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-blackbox-module") }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

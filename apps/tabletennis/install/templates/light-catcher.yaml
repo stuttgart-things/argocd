@@ -46,10 +46,37 @@ spec:
             metadata:
               name: {{ $base }}
             $patch: delete
-        {{- /* No route. This instance drives the strip at the table and has no
-               reader; the dashboard on homerun2's own light-catcher is the one
-               worth exposing, and a second route would need a second hostname
-               to say nothing new. */}}
+{{- if include "tabletennis.lightCatcherRouteEnabled" . }}
+        {{- /* The base ships its HTTPRoute next to the Service; patching it in
+               place (parentRef + hostname) keeps both in ONE apply. That
+               matters: Cilium resolves a route's backendRefs once, so a route
+               applied before its Service serves HTTP 500 for good while
+               everything reports Synced/Healthy. flux gets the same ordering
+               from a separate routes Kustomization that dependsOn this one. */}}
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $base }}
+          patch: |-
+            - op: replace
+              path: /spec/parentRefs
+              value:
+                # group + kind spelled out so the replace matches the
+                # admission-defaulted live object.
+                - group: gateway.networking.k8s.io
+                  kind: Gateway
+                  name: {{ .Values.gateway.name | quote }}
+                  namespace: {{ .Values.gateway.namespace | quote }}
+            - op: replace
+              path: /spec/hostnames
+              value:
+                - {{ .Values.lightCatcher.hostname | default (printf "light-catcher-tabletennis.%s" .Values.domain) | quote }}
+{{- else }}
+        {{- /* No route by default. This instance drives the strip at the table
+               and has no reader; the dashboard on homerun2's own light-catcher
+               is the one worth exposing. `lightCatcher.httpRoute.enabled` keeps
+               the base's route instead (flux's routes Kustomization). */}}
         - target:
             kind: HTTPRoute
             name: {{ $base }}
@@ -59,6 +86,7 @@ spec:
             metadata:
               name: {{ $base }}
             $patch: delete
+{{- end }}
         - target:
             kind: Deployment
             name: {{ $base }}
@@ -67,6 +95,14 @@ spec:
             kind: Deployment
             metadata:
               name: {{ $base }}
+              {{- /* Roll the pod when a referenced ConfigMap/Secret changes: the
+                     catcher reads its profile and redis password at start only.
+                     Needs Stakater Reloader on the cluster (infra/reloader) —
+                     without it the annotation does nothing. */}}
+              {{- if include "tabletennis.lightCatcherReloader" . }}
+              annotations:
+                reloader.stakater.com/auto: "true"
+              {{- end }}
             spec:
               template:
                 spec:
@@ -181,6 +217,22 @@ spec:
 {{- end }}
   destination:
     {{- include "tabletennis.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+{{- if include "tabletennis.lightCatcherRouteEnabled" . }}
+  {{- /* Fields the API server defaults onto the base's route (group/kind on
+         refs, weight on a backendRef); without this the Application stays
+         OutOfSync while applying cleanly — same as apps/homerun2/install's
+         inline routes. */}}
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $base | quote }}
+      jqPathExpressions:
+        - .spec.parentRefs[].group
+        - .spec.parentRefs[].kind
+        - .spec.rules[].backendRefs[].group
+        - .spec.rules[].backendRefs[].kind
+        - .spec.rules[].backendRefs[].weight
+{{- end }}
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
 {{- end }}

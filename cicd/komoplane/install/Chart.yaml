@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: komoplane-install
+description: App-of-apps chart packaging the upstream Komoplane Helm chart (komodorio/komoplane), a read-only browser for Crossplane claims, composites and managed resources, plus an optional Gateway API HTTPRoute sub-Application.
+type: application
+version: 0.1.0
+appVersion: "0.2.1"

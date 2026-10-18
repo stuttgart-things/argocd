@@ -1,0 +1,88 @@
+# Crossplane Configurations, FLUX FAMILY -- opt-in alternative to
+# appset-crossplane-configs.yaml.
+#
+# Renders cicd/crossplane/configs with valueFiles profiles/flux.yaml, i.e. the
+# ghcr.io/stuttgart-things/crossplane/* set stuttgart-things/flux installs on its
+# cicd-platform clusters (cloud-config, volume-claim, storage-platform,
+# ansible-run, pipeline-integration, harvester-vm) instead of the default
+# crossplane-configurations/* list.
+#
+# OPT-IN, an explicit 'true':
+#     cicd-platform/crossplane-configs-flux: "true"
+# The same label EXCLUDES the cluster from appset-crossplane-configs.yaml
+# (matchExpressions NotIn ["true"] there), so the two families can never both
+# apply -- they share CR names from different sources, and a duplicate lock node
+# freezes every package on the cluster (Healthy=False, Installed=True, nothing
+# restarts, no claim reconciles).
+#
+# Opt-in rather than opt-out because the flux family is the one on borrowed
+# time (the default list records it as "old repo, decommissioned"): a cluster
+# takes it deliberately, typically because it runs claims written against it
+# (pipeline-integration, storage-platform exist only there).
+#
+# SWITCHING A LIVE CLUSTER is not a label flip: the default AppSet preserves
+# resources on deletion, so its `volume-claim` stays and this one then re-points
+# that CR at the other lineage. See the header of profiles/flux.yaml.
+#
+# Needs nothing extra from the other crossplane AppSets: functions/ installs all
+# four functions these packages declare at the registries they declare, and
+# provider-kubernetes arrives through their dependsOn (from xpkg.upbound.io for
+# this family) -- see the dependency table in profiles/flux.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: crossplane-configs-flux-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/crossplane-configs-flux: "true"
+          matchExpressions:
+            - key: cicd-platform/crossplane
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      # Not crossplane-configs-<cluster>: that name belongs to the default
+      # AppSet, and two AppSets generating one Application name fight over it.
+      name: crossplane-configs-flux-{{ .name }}
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: '{{ .server }}'
+        namespace: crossplane-system
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: cicd/crossplane/configs
+        helm:
+          releaseName: 'crossplane-configs-{{ .name }}'
+          # REPLACES the chart's default `configurations` list (a list in a
+          # values file overrides, it does not append) -- that is what keeps
+          # this a choice of family rather than a union of both.
+          valueFiles:
+            - profiles/flux.yaml
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

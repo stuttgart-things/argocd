@@ -1,0 +1,13 @@
+---
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: harvester-vm-defaults
+  labels:
+    harvester-vm.resources.stuttgart-things.com/environment: {{ .Values.environment | quote }}
+data:
+  providerConfigRef: {{ .Values.providerConfigRef | quote }}
+  storageClassName: {{ .Values.storageClassName | quote }}
+  namespace: {{ .Values.namespace | quote }}
+  networkName: {{ .Values.networkName | quote }}
+  imageId: {{ .Values.imageId | quote }}

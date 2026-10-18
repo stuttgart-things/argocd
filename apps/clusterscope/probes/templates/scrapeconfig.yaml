@@ -1,0 +1,36 @@
+---
+# Every HTTPRoute URL clusterscope knows (its /api/targets, http_sd format)
+# becomes a blackbox probe — new routes in the lab are watched without a
+# per-app target list. Target labels (cluster, namespace, route, app) come from
+# clusterscope; probe_source tells these probes apart from hand-written ones.
+# The blackbox module decides what counts as up.
+#
+# These series also feed infra/blackbox-exporter's generic rules
+# (BlackboxProbeFailed is critical): a module stricter than clusterscope's own
+# notion of reachable pages for every route behind a login.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: clusterscope-endpoints
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    release: {{ .Values.prometheusRelease | quote }}
+spec:
+  httpSDConfigs:
+    - url: {{ .Values.targetsURL | quote }}
+      refreshInterval: {{ .Values.sdRefresh | quote }}
+  metricsPath: /probe
+  params:
+    module:
+      - {{ .Values.module | quote }}
+  scrapeInterval: {{ .Values.interval | quote }}
+  scrapeTimeout: 30s
+  relabelings:
+    - sourceLabels: [__address__]
+      targetLabel: __param_target
+    - sourceLabels: [__param_target]
+      targetLabel: instance
+    - targetLabel: __address__
+      replacement: {{ .Values.address | quote }}
+    - targetLabel: probe_source
+      replacement: clusterscope

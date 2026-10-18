@@ -136,3 +136,18 @@ gets an 8-character hash of the full name, so two long names cannot collide.
 {{- printf "%s-%s" (trunc 44 . | trimSuffix "-") (sha1sum . | trunc 8) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+tabletennis.lightCatcherRouteEnabled / tabletennis.lightCatcherReloader --
+"true" or empty, string-compared for the same reason as lightCatcherEnabled: a
+platform AppSet may template them from a label or annotation.
+*/}}
+{{- define "tabletennis.lightCatcherRouteEnabled" -}}
+{{- if eq ((.Values.lightCatcher.httpRoute | default dict).enabled | default false | toString) "true" }}true{{ end -}}
+{{- end -}}
+
+{{- define "tabletennis.lightCatcherReloader" -}}
+{{- $r := .Values.lightCatcher.reloader -}}
+{{- if kindIs "invalid" $r }}{{ $r = true }}{{ end -}}
+{{- if eq (toString $r) "true" }}true{{ end -}}
+{{- end -}}

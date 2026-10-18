@@ -1,0 +1,206 @@
+---
+# Reference back to this catalog repo -- used by the external-secrets /
+# httpRoute Applications to load apps/openbao/{external-secrets,httproute}.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+# Where all rendered Applications deploy.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: openbao
+
+# Upstream openbao-helm chart (https://openbao.github.io/openbao-helm).
+# Held at the version stuttgart-things/flux runs in apps/openbao.
+# renovate: datasource=helm depName=openbao registryUrl=https://openbao.github.io/openbao-helm
+chartVersion: 0.30.3
+
+# Server image. NO tag, deliberately. The chart renders
+#   {{ .Values.server.image.tag | default (trimPrefix "v" .Chart.AppVersion) }}
+# so an unset tag follows the chart AND gets the leading "v" stripped, while an
+# explicit one does not. The image tags are e.g. 2.7.1; the GitHub release and
+# the chart's appVersion are v2.7.1. Setting the obvious value yields
+# quay.io/openbao/openbao:v2.7.1, which does not exist. chartVersion is the
+# single thing to keep current. (extraValues.server.image.tag still works, if
+# you must -- without the "v".)
+image:
+  repository: openbao/openbao
+
+# Raft data volume.
+storage:
+  size: 8Gi
+  # REQUIRED in practice: the chart default is the cluster's default
+  # StorageClass, and a PVC that never binds leaves the pod Pending while the
+  # Application reports Synced. The placeholder names itself in
+  # `kubectl describe pvc`; set the real class per cluster.
+  storageClass: set-storageClass
+
+# Topology of the CLUSTER (not OpenBao HA -- both render one standalone raft
+# server):
+#   multi-node   the chart as it is: injector on, `resources` below.
+#   single-node  ONE node (edge boxes, single-node labs): no agent injector
+#                (and an empty injector affinity if it is enabled anyway),
+#                smaller requests -- see `singleNode`.
+topology: multi-node
+
+# Server resources for topology multi-node.
+# Requests make the pod Burstable instead of BestEffort -- with none set, the
+# kernel kills it FIRST when the node runs short (sthings-infra, 2026-10-07:
+# OOM-killed at 2.1 GB RSS after weeks of ~50 MiB/day growth,
+# stuttgart-things#3502). The limit sits above that plateau; reaching it means
+# a restart, which an auto-unsealed instance unseals by itself.
+resources:
+  requests:
+    cpu: 50m
+    memory: 512Mi
+  limits:
+    memory: 3Gi
+
+# topology: single-node only.
+singleNode:
+  # The injector is off because nothing on a single node is expected to use
+  # sidecar injection. If enabled anyway it gets `affinity: ""`: the chart's
+  # injector carries a HARD pod anti-affinity against itself plus a
+  # RollingUpdate Deployment, so on one node the new injector pod can never be
+  # scheduled beside the old one and every chart upgrade leaves it Pending.
+  # NOT `strategy: Recreate`: the live Deployment keeps the API-server-defaulted
+  # rollingUpdate, and server-side apply then fails with
+  # "rollingUpdate: Forbidden".
+  injectorEnabled: false
+  # The chart sets none, so the scheduler counts the pod as free; on a small
+  # box the request is what reserves the room.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# WHAT UNSEALS IT. Decide before the first init: changing the seal of an
+# initialised instance is not a value swap -- the data is still sealed by the
+# old mechanism, and OpenBao needs its seal-migration procedure (old stanza kept
+# with disabled = "true", unseal with -migrate), which this chart does not
+# model.
+#
+#   none     plain shamir. The instance starts SEALED after every pod restart
+#            and stays down until somebody runs `bao operator unseal`.
+#            Legitimate for a short-lived or hand-held instance; not one to
+#            discover during an incident.
+#   static   a 32-byte key from a Secret (env OPENBAO_SEAL_STATIC_KEY). For the
+#            FIRST OpenBao in an environment, where there is no peer to chain a
+#            transit seal to. Honestly the same class of trade-off as an unseal
+#            operator -- a key that can unseal the instance is stored in the
+#            cluster -- but smaller, native and rotatable. Prefer transit
+#            wherever a peer exists.
+#   transit  another Vault/OpenBao unwraps the master key on start. The
+#            strongest: nothing that can unseal this instance is stored near
+#            it. Needs the peer to exist already.
+#
+# The default is `none`, as the flux base: an instance whose seal nobody chose
+# is one a human unseals.
+seal:
+  type: none
+
+  static:
+    # An OPAQUE LABEL, not a version to be clever with -- but it MUST change
+    # whenever the key does, or OpenBao cannot tell the two apart and the data
+    # sealed with the old one is lost. REQUIRED with type static (the schema
+    # fails the render when empty).
+    keyId: ""
+    # Secret + key holding the key (`openssl rand -base64 32`).
+    secretName: openbao-static-seal     # pragma: allowlist secret
+    secretKey: key
+
+  transit:
+    # The Vault/OpenBao holding the transit mount and key. REQUIRED with type
+    # transit (the schema fails the render when empty).
+    address: ""
+    keyName: openbao-unseal
+    mountPath: transit/
+    # Secret + key holding the peer token, passed as BAO_TOKEN via env -- never
+    # in the config: the chart renders that config into a ConfigMap, and a
+    # token there is plaintext to anyone with `get`. Make the token PERIODIC
+    # and RENEWABLE: OpenBao renews it itself (disable_renewal defaults false),
+    # and that is the whole reason it does not become a static token that dies
+    # a month later with everything green.
+    secretName: openbao-transit-seal    # pragma: allowlist secret
+    secretKey: token
+    # The CA that signed the peer's certificate, mounted at /etc/ssl/custom --
+    # without it the seal fails on x509 and the pod never becomes ready while
+    # the Application reports Synced. trust-manager's bundle is in every
+    # namespace (network-platform/trust-manager-bundle).
+    trustBundle:
+      configMap: cluster-trust-bundle
+      key: trust-bundle.pem
+
+  # Where the seal Secret (the one named by static.secretName /
+  # transit.secretName for the selected type) comes from:
+  #   enabled: true   an ExternalSecret (sub-Application, sync-wave -10) from
+  #                   the store below. Store properties, under remoteKey:
+  #                     key | token                         the seal secretKey
+  #                     terraform-password, admin-password  init self-init-userpass
+  #   enabled: false  the Secret already exists in the namespace -- created
+  #                   out of band. Never commit it here.
+  # Ignored with type none and init none: nothing reads a Secret then.
+  externalSecret:
+    enabled: false
+    store:
+      name: vault-backend
+      kind: ClusterSecretStore
+    # Entry name/path of the store (e.g. Vault `<mount>/openbao`).
+    remoteKey: openbao
+    # "0" = fetch ONCE, never refresh. On purpose for a seal: a key overwritten
+    # in the store under the same keyId would otherwise land in the Secret
+    # within the hour, and the next restart could no longer unseal. With "0"
+    # the cluster keeps the key it was initialised with until somebody
+    # deliberately forces a resync. Set e.g. 1h to follow the store.
+    refreshInterval: "0"
+
+# HOW IT IS INITIALISED.
+#   none                by hand, once: `bao operator init` (README.md,
+#                       "Initialize").
+#   self-init-userpass  OpenBao initialises ITSELF on first start, on empty
+#                       storage only: no root token anyone holds, no recovery
+#                       keys. Leaves userpass with `terraform` (PKI at pki/
+#                       only, automation) and `admin` (everything, BREAK-GLASS,
+#                       by hand only). Passwords from keys terraform-password
+#                       and admin-password of the seal Secret. REQUIRES an
+#                       auto-unseal (seal static or transit) -- the schema
+#                       rejects it with none, as OpenBao would. See
+#                       files/self-init.hcl.
+init:
+  mode: none
+
+# Gateway API HTTPRoute sub-Application (sync-wave 10) -> Service `openbao`
+# on 8200. The chart's own Ingress stays off.
+httpRoute:
+  enabled: true
+  hostname: openbao.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+
+# Deep-merged on top of the computed valuesObject passed to the upstream chart
+# (lists are replaced, not merged). Use for any upstream key not exposed above.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    # Honour the openbao Application's ignoreDifferences (the injector's
+    # webhook caBundle) during sync and selfHeal too.
+    - RespectIgnoreDifferences=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

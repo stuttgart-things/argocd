@@ -18,6 +18,16 @@ spec:
             - key: cicd-platform/crossplane
               operator: NotIn
               values: ["false"]
+            # ONE CONFIGURATION FAMILY PER CLUSTER. A cluster that opted into
+            # the flux family (appset-crossplane-configs-flux.yaml,
+            # cicd/crossplane/configs/profiles/flux.yaml) must NOT also get this
+            # default crossplane-configurations/* list: both carry a CR named
+            # `volume-claim` from different sources, and a duplicate lock node
+            # takes every package on the cluster to Healthy=False. NotIn, so a
+            # cluster without the label keeps getting this AppSet unchanged.
+            - key: cicd-platform/crossplane-configs-flux
+              operator: NotIn
+              values: ["true"]
   template:
     metadata:
       name: crossplane-configs-{{ .name }}

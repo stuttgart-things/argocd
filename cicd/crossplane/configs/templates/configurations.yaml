@@ -6,4 +6,7 @@ metadata:
   name: {{ .name | quote }}
 spec:
   package: {{ .package | quote }}
+  {{- if .skipDependencyResolution }}
+  skipDependencyResolution: true
+  {{- end }}
 {{- end }}

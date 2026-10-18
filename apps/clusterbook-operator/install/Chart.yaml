@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: clusterbook-operator-install
+description: App-of-apps entry for clusterbook-operator — the operator that reconciles ClusterbookCluster / ClusterbookAllocation / ClusterbookLoadBalancer / ClusterbookProviderConfig CRs against a clusterbook server and writes the Argo CD cluster Secrets the platforms/ AppSets select on. Renders one Argo CD Application over the published kustomize OCI artifact (ghcr.io/stuttgart-things/clusterbook-operator-kustomize) with the image tag and the trust-manager CA bundle patched in. Runs on the cluster that hosts Argo CD.
+type: application
+version: 0.1.0
+appVersion: "v0.21.0"

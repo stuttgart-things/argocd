@@ -1,0 +1,23 @@
+---
+# LabDA / vSphere AND LabUL / Proxmox -- flux set
+# capabilities/sets/labda-vsphere-labul-proxmox, the shape of a MACHINERY
+# cluster: it lives in LabDA and builds there, and it builds the app clusters on
+# LabUL Proxmox (stuttgart-things#3136, #3065).
+#
+# TWO ENVIRONMENTS IN ONE PRESET rather than two releases of this chart: both
+# would own `ansible-run` and fight over it on every sync. vspherevm and
+# ansible-run stay on labda; proxmoxvm is pinned to labul -- the chart ships
+# environments.labul only (flux needs a build-time patch for this; here it is
+# just the per-capability `environment`).
+capabilities:
+  vspherevm:
+    enabled: true
+    environment: labda
+  proxmoxvm:
+    enabled: true
+    environment: labul
+  ansibleRun:
+    enabled: true
+    environment: labda
+  packer:
+    enabled: true

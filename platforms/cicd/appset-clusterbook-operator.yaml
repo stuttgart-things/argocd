@@ -1,0 +1,108 @@
+---
+# clusterbook-operator for the cicd platform -- the Argo CD counterpart of the
+# operator half of flux's cicd/argocd-platform bundle.
+#
+# The operator reconciles ClusterbookCluster CRs against the clusterbook server
+# and writes the Argo CD cluster Secrets (+ the clusterbook.stuttgart-things.com/*
+# labels and annotations) every other platforms/ AppSet selects on. It writes
+# them into the cluster it RUNS ON (spec.argocdNamespace, default `argocd`), so
+# it belongs on the cluster that hosts Argo CD -- the management cluster -- and
+# nowhere else. Flux installs it after Argo CD for the same reason
+# (dependsOn: argo-cd).
+#
+# OPT-IN, an explicit `cicd-platform/clusterbook-operator: "true"`, although the
+# other cicd AppSets are opt-out: an opt-out default would install a second
+# operator on every cicd cluster, each registering clusters with an Argo CD
+# that is not there.
+#
+# BOOTSTRAP: a cluster generator only sees clusters that have a cluster Secret.
+# For the management cluster that is the declared in-cluster Secret
+# (server https://kubernetes.default.svc) carrying `cicd-platform: "true"` and
+# the opt-in label -- the operator cannot register the cluster it is about to
+# be installed on. See apps/clusterbook-operator/README.md.
+#
+# PRECONDITION, not in the selector: a ClusterbookProviderConfig `default`
+# (apiURL of the clusterbook server) on the cluster, seeded from the cluster
+# repo -- environment data, deliberately not in the catalog chart.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: clusterbook-operator-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # The operator and its CRDs stay on the cluster either way (cascadingDelete
+  # false, protectCRDs true) -- removing them would deregister the fleet.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            # Opt-IN, so an explicit "true" rather than a NotIn ["false"].
+            cicd-platform/clusterbook-operator: "true"
+  template:
+    metadata:
+      name: 'clusterbook-operator-cicd-{{ .name }}'
+      annotations:
+        # Ahead of the cicd components (0): it is what labels clusters for
+        # them. Informational only -- top-level Applications from different
+        # AppSets do not order against each other.
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      # The parent renders an Application CRD, which must land in the argocd ns
+      # on the management cluster. The child targets the selected cluster via
+      # valuesObject.destination.server below.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: apps/clusterbook-operator/install
+        helm:
+          releaseName: 'clusterbook-operator-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent: the parent
+            # server-side-applies the child spec over itself, the ApplicationSet
+            # controller puts its own back a moment later, and nothing ever
+            # deploys -- while both report "successfully synced".
+            applicationName: 'clusterbook-operator-{{ .name }}'
+            project: '{{ .name }}'
+            # Long-lived platform install: an opt-out should stop Argo CD
+            # managing the operator, not uninstall it (#324).
+            cascadingDelete: false
+            destination:
+              server: '{{ .server }}'
+              namespace: '{{ default "clusterbook-system" (index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/clusterbook-operator-namespace") }}'
+            # `version` and `image.tag` are intentionally NOT set here -- they
+            # inherit apps/clusterbook-operator/install/values.yaml, which
+            # Renovate keeps bumped and which is held at the version
+            # stuttgart-things/flux runs. A second pinned copy here is exactly
+            # the drift flux's ks-clusterbook-operator.yaml warns about (it said
+            # v0.19.0 while the base said v0.20.0).
+            trustBundle:
+              enabled: true
+              configMapName: '{{ default "cluster-trust-bundle" (index (default (dict) .metadata.annotations) "cicd-platform.stuttgart-things.com/clusterbook-operator-trust-bundle") }}'
+              key: trust-bundle.pem
+              sslCertDir: /etc/ssl/custom
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

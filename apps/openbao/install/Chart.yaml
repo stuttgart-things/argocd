@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: openbao-install
+description: App-of-apps chart packaging OpenBao (upstream openbao-helm chart) as a standalone raft instance, with the seal (none / static / transit), topology (single-node / multi-node) and optional self-initialisation as values, the seal Secret from an ExternalSecret or an existing Secret, and a Gateway API HTTPRoute sub-Application.
+type: application
+version: 0.1.0
+appVersion: "v2.7.1"

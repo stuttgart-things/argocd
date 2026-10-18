@@ -2,18 +2,30 @@
 # Crossplane Configuration packages to install.
 #
 # Each entry:
-#   name:    Configuration resource name
-#   package: full xpkg reference including tag
+#   name:                     Configuration resource name
+#   package:                  full xpkg reference including tag
+#   skipDependencyResolution: optional, default false. Sets the field of the
+#                             same name on the Configuration. Only for a package
+#                             whose dependencies are ALL in this same list --
+#                             see profiles/flux.yaml (harvester-vm) for the one
+#                             case that needs it and why.
 #
 # Migrated from ghcr.io/stuttgart-things/crossplane/... (old repo, decommissioned)
 # to ghcr.io/stuttgart-things/crossplane-configurations/... (Crossplane v2,
 # namespaced XRs, dagger-verified). Entries are re-added one at a time as their
 # replacements are pushed.
 #
-# Profile structure (one chart, one entry list) is deliberately flat for now —
-# when there's a real second profile (e.g. CI/CD-only Configurations vs.
-# generic k8s primitives), split into cicd/crossplane/profiles/<name>/ with
-# one chart + one ApplicationSet per profile.
+# ONE FAMILY PER CLUSTER. This default list is the crossplane-configurations/*
+# family. profiles/flux.yaml is the OTHER family (ghcr.io/stuttgart-things/
+# crossplane/*, the set stuttgart-things/flux installs on its cicd-platform
+# clusters), selected per cluster by the opt-in label
+# `cicd-platform/crossplane-configs-flux: "true"` (platforms/cicd/
+# appset-crossplane-configs-flux.yaml), which also takes the cluster OUT of
+# appset-crossplane-configs.yaml. The two families share package NAMES
+# (volume-claim, ...) with unrelated lineages; Crossplane keys its lock on the
+# source string, so both on one cluster is a duplicate lock node and every
+# package goes Healthy=False. A profile REPLACES this list (valueFiles), it
+# never appends to it -- that is what makes "both" unrepresentable.
 configurations:
   - name: namespace
     package: ghcr.io/stuttgart-things/crossplane-configurations/namespace:v0.1.2

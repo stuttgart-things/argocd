@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: openbao-external-secrets
+description: ExternalSecret for the OpenBao seal Secret (static key or transit token, plus the self-init passwords) -- loaded as a sub-Application by apps/openbao/install.
+type: application
+version: 0.1.0

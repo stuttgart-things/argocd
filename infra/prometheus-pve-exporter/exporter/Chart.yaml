@@ -1,0 +1,6 @@
+apiVersion: v2
+name: prometheus-pve-exporter
+description: prometheus-pve-exporter (Proxmox VE metrics) as plain manifests -- Deployment, Service, PodMonitor, optional ExternalSecret for the PVE API token, and a Grafana dashboard ConfigMap for the kube-prometheus-stack sidecar. Leaf chart rendered by infra/prometheus-pve-exporter/install.
+type: application
+version: 0.1.0
+appVersion: "3.10.1"

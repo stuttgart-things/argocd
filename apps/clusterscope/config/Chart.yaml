@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: clusterscope-config
+description: What clusterscope reads from its namespace — the -config ConfigMap, the git-sync credentials ExternalSecret and the ExternalSecret that gathers the lab's kubeconfigs into one Secret. Loaded as the `-config` sub-Application by apps/clusterscope/install.
+type: application
+version: 0.1.0

@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: komoplane-httproute
+description: Gateway API HTTPRoute exposing the Komoplane UI (komoplane:8090). Leaf chart rendered by cicd/komoplane/install.
+type: application
+version: 0.1.0

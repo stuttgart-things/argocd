@@ -1,0 +1,272 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "crossplane capabilities app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "destination",
+    "catalog",
+    "chartRepository",
+    "tektonNamespace",
+    "secretStore",
+    "capabilities"
+  ],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Prefix for the rendered Application names (<prefix>-<capability>). Defaults to cxp-cap-<sha1(destination)[0:8]>. Must differ from the parent Application's own name."
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The WORKLOAD (crossplane) cluster. Provide `server` or `name`; `name` wins when both are set.",
+      "properties": {
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "namespace"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "server"
+          ]
+        },
+        {
+          "required": [
+            "name"
+          ]
+        }
+      ]
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetRevision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ],
+      "description": "This catalog repo; the harvester-vm child renders ./harvester-vm from it."
+    },
+    "chartRepository": {
+      "type": "string",
+      "minLength": 1,
+      "description": "OCI Helm registry of the capability charts, ArgoCD form (no oci:// scheme)."
+    },
+    "tektonNamespace": {
+      "type": "string",
+      "minLength": 1,
+      "description": "PipelineRun namespace for ansible-run and packer."
+    },
+    "secretStore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authMountPath": {
+          "type": "string",
+          "description": "Vault Kubernetes auth mount of THIS cluster (<cluster>-eso). Required when vspherevm or proxmoxvm is enabled."
+        }
+      },
+      "required": [
+        "authMountPath"
+      ]
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ansibleRun": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "chartVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "extraValues": {
+              "type": "object",
+              "description": "Deep-merged over the computed values passed to the upstream chart (lists replace)."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "environments.<key> of the ansible chart (labda | labul): selects the SSH-credentials store, NOT the EnvironmentConfig label (always `default`)."
+            },
+            "storageClass": {
+              "type": "string",
+              "minLength": 1
+            },
+            "secretStoreName": {
+              "type": "string",
+              "description": "ClusterSecretStore for ansible-credentials. Empty = the chart's environments.<env>.sshCredentials.secretStoreName."
+            }
+          },
+          "required": [
+            "enabled",
+            "chartVersion",
+            "environment",
+            "storageClass",
+            "secretStoreName"
+          ]
+        },
+        "packer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "chartVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "extraValues": {
+              "type": "object",
+              "description": "Deep-merged over the computed values passed to the upstream chart (lists replace)."
+            }
+          },
+          "required": [
+            "enabled",
+            "chartVersion"
+          ]
+        },
+        "proxmoxvm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "chartVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "extraValues": {
+              "type": "object",
+              "description": "Deep-merged over the computed values passed to the upstream chart (lists replace)."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "environments.<key> of the proxmoxvm chart (ships labul only)."
+            }
+          },
+          "required": [
+            "enabled",
+            "chartVersion",
+            "environment"
+          ]
+        },
+        "vspherevm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "chartVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "extraValues": {
+              "type": "object",
+              "description": "Deep-merged over the computed values passed to the upstream chart (lists replace)."
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1,
+              "description": "environments.<key> of the vspherevm chart (labda | labul)."
+            }
+          },
+          "required": [
+            "enabled",
+            "chartVersion",
+            "environment"
+          ]
+        },
+        "harvesterVm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "environment": {
+              "type": "string",
+              "minLength": 1
+            },
+            "providerConfigRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "storageClassName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            },
+            "networkName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "imageId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "enabled",
+            "environment",
+            "providerConfigRef",
+            "storageClassName",
+            "namespace",
+            "networkName",
+            "imageId"
+          ]
+        }
+      },
+      "required": [
+        "ansibleRun",
+        "packer",
+        "proxmoxvm",
+        "vspherevm",
+        "harvesterVm"
+      ]
+    },
+    "syncPolicy": {
+      "type": "object"
+    }
+  }
+}

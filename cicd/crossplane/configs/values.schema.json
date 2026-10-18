@@ -24,6 +24,10 @@
           "package": {
             "type": "string",
             "minLength": 1
+          },
+          "skipDependencyResolution": {
+            "type": "boolean",
+            "description": "Sets spec.skipDependencyResolution on the Configuration. Only for a package whose dependencies are ALL listed explicitly in the same list (profiles/flux.yaml: harvester-vm). With it set, Crossplane installs none of that package's dependencies."
           }
         }
       }

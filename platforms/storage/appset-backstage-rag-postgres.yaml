@@ -1,0 +1,138 @@
+---
+# The Backstage RAG-AI plugin's PostgreSQL (CloudNativePG + pgvector), the
+# ArgoCD counterpart of stuttgart-things/flux apps/backstage-rag-postgres.
+#
+# WHY IT SITS IN THE STORAGE PLATFORM: no platform deploys Backstage itself
+# (apps/backstage is hand-registered per cluster), so there is no app platform
+# to put it beside -- and what it does need from a platform is here: the CNPG
+# operator (appset-cloudnative-pg.yaml), its backup plugin
+# (appset-cloudnative-pg-barman.yaml) and Velero (appset-velero.yaml).
+#
+# OPT-IN, an explicit `storage-platform/backstage-rag-postgres: "true"`, AND
+# the operator's own opt-in label: a Cluster CR without the CRD fails the whole
+# Application's dry-run. A second, optional Postgres beside Backstage -- it
+# does not touch Backstage's own (bundled) database.
+#
+# Lands in Backstage's namespace (annotation backstage-namespace, default
+# `portal`): the RAG plugin connects to rag-postgres-rw there and reads the
+# owner Secret rag-postgres-creds from there.
+#
+# BACKUPS are off unless the cluster asks (annotation
+# backstage-rag-postgres-backup-enabled: "true"). They then also need
+# `storage-platform/cloudnative-pg-barman: "true"` (not in the selector -- a
+# cluster may run the database without backups), a pre-created bucket, and the
+# S3 key pair in the store. Enabling them on an EXISTING Cluster restarts its
+# Postgres pod. The Velero Schedule for the K8s objects is its own switch
+# (backstage-rag-postgres-velero-enabled) and needs storage-platform/velero.
+#
+# PRECONDITIONS, not in the selector:
+#   1. external-secrets and the ClusterSecretStore below, able to read the
+#      entries `rag-postgres` (username, password) and, with backups,
+#      `rag-postgres-s3` (access_key, secret_key);
+#   2. the pgvector image ghcr.io/stuttgart-things/postgresql-pgvector:16
+#      pushed and PUBLIC (the kubelet pulls it).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: backstage-rag-postgres-storage
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324). The
+  # Cluster itself carries Prune=false,Delete=false (chart `protect: true`),
+  # so an opt-out never takes the data with it.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            storage-platform: "true"
+            # Both opt-IN, so explicit "true" rather than NotIn ["false"].
+            storage-platform/cloudnative-pg: "true"
+            storage-platform/backstage-rag-postgres: "true"
+  template:
+    metadata:
+      name: 'backstage-rag-postgres-storage-{{ .name }}'
+      annotations:
+        # After the operator and plugin (-5). Informational only -- retry
+        # resolves the race with the CRDs.
+        argocd.argoproj.io/sync-wave: "5"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: apps/backstage-rag-postgres/install
+        helm:
+          # Fixed, not derived: Helm caps release names at 53 characters and
+          # the chart does not use .Release.Name.
+          releaseName: backstage-rag-postgres
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent and neither
+            # ever deploys while both report "successfully synced".
+            applicationName: 'backstage-rag-postgres-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.82.2
+            destination:
+              server: '{{ .server }}'
+              namespace: '{{ default "portal" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-namespace") }}'
+            storage:
+              size: '{{ default "5Gi" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-storage-size") }}'
+              # Empty = the cluster's default StorageClass. NOT the chart's
+              # `nfs4-csi`, which exists in one lab only.
+              storageClass: '{{ default "" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-storage-class") }}'
+            externalSecrets:
+              enabled: true
+              secretStore:
+                kind: ClusterSecretStore
+                # Explicit annotation > `vault-<cluster>`, the per-cluster
+                # store LabDA clusters get (own mount) -- same fallback as velero.
+                name: '{{ default (printf "vault-%s" .name) (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-secret-store") }}'
+              # Entry NAMES in the store's mount, never kv/data/... paths: the
+              # per-cluster stores are mounted on their KV path.
+              credentials:
+                remoteKey: '{{ default "rag-postgres" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-secret-key") }}'
+              s3:
+                remoteKey: '{{ default "rag-postgres-s3" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-s3-secret-key") }}'
+            backup:
+              # Strings -- this template cannot produce booleans; the chart
+              # converts. Anything but "true" is off.
+              enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-backup-enabled") }}'
+              # Default = the Flux one, https://artifacts.<domain>, from the
+              # clusterbook fqdn. Read only when backups are on.
+              endpointURL: '{{ default (printf "https://artifacts.%s" (trimPrefix "*." (default "set-fqdn.invalid" (index (default (dict) .metadata.annotations) "clusterbook.stuttgart-things.com/fqdn")))) (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-s3-url") }}'
+              bucket: '{{ default "backstage-rag-backups" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-bucket") }}'
+              # trust-manager's bundle (network-platform), for an endpoint
+              # signed by the lab PKI. "" = system CAs.
+              caConfigMap: '{{ default "" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-ca-configmap") }}'
+              # One base backup the moment the ScheduledBackup is created. The
+              # chart's default "true" suits a NEW Cluster; set "false" when
+              # switching backups on for an existing one -- enabling restarts
+              # the pod, and the immediate backup fails against it.
+              immediate: '{{ default "true" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-backup-immediate") }}'
+            veleroSchedule:
+              enabled: '{{ default "false" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-rag-postgres-velero-enabled") }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

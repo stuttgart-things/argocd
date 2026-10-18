@@ -1,0 +1,105 @@
+---
+# Optional explicit name for the rendered Application. Defaults to
+# prometheus-pve-exporter-<sha1(destination)[:8]>.
+# applicationName: prometheus-pve-exporter-mycluster
+
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Reference back to this catalog repo -- the rendered Application loads
+# infra/prometheus-pve-exporter/exporter from it.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# Where the exporter lands. `monitoring` is kube-prometheus-stack's namespace
+# (platforms/observability). It has to be wherever kps runs: the PodMonitor
+# needs the prometheus-operator CRDs kps installs, and the dashboard ConfigMap
+# needs kps's Grafana sidecar. The standalone prometheus chart provides
+# neither -- with it, nothing fails and the metrics are simply absent.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: monitoring
+
+# Exporter image (https://github.com/prometheus-pve/prometheus-pve-exporter).
+# Same version stuttgart-things/flux runs (infra/platform's pve-exporter
+# component), so both fleets stay on one exporter.
+image:
+  repository: prompve/prometheus-pve-exporter
+  # renovate: datasource=docker depName=prompve/prometheus-pve-exporter
+  tag: 3.10.1
+
+# The Proxmox host scraped via /pve?target=<host>. REQUIRED in practice. The
+# `.invalid` default is deliberate (the Flux sentinel): an EMPTY target renders
+# `?target=` and Prometheus scrapes the exporter for a host it never named --
+# every object healthy, the target UP, the series absent. A sentinel turns that
+# into a scrape error somebody can see.
+target: set-pve-exporter-target.invalid
+
+# PVE_VERIFY_SSL. false = the Flux behaviour (lab Proxmox hosts carry
+# self-signed certificates).
+verifySSL: false
+
+# Secret the exporter reads through envFrom, with keys PVE_USER,
+# PVE_TOKEN_NAME, PVE_TOKEN_VALUE -- a READ-ONLY PVE API token (role
+# PVEAuditor). A token without that role starts fine and returns nothing.
+secretName: prometheus-pve-exporter
+
+# Render that Secret from a secret store with ESO. With `enabled: false` the
+# Secret has to exist already (Flux supplies it SOPS-encrypted from the
+# cluster repo; there is no sops equivalent here) and the pod stays in
+# CreateContainerConfigError until it does.
+externalSecrets:
+  enabled: false
+  refreshInterval: 1h
+  secretStore:
+    kind: ClusterSecretStore
+    name: ""
+  # Entry NAME under the store's mount, never a path with /data/ in it.
+  remoteKey: pve-exporter
+  # Properties of that entry, mapped to PVE_USER / PVE_TOKEN_NAME / PVE_TOKEN_VALUE.
+  properties:
+    user: user
+    tokenName: token_name
+    tokenValue: token_value
+
+# PodMonitor scrape timing. The exporter walks the whole PVE API per scrape,
+# so the timeout is generous.
+scrape:
+  interval: 60s
+  scrapeTimeout: 30s
+
+# Resource requests/limits for the exporter container.
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# Annotate the Deployment `reloader.stakater.com/auto: "true"`: the token is
+# read once, at container start, so a rotated token needs a restart. Inert
+# without Reloader (platforms/base).
+reloader: true
+
+# Grafana dashboard ConfigMap (label grafana_dashboard: "1") for the kps
+# sidecar.
+dashboard:
+  enabled: true
+
+# Sync policy applied to the rendered Application. The retry recovers a sync
+# that lands before kps has registered the PodMonitor CRD.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

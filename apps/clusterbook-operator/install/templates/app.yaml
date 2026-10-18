@@ -1,0 +1,104 @@
+{{- $name := include "clusterbookOperator.appName" . }}
+{{- $ns := .Values.destination.namespace }}
+{{- $tb := .Values.trustBundle | default dict }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    # The `oci://` prefix is required — without it Argo treats repoURL as a git
+    # URL and fails with "failed to list refs: repository not found".
+    repoURL: oci://ghcr.io/stuttgart-things/clusterbook-operator-kustomize
+    targetRevision: {{ .Values.version | quote }}
+    path: .
+    kustomize:
+      {{- /* Renames the base's Namespace and rewrites the ClusterRoleBinding
+             subject along with the namespaced objects — the equivalent of
+             flux's targetNamespace. */}}
+      namespace: {{ $ns | quote }}
+      patches:
+        {{- /* The container image tag. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterbook-operator
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterbook-operator
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: manager
+                      image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+        {{- if $tb.enabled }}
+        {{- /* trust-manager CA bundle, so the operator can verify the internal
+               clusterbook server when the ProviderConfig's insecureSkipVerify
+               is false. optional: true — no bundle, the pod still starts. */}}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: clusterbook-operator
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: clusterbook-operator
+            spec:
+              template:
+                spec:
+                  volumes:
+                    - name: trust-bundle
+                      configMap:
+                        name: {{ $tb.configMapName | quote }}
+                        optional: true
+                  containers:
+                    - name: manager
+                      env:
+                        - name: SSL_CERT_DIR
+                          value: {{ $tb.sslCertDir | quote }}
+                      volumeMounts:
+                        - name: trust-bundle
+                          mountPath: {{ printf "%s/%s" (trimSuffix "/" $tb.sslCertDir) $tb.key | quote }}
+                          subPath: {{ $tb.key | quote }}
+                          readOnly: true
+        {{- end }}
+        {{- if .Values.protectCRDs }}
+        {{- /* Deleting a CRD deletes every ClusterbookCluster with it — and each
+               one's finalizer releases the IP and removes the Argo CD cluster
+               Secret. Argo CD still creates and updates the CRDs; it never
+               removes them. */}}
+        - target:
+            group: apiextensions.k8s.io
+            kind: CustomResourceDefinition
+          patch: |
+            apiVersion: apiextensions.k8s.io/v1
+            kind: CustomResourceDefinition
+            metadata:
+              name: any
+              annotations:
+                argocd.argoproj.io/sync-options: Prune=false,Delete=false
+        {{- end }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

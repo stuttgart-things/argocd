@@ -1,0 +1,35 @@
+---
+# Harvester VM capability: ONE EnvironmentConfig, written out rather than
+# rendered from an OCI chart, because there is no harvester capability chart
+# (the other capabilities have one; Harvester is the newest hypervisor in the
+# fleet and never got one). Rendered by ../templates/applications.yaml as the
+# `harvester-vm` child Application of cicd/crossplane/capabilities.
+#
+# It is also the shortest capability, for a structural reason: harvester-vm
+# renders a KubeVirt VirtualMachine through provider-kubernetes and registers no
+# provider of its own. There is no hypervisor API to authenticate against --
+# only the Harvester cluster's own Kubernetes API -- so there is no credential
+# to fetch, no ExternalSecret and no ClusterSecretStore here.
+#
+# WHAT IS STILL NEEDED and is not in this chart: a provider-kubernetes
+# ClusterProviderConfig pointing at the Harvester cluster, i.e. a kubeconfig
+# for it. Until a cluster has one, `providerConfigRef` stays `in-cluster`,
+# which composes VMs onto the cluster itself -- correct for a demo lab where
+# Harvester IS the cluster, wrong the moment it is a separate one.
+#
+# EVERY VALUE IS PER CLUSTER. The defaults only suit a Harvester that IS the
+# cluster; on the lab Harvester the storage class is a per-image `lh-<uuid>`.
+# Nothing reports a wrong value -- the first sign is a VM whose PVC stays
+# Pending behind an XR that looks applied (flux#514).
+
+# Selector label of the EnvironmentConfig, matched against an XR's
+# spec.environmentConfig. function-environment-configs requires EXACTLY ONE
+# match. Settable so a management cluster building on a SEPARATE Harvester can
+# name that lab instead of `default`.
+environment: default
+# provider-kubernetes ClusterProviderConfig for the Harvester API.
+providerConfigRef: in-cluster
+storageClassName: harvester-longhorn
+namespace: vms
+networkName: default/vms
+imageId: default/image-ubuntu

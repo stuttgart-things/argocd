@@ -1,0 +1,86 @@
+{{- if .Values.backup.enabled }}
+---
+# Where rag-postgres's WAL and base backups go, for the Barman Cloud plugin.
+# Replaces the Cluster's in-tree spec.backup.barmanObjectStore, which
+# CloudNativePG removes in 1.31. serverName defaults to the Cluster's name, so
+# objects land under <destinationPath>/<name>/ -- the same path the Flux
+# deployment archives into.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    backup: backstage-rag-postgres
+spec:
+  retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
+  configuration:
+    destinationPath: {{ .Values.backup.destinationPath | quote }}
+    endpointURL: {{ .Values.backup.endpointURL | quote }}
+    {{- with .Values.backup.caConfigMap }}
+    endpointCA:
+      name: {{ $.Values.backup.s3SecretName | quote }}
+      key: {{ $.Values.backup.caKey | quote }}
+    {{- end }}
+    s3Credentials:
+      accessKeyId:
+        name: {{ .Values.backup.s3SecretName | quote }}
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: {{ .Values.backup.s3SecretName | quote }}
+        key: SECRET_ACCESS_KEY
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+---
+# A daily base backup. WAL without a base backup to replay it onto restores
+# nothing; WAL is archived continuously in between, so a recovery can reach
+# any point after the oldest base backup the retention keeps.
+#
+# CloudNativePG's schedule has SIX fields -- seconds first. `immediate` takes
+# one backup as soon as this is created, so a fresh cluster has something to
+# recover from before the first night. On an EXISTING Cluster that enables
+# backups later, set it false: enabling restarts the pod and the immediate
+# backup fails against it -- take the first one by hand once
+# ContinuousArchiving is True.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ printf "%s-daily" .Values.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    backup: backstage-rag-postgres
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  immediate: {{ .Values.backup.immediate }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ .Values.name | quote }}
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+{{- end }}
+{{- if .Values.veleroSchedule.enabled }}
+---
+# Velero Schedule for the Kubernetes OBJECTS (Cluster CR, ExternalSecrets,
+# ObjectStore, ...), selected by label backup=backstage-rag-postgres in this
+# namespace. The Barman Cloud plugin above covers the database CONTENTS; this
+# covers the objects -- together they give full DR. Needs Velero's CRDs
+# (platforms/storage appset-velero.yaml).
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: backstage-rag-postgres
+  namespace: {{ .Values.veleroSchedule.namespace | quote }}
+spec:
+  schedule: {{ .Values.veleroSchedule.cron | quote }}
+  template:
+    ttl: {{ .Values.veleroSchedule.ttl | quote }}
+    storageLocation: {{ .Values.veleroSchedule.storageLocation | quote }}
+    includedNamespaces:
+      - {{ .Values.namespace | quote }}
+    labelSelector:
+      matchLabels:
+        backup: backstage-rag-postgres
+{{- end }}

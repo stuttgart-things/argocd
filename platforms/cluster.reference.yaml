@@ -87,6 +87,19 @@ spec:
     cicd-platform/argo-rollouts: 'false'# → appset-argo-rollouts
     cicd-platform/openebs: 'false'      # → appset-openebs (cicd). Prefer storage-platform/openebs;
                                         #   keep these two mutually exclusive (single OpenEBS install).
+    # clusterbook-operator -- opt-IN, and 'true' ONLY on the cluster running Argo CD
+    # (it writes the Argo CD cluster Secrets into its own cluster).
+    cicd-platform/clusterbook-operator: 'false'      # → appset-clusterbook-operator
+    # Komoplane read-only Crossplane UI -- opt-IN: NO authentication, lab-internal gateways only.
+    cicd-platform/komoplane: 'false'                 # → appset-komoplane [ann: fqdn]
+    # Flux-family Crossplane Configurations INSTEAD of the default list (never both).
+    cicd-platform/crossplane-configs-flux: 'false'   # → appset-crossplane-configs-flux (excludes appset-crossplane-configs)
+    # Crossplane capabilities (opt-in each; not together with the old cicd-platform/crossplane-<cap> labels)
+    cicd-platform/crossplane-cap-vspherevm: 'false'     # → appset-crossplane-capabilities [ann: crossplane-cap-vspherevm-environment, crossplane-cap-vault-auth-mount]
+    cicd-platform/crossplane-cap-proxmoxvm: 'false'     # → appset-crossplane-capabilities [ann: crossplane-cap-proxmoxvm-environment, crossplane-cap-vault-auth-mount]
+    cicd-platform/crossplane-cap-ansible-run: 'false'   # → appset-crossplane-capabilities [ann: crossplane-cap-ansible-run-*, crossplane-cap-storage-class, crossplane-cap-tekton-namespace]
+    cicd-platform/crossplane-cap-packer: 'false'        # → appset-crossplane-capabilities [ann: crossplane-cap-tekton-namespace]
+    cicd-platform/crossplane-cap-harvester-vm: 'false'  # → appset-crossplane-capabilities [ann: crossplane-cap-harvester-*]
 
     # ---- profile: network-platform (Cilium + cert-manager + trust) ----
     network-platform: 'true'            # umbrella
@@ -125,6 +138,8 @@ spec:
     # Velero -- opt-IN: needs an S3 endpoint annotation, external-secrets and a
     # store holding access_key/secret_key. Metadata backups, daily-all 02:00 UTC.
     storage-platform/velero: 'false'            # → appset-velero [ann: velero-s3-url]
+    # Backstage RAG-AI Postgres (CNPG + pgvector) -- opt-IN, REQUIRES storage-platform/cloudnative-pg: 'true'.
+    storage-platform/backstage-rag-postgres: 'false'  # → appset-backstage-rag-postgres
 
     # ---- profile: security-platform ----
     security-platform: 'true'           # umbrella
@@ -135,6 +150,11 @@ spec:
     # carries a read policy for every mount in the kv-mounts annotation below.
     security-platform/external-secrets-stores: 'true'  # → appset-external-secrets-stores
     security-platform/kyverno: 'true'           # → appset-kyverno-install
+    # sops-secrets-operator -- opt-IN: without an age key it decrypts nothing.
+    security-platform/sops-secrets-operator: 'false' # → appset-sops-secrets-operator [ann: sops-age-key-store]
+    # OpenBao -- opt-IN: needs a seal decision, a StorageClass and the seal
+    # Secret's entry in the store. Decide the seal BEFORE the first init.
+    security-platform/openbao: 'false'          # → appset-openbao [ann: openbao-storage-class, openbao-seal*]
 
     # ---- profile: observability-platform ----
     observability-platform: 'true'              # umbrella
@@ -142,6 +162,11 @@ spec:
     # gate (operator: Exists) — present this label only once the ClusterSecretStore
     # named in the secret-store annotation exists and can read the entry:
     observability-platform.stuttgart-things.com/secrets-config: 'true'
+    # clusterscope lab visualizer -- opt-IN: one per lab, needs a git repo.
+    observability-platform/clusterscope: 'false'          # → appset-clusterscope [ann: fqdn, clusterscope-git-repo]
+    observability-platform/clusterscope-blackbox-probes: 'false'  # ScrapeConfig over /api/targets; needs clusterscope-live + blackbox exporter
+    # Proxmox VE exporter -- opt-IN.
+    observability-platform/prometheus-pve-exporter: 'false'  # → appset-prometheus-pve-exporter [ann: pve-exporter-target]
 
     # ---- profile: homerun2-platform ----
     # The homerun2 event bus. Core components (on unless 'false'):
@@ -207,6 +232,18 @@ spec:
     # clusterbook.stuttgart-things.com/fqdn-secondary: ...          (cilium-gateway-secondary)
     # clusterbook.stuttgart-things.com/lb-range-start / lb-range-stop: ...  (kind gateway/lb)
 
+    # ---- [user] cicd: clusterbook-operator / crossplane capabilities (all optional) ----
+    # cicd-platform.stuttgart-things.com/clusterbook-operator-namespace: clusterbook-system     # default clusterbook-system
+    # cicd-platform.stuttgart-things.com/clusterbook-operator-trust-bundle: cluster-trust-bundle # default cluster-trust-bundle
+    # cicd-platform.stuttgart-things.com/crossplane-cap-vspherevm-environment: labda    # default labda
+    # cicd-platform.stuttgart-things.com/crossplane-cap-proxmoxvm-environment: labul    # default labul
+    # cicd-platform.stuttgart-things.com/crossplane-cap-ansible-run-environment: labda  # default labda
+    # cicd-platform.stuttgart-things.com/crossplane-cap-ansible-run-secret-store: ''    # '' = chart's vault-cicd-vsphere-<env>
+    # cicd-platform.stuttgart-things.com/crossplane-cap-vault-auth-mount: ''            # '' = <cluster>-eso
+    # cicd-platform.stuttgart-things.com/crossplane-cap-storage-class: openebs-hostpath
+    # cicd-platform.stuttgart-things.com/crossplane-cap-tekton-namespace: tekton-ci
+    # cicd-platform.stuttgart-things.com/crossplane-cap-harvester-storage-class: harvester-longhorn  # also -environment, -provider-config, -namespace, -network, -image
+
     # ---- [user] security: the KV mounts this cluster opens ----
     # One ClusterSecretStore per mount, named vault-<mount>, rendered by
     # appset-external-secrets-stores. Comma-separated: a label could not carry
@@ -214,6 +251,25 @@ spec:
     # chart, which splits it. The login is shared — server below, auth mount
     # <cluster>-eso, ServiceAccount external-secrets/eso.
     external-secrets.stuttgart-things.com/kv-mounts: homerun2-pr,schmetterpause,observability
+
+    # ---- [user] security: sops-secrets-operator age key (optional) ----
+    # security-platform.stuttgart-things.com/sops-age-key-store: vault-<cluster>   # set = ExternalSecret for the age key
+    # security-platform.stuttgart-things.com/sops-age-key-secret-key: sops-age-key # default sops-age-key
+    # security-platform.stuttgart-things.com/sops-age-key-property: age.agekey     # default age.agekey
+
+    # ---- [user] security: OpenBao (appset-openbao) ----
+    # security-platform.stuttgart-things.com/openbao-storage-class: openebs-hostpath   # REQUIRED
+    # security-platform.stuttgart-things.com/openbao-seal: transit        # transit (default) | static | none
+    # security-platform.stuttgart-things.com/openbao-seal-address: https://vault.example.com  # transit: REQUIRED
+    # security-platform.stuttgart-things.com/openbao-seal-key-name: openbao-unseal       # transit, default openbao-unseal
+    # security-platform.stuttgart-things.com/openbao-seal-mount-path: transit/           # transit, default transit/
+    # security-platform.stuttgart-things.com/openbao-seal-key-id: openbao-2026-01        # static: REQUIRED, change with the key
+    # security-platform.stuttgart-things.com/openbao-topology: multi-node # | single-node
+    # security-platform.stuttgart-things.com/openbao-init: none           # | self-init-userpass (needs static/transit)
+    # security-platform.stuttgart-things.com/openbao-storage-size: 8Gi    # default 8Gi
+    # security-platform.stuttgart-things.com/openbao-secret-store: vault-<cluster>
+    # security-platform.stuttgart-things.com/openbao-secret-key: openbao  # props: token|key [+ terraform-password, admin-password]
+    # security-platform.stuttgart-things.com/openbao-hostname: openbao.<fqdn>  # default from fqdn
 
     # ---- [user] network: cert-manager Vault-PKI ClusterIssuer ----
     clusterbook.stuttgart-things.com/vault-server: https://vault.infra.sthings-vsphere.labul.sva.de
@@ -261,6 +317,20 @@ spec:
     # storage-platform.stuttgart-things.com/velero-schedule-ttl: 720h0m0s
     # storage-platform.stuttgart-things.com/velero-ssl-cert-dir: /etc/ssl/custom  # trust-manager cluster-trust-bundle mount
 
+    # ---- [user] storage: backstage-rag-postgres (needs storage-platform/backstage-rag-postgres: 'true') ----
+    # storage-platform.stuttgart-things.com/backstage-namespace: portal                      # default portal
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-storage-class: openebs-hostpath  # default = cluster default SC
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-storage-size: 5Gi        # default 5Gi
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-secret-store: vault-<cluster>  # default vault-<cluster>
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-secret-key: rag-postgres       # username, password
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-s3-secret-key: rag-postgres-s3 # access_key, secret_key
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-backup-enabled: 'false'  # needs cloudnative-pg-barman
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-backup-immediate: 'true' # 'false' when enabling on an existing Cluster
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-s3-url: https://artifacts.<fqdn>  # default from fqdn
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-bucket: backstage-rag-backups
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-ca-configmap: cluster-trust-bundle  # default "" = system CAs
+    # storage-platform.stuttgart-things.com/backstage-rag-postgres-velero-enabled: 'false'  # needs storage-platform/velero
+
     # ---- [user] storage: Longhorn ----
     # storage-platform.stuttgart-things.com/longhorn-replica-count: '3'   # default 1; '3' on 3-node clusters
     # storage-platform.stuttgart-things.com/longhorn-default-class: 'true' # only effective together with
@@ -275,6 +345,33 @@ spec:
     # observability-platform.stuttgart-things.com/storage-class: openebs-hostpath    # default = cluster default SC
     # observability-platform.stuttgart-things.com/storage-size: 10Gi                 # default 10Gi
     # observability-platform.stuttgart-things.com/retention: 15d                     # default 15d
+
+    # ---- [user] observability: clusterscope (only with observability-platform/clusterscope: 'true') ----
+    # observability-platform.stuttgart-things.com/clusterscope-git-repo: https://github.com/stuttgart-things/stuttgart-things  # [req] no ".git"
+    # observability-platform.stuttgart-things.com/clusterscope-git-branch: main                     # default main
+    # observability-platform.stuttgart-things.com/clusterscope-git-sync-dir: /data/stuttgart-things/clusters/labul  # default /data/repo/clusters
+    # observability-platform.stuttgart-things.com/clusterscope-tech: flux                           # default flux
+    # observability-platform.stuttgart-things.com/clusterscope-lab: labul
+    # observability-platform.stuttgart-things.com/clusterscope-live: 'true'                         # default false
+    # observability-platform.stuttgart-things.com/clusterscope-probe: 'true'                        # default false
+    # observability-platform.stuttgart-things.com/clusterscope-refresh: '60'                        # default 60
+    # observability-platform.stuttgart-things.com/clusterscope-self-cluster: <cluster>              # default = cluster name
+    # observability-platform.stuttgart-things.com/clusterscope-git-auth-store: vault-<cluster>
+    # observability-platform.stuttgart-things.com/clusterscope-git-auth-path: <mount>/data/<entry>  # set = git token from Vault
+    # observability-platform.stuttgart-things.com/clusterscope-git-auth-username-property: gitUsername
+    # observability-platform.stuttgart-things.com/clusterscope-git-auth-password-property: gitToken
+    # observability-platform.stuttgart-things.com/clusterscope-kubeconfig-clusters: ^(cluster-a|cluster-b)$  # set = kubeconfigs from Vault
+    # observability-platform.stuttgart-things.com/clusterscope-kubeconfig-store: vault-kubeconfigs
+    # observability-platform.stuttgart-things.com/clusterscope-config: '{"roots":[...]}'            # one-line JSON, set = -config
+    # observability-platform.stuttgart-things.com/clusterscope-git-extra-repo: https://github.com/stuttgart-things/harvester
+    # observability-platform.stuttgart-things.com/clusterscope-git-extra-branch: main
+    # observability-platform.stuttgart-things.com/clusterscope-blackbox-module: http_2xx
+
+    # ---- [user] observability: prometheus-pve-exporter ----
+    # observability-platform.stuttgart-things.com/pve-exporter-target: pve01.example   # [req]
+    # observability-platform.stuttgart-things.com/pve-exporter-secret-store: vault-obs # default …/secret-store; neither = hand-made Secret
+    # observability-platform.stuttgart-things.com/pve-exporter-secret-key: pve-exporter  # user, token_name, token_value (PVEAuditor)
+    # observability-platform.stuttgart-things.com/pve-exporter-verify-ssl: 'false'
 
     # ---- [user] homerun2-platform (needs the secrets-config gate label above) ----
     # homerun2-platform.stuttgart-things.com/secret-store: vault-<cluster>   # [req] ClusterSecretStore

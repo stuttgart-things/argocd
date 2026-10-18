@@ -12,6 +12,8 @@ resources:
   - appset-crossplane-functions.yaml
   - appset-crossplane-configs.yaml
   - appset-crossplane-platform-baseline.yaml
+  - appset-crossplane-configs-flux.yaml
+  - appset-crossplane-capabilities.yaml
   - appset-cxp-ansible.yaml
   - appset-cxp-vspherevm.yaml
   - appset-cxp-proxmoxvm.yaml
@@ -21,3 +23,5 @@ resources:
   - appset-tekton-config.yaml
   - appset-tekton-dashboard-httproute.yaml
   - appset-machinery.yaml
+  - appset-clusterbook-operator.yaml
+  - appset-komoplane.yaml

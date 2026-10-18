@@ -1,0 +1,119 @@
+---
+# prometheus-pve-exporter for the observability platform: Proxmox VE metrics
+# scraped by kube-prometheus-stack, plus a Grafana dashboard. The ArgoCD
+# counterpart of stuttgart-things/flux infra/prometheus-pve-exporter.
+#
+# OPT-IN, an explicit `observability-platform/prometheus-pve-exporter: "true"`,
+# unlike kube-prometheus-stack's opt-out: it only makes sense on a cluster
+# that has a Proxmox host to watch and a read-only PVE API token for it. A
+# cluster without the label renders nothing here.
+#
+# ONE parent per cluster, rendering infra/prometheus-pve-exporter/install,
+# whose child deploys Deployment + Service + PodMonitor + dashboard ConfigMap
+# (and the token's ExternalSecret) into `monitoring` ON THE WORKLOAD CLUSTER.
+#
+# PRECONDITIONS, only the first is in the selector:
+#   1. kube-prometheus-stack in `monitoring` (this platform). Hard, not an
+#      ordering preference: the PodMonitor CRD comes from its operator, and
+#      the dashboard needs its Grafana sidecar. Shares kps's opt-out key, so
+#      switching kps off switches this off too.
+#   2. the PVE token: either the store/entry named by the annotations below
+#      (properties user / token_name / token_value, role PVEAuditor), or --
+#      with no store resolvable -- a hand-made Secret/prometheus-pve-exporter
+#      in `monitoring` with PVE_USER / PVE_TOKEN_NAME / PVE_TOKEN_VALUE. The
+#      pod sits in CreateContainerConfigError until one exists.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: prometheus-pve-exporter-observability
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            observability-platform: "true"
+            # Opt-IN, so an explicit "true" rather than a NotIn ["false"].
+            observability-platform/prometheus-pve-exporter: "true"
+          matchExpressions:
+            # Inherit kube-prometheus-stack's opt-out: without kps there is no
+            # PodMonitor CRD and the child fails its dry-run.
+            - key: observability-platform/kube-prometheus-stack
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      name: 'prometheus-pve-exporter-observability-{{ .name }}'
+      annotations:
+        # After kube-prometheus-stack (5). Informational only -- top-level
+        # Applications do not order across appsets; retry resolves the race.
+        argocd.argoproj.io/sync-wave: "10"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: infra/prometheus-pve-exporter/install
+        helm:
+          # Fixed, not derived: Helm caps release names at 53 characters and
+          # the chart does not use .Release.Name (same as kube-prometheus-stack).
+          releaseName: prometheus-pve-exporter
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent and neither
+            # ever deploys while both report "successfully synced".
+            applicationName: 'prometheus-pve-exporter-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.82.2
+            destination:
+              server: '{{ .server }}'
+              # kube-prometheus-stack's namespace -- the exporter has to live
+              # beside the Prometheus that scrapes it.
+              namespace: monitoring
+            # `image.tag` is intentionally NOT set -- it inherits the chart's
+            # values.yaml, which Renovate keeps bumped and which tracks the
+            # version stuttgart-things/flux runs.
+            #
+            # REQUIRED. Missing, it falls back to the chart's `.invalid`
+            # sentinel: a scrape error somebody can see, instead of an UP
+            # target with no series.
+            target: '{{ default "set-pve-exporter-target.invalid" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/pve-exporter-target") }}'
+            verifySSL: '{{ default "false" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/pve-exporter-verify-ssl") }}'
+            externalSecrets:
+              # On whenever a store resolves: explicit pve-exporter-secret-store
+              # > kube-prometheus-stack's secret-store. With neither, no
+              # ExternalSecret is rendered and the Secret is expected to exist.
+              # A string -- this template can only produce strings; the chart
+              # turns it into a boolean.
+              enabled: '{{ if (default (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/secret-store") (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/pve-exporter-secret-store")) }}true{{ else }}false{{ end }}'
+              secretStore:
+                kind: ClusterSecretStore
+                name: '{{ default (default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/secret-store")) (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/pve-exporter-secret-store") }}'
+              # An entry NAME, never a path.
+              remoteKey: '{{ default "pve-exporter" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/pve-exporter-secret-key") }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

@@ -1,6 +1,6 @@
 # cicd/crossplane
 
-Catalog entries for [Crossplane](https://crossplane.io/) plus the stuttgart-things opinionated stack of composition Functions, Providers, ProviderConfigs, and Configurations. Five independently deployable pieces — consumers create one ArgoCD `Application` per piece they need, each pointing at a Helm chart in this directory.
+Catalog entries for [Crossplane](https://crossplane.io/) plus the stuttgart-things opinionated stack of composition Functions, Providers, ProviderConfigs, and Configurations. Six independently deployable pieces — consumers create one ArgoCD `Application` per piece they need, each pointing at a Helm chart in this directory.
 
 ## Layout
 
@@ -11,6 +11,9 @@ cicd/crossplane/
 ├── provider-configs/  plain Helm chart — renders Crossplane ProviderConfig resources
 ├── functions/         plain Helm chart — renders Crossplane Function resources
 ├── configs/           plain Helm chart — renders Crossplane Configuration resources
+│   └── profiles/flux.yaml   opt-in flux-family Configuration list (replaces the default)
+├── capabilities/      app-of-apps — one Application per enabled capability (vspherevm,
+│                      proxmoxvm, ansible-run, packer, harvester-vm); see capabilities/README.md
 └── README.md
 ```
 
@@ -106,9 +109,11 @@ spec:
 
 | Provider | apiVersion | Package | RBAC |
 |---|---|---|---|
-| `provider-helm` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0` | `cluster-admin` |
-| `provider-kubernetes` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-kubernetes:v1.2.1` | `cluster-admin` |
-| `provider-opentofu` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/upbound/provider-opentofu:v1.1.2` | `cluster-admin` |
+| `provider-helm` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/crossplane-contrib/provider-helm:v1.5.0` | `cluster-admin` |
+| `provider-opentofu` | `pkg.crossplane.io/v1` | `xpkg.upbound.io/upbound/provider-opentofu:v1.1.9` | `cluster-admin` |
+| `provider-kubeconfig` | `pkg.crossplane.io/v1` | `ghcr.io/stuttgart-things/provider-kubeconfig-xpkg:v0.13.0` | — (declares its own permissions) |
+
+helm/opentofu versions follow `stuttgart-things/flux` (`cicd/crossplane/components/install`). `provider-kubernetes` is deliberately **not** declared: every Configuration `dependsOn` it, so the package manager pulls it at the registry the installed family names (`xpkg.crossplane.io` for the default family, `xpkg.upbound.io` for `configs/profiles/flux.yaml`); a second, explicit CR for the same source is a duplicate lock node.
 
 Override the list — or add additional providers — via `helm.values`:
 
@@ -310,18 +315,31 @@ spec:
     syncOptions: [ServerSideApply=true]
 ```
 
-### configs defaults
+### configs defaults — one family per cluster
 
-The chart ships the stuttgart-things Configuration stack published to `ghcr.io/stuttgart-things/crossplane/`:
+The default list is the `ghcr.io/stuttgart-things/crossplane-configurations/` family:
 
 | Configuration | Version |
 |---|---|
-| `cloud-config` | v0.5.1 |
-| `volume-claim` | v0.1.1 |
-| `storage-platform` | v0.6.0 |
-| `ansible-run` | v12.0.0 |
-| `pipeline-integration` | v0.1.2 |
-| `harvester-vm` | v0.3.3 |
+| `namespace` | v0.1.2 |
+| `volume-claim` | v0.1.0 |
+
+`profiles/flux.yaml` is the **other** family, `ghcr.io/stuttgart-things/crossplane/` — what `stuttgart-things/flux` installs on its cicd-platform clusters. Passed as `valueFiles`, it **replaces** the default list:
+
+| Configuration | Version | |
+|---|---|---|
+| `cloud-config` | v0.5.1 | |
+| `volume-claim` | v0.1.1 | |
+| `storage-platform` | v0.6.0 | |
+| `ansible-run` | v12.0.0 | |
+| `pipeline-integration` | v0.1.2 | |
+| `harvester-vm` | v0.3.3 | `skipDependencyResolution: true` — its dependencies are all in the same list, and resolving them again races the explicit `volume-claim` into a duplicate lock node |
+
+The two families share CR names (`volume-claim`, …) from different sources; both on one cluster is a duplicate lock node and every package goes `Healthy=False`. The platform enforces the choice: `cicd-platform/crossplane-configs-flux: "true"` selects `appset-crossplane-configs-flux.yaml` **and** excludes the cluster from `appset-crossplane-configs.yaml`. Switching a live cluster is not a label flip — see the header of `profiles/flux.yaml`.
+
+Both families' function dependencies are covered by `functions/` at the registries they declare (verified against the packages' `crossplane.yaml`); no extra functions are needed for the flux family.
+
+Per-entry `skipDependencyResolution: true` is available for any list.
 
 Configurations depend on the Functions they reference, so `functions/` should be present whenever `configs/` is. Override the list via `helm.values`:
 
@@ -334,6 +352,10 @@ helm:
       - name: my-custom
         package: ghcr.io/acme/my-custom-config:v0.1.0
 ```
+
+## capabilities/
+
+App-of-apps rendering the per-cluster half of a VM-building management cluster — ClusterProviderConfigs, ESO-backed credentials and placement EnvironmentConfigs — from the OCI charts `ghcr.io/stuttgart-things/charts/{vspherevm,proxmoxvm,ansible,packer}` plus a local `harvester-vm` chart. Configurations are **not** installed by it. See [`capabilities/README.md`](capabilities/README.md).
 
 ## Fleet — one `ApplicationSet` per piece across many clusters
 

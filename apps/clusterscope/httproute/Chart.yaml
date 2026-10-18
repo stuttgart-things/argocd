@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: clusterscope-httproute
+description: Gateway API HTTPRoute for the clusterscope UI — loaded as the `-httproute` sub-Application by apps/clusterscope/install.
+type: application
+version: 0.1.0

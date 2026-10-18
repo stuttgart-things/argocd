@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sops-secrets-operator app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "destination",
+    "version"
+  ],
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "This catalog repo, for the `-age-key` Application's git source.",
+      "properties": {
+        "repoURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetRevision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ]
+    },
+    "applicationName": {
+      "type": "string",
+      "description": "Empty = derive from the destination (sops-secrets-operator-<sha1[:8]>). The age key Application is `<this>-age-key`."
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Provide `server` or `name`; if both are set, `name` wins. `namespace` does NOT move the operator — the base names sops-secrets-operator-system throughout and no kustomize namespace is set over it.",
+      "properties": {
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "namespace"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "server"
+          ]
+        },
+        {
+          "required": [
+            "name"
+          ]
+        }
+      ]
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^v(0\\.(9|[1-9][0-9]+)|[1-9][0-9]*\\.[0-9]+)\\.[0-9]+.*$",
+      "description": "Tag of ghcr.io/stuttgart-things/sops-secrets-operator-kustomize, with the `v`. >= v0.9.0: earlier tags ship the previous release's image (sops-secrets-operator#90)."
+    },
+    "ageKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "externalSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional ExternalSecret for the age key Secret. Off while secretStore.name is empty.",
+          "properties": {
+            "secretStore": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "ClusterSecretStore",
+                    "SecretStore"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Empty = no ExternalSecret."
+                }
+              }
+            },
+            "remoteKey": {
+              "type": "string",
+              "minLength": 1,
+              "not": {
+                "pattern": "/data/"
+              },
+              "description": "Entry name under the store's mount, not a KV path."
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            },
+            "refreshInterval": {
+              "type": "string",
+              "minLength": 1
+            },
+            "namespaces": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "global": {
+          "type": "boolean",
+          "description": "Point the operator's global age key (--global-age-key-secret/--global-age-key-data-key) at secretName/dataKey in sops-secrets-operator-system."
+        }
+      }
+    },
+    "protectCRDs": {
+      "type": "boolean",
+      "description": "Annotate the CRDs Prune=false,Delete=false: deleting them deletes every SopsSecret and the Secrets owned by them."
+    },
+    "cascadingDelete": {
+      "type": "boolean",
+      "description": "Put a resources-finalizer on the child Applications. False by default (argocd#324)."
+    }
+  }
+}

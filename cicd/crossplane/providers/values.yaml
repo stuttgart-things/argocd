@@ -23,9 +23,17 @@
 # Single-package providers go in this list. For cloud-family providers that
 # publish one xpkg per service (AWS, Azure, GCP), prefer a dedicated family
 # block — see `awsFamily` below — to avoid listing every service by hand.
+#
+# Versions follow stuttgart-things/flux (cicd/crossplane/components/install,
+# CROSSPLANE_HELM_PROVIDER_VERSION / _OPENTOFU_PROVIDER_VERSION defaults), at the
+# same registry: provider-helm v1.5.0, provider-opentofu v1.1.9. xpkg.upbound.io
+# for provider-helm is load-bearing, not cosmetic -- it is the source the
+# crossplane/* family (cicd/crossplane/configs/profiles/flux.yaml:
+# pipeline-integration, storage-platform, ">=v1.0.6") declares, and the lock
+# keys on that string.
 providers:
   - name: provider-helm
-    package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.2.0
+    package: xpkg.upbound.io/crossplane-contrib/provider-helm:v1.5.0
     rbac:
       clusterRole: cluster-admin
   # provider-kubernetes is intentionally NOT installed explicitly here: every
@@ -35,8 +43,19 @@ providers:
   # node for the same source → "node ... already exists" → the package resolver
   # freezes for every Configuration. Manage it via dependsOn only (same rule as
   # the Configuration building blocks). See crossplane-configurations CLAUDE.md.
+  #
+  # flux's cicd-platform profile DOES list it (xpkg.upbound.io, v1.4.1) in the
+  # crossplane chart's provider.packages. That does not contradict this rule:
+  # the chart only passes `--provider <ref>` to the core, which creates the CR
+  # itself at startup (not a CR declared in Git under a short name, which is
+  # what collides here). Not verified on a live cluster that the core-created
+  # name equals the dependsOn-derived one -- the rule stays. It also keeps this
+  # chart family-agnostic -- the default Configuration family declares
+  # provider-kubernetes on xpkg.crossplane.io, the flux family
+  # (configs/profiles/flux.yaml) on xpkg.upbound.io, and either way it is
+  # pulled at the spelling the installed packages ask for.
   - name: provider-opentofu
-    package: xpkg.upbound.io/upbound/provider-opentofu:v1.1.2
+    package: xpkg.upbound.io/upbound/provider-opentofu:v1.1.9
     rbac:
       clusterRole: cluster-admin
   # stuttgart-things provider managing remote kubeconfigs from SOPS-encrypted

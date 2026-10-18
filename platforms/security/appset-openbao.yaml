@@ -1,0 +1,161 @@
+---
+# OpenBao for the security platform: a standalone raft instance on the
+# workload cluster, the ArgoCD counterpart of stuttgart-things/flux
+# apps/openbao (+ apps/platform/components/openbao{,-sops}).
+#
+# OPT-IN, an explicit `security-platform/openbao: "true"`, unlike the
+# controller AppSets beside it: a secrets store is not something every
+# security-labelled cluster should grow, and it cannot be useful without a seal
+# decision, a StorageClass and (for an auto-unseal) a Secret in the store.
+#
+# ONE parent per cluster, rendering apps/openbao/install, which renders on the
+# target cluster:
+#   - `openbao-<cluster>-external-secrets` (sync-wave -10): the seal Secret
+#     (static key or transit token, plus the self-init passwords) as an
+#     ExternalSecret from the store below -- with seal `none` and init `none`
+#     nothing reads a Secret and it is not rendered;
+#   - `openbao-<cluster>` (0): the upstream openbao chart;
+#   - `openbao-<cluster>-httproute` (10): the route, on its own, after the
+#     Service (Cilium resolves backendRefs once).
+#
+# WHICH SEAL -- annotation `…/openbao-seal`: transit (default, as the flux
+# apps-platform bundle), static or none. Decide it before the first init:
+# changing the seal of an initialised instance needs OpenBao's seal migration,
+# not an annotation edit. A seal whose required parameter is missing
+# (transit without `…/openbao-seal-address`, static without
+# `…/openbao-seal-key-id`) fails the parent's render on the chart schema --
+# loudly, instead of starting an instance nobody can unseal.
+#
+# PRECONDITIONS, not in the selector:
+#   1. external-secrets + the ClusterSecretStore named below, able to read the
+#      entry (properties: `token` for transit or `key` for static, plus
+#      `terraform-password` / `admin-password` with init self-init-userpass).
+#      Without it the pod sits in CreateContainerConfigError.
+#   2. transit: the peer's transit mount, key, policy and a PERIODIC RENEWABLE
+#      token -- the Vault-side half, which needs credentials for the peer and
+#      cannot be created here. Its CA must be in trust-manager's
+#      `cluster-trust-bundle` (network-platform/trust-manager-bundle).
+#   3. A StorageClass that exists on the cluster (`…/openbao-storage-class`,
+#      REQUIRED: unset fails the schema).
+#   4. The `<cluster>-gateway` Gateway (clusterbook, network-platform) for the
+#      route. NOT a sync dependency: a route attaches whenever the Gateway
+#      comes up, and gating OpenBao on ingress once deadlocked a cluster whose
+#      gateway certificate came from the Vault this OpenBao replaced
+#      (stuttgart-things/harvester#152).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: openbao-security
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  # The raft PVC and the seal Secret (ExternalSecret creationPolicy Orphan)
+  # stay on the cluster either way: an opt-out never destroys the data or what
+  # unseals it.
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            security-platform: "true"
+            # Opt-IN, so an explicit "true" rather than a NotIn ["false"].
+            security-platform/openbao: "true"
+  template:
+    metadata:
+      name: 'openbao-security-{{ .name }}'
+      annotations:
+        # After external-secrets (-10) and its stores (-5): the seal Secret is
+        # an ExternalSecret.
+        argocd.argoproj.io/sync-wave: "0"
+    spec:
+      project: '{{ .name }}'
+      # The parent renders Application CRs, which must land in the argocd ns on
+      # the management cluster. The children target the remote cluster via
+      # valuesObject.destination.server below.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.82.2
+        path: apps/openbao/install
+        helm:
+          releaseName: 'openbao-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent and neither
+            # ever deploys while both report "successfully synced".
+            applicationName: 'openbao-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.82.2
+            destination:
+              server: '{{ .server }}'
+              namespace: openbao
+            # `chartVersion` is intentionally NOT set here -- it inherits
+            # apps/openbao/install/values.yaml, which Renovate keeps bumped and
+            # which is held at the version stuttgart-things/flux runs.
+            storage:
+              # REQUIRED: "" fails the schema rather than leaving a PVC that
+              # never binds while everything reports Synced.
+              storageClass: '{{ default "" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-storage-class") }}'
+              size: '{{ default "8Gi" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-storage-size") }}'
+            # multi-node | single-node (no injector, small requests).
+            topology: '{{ default "multi-node" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-topology") }}'
+            seal:
+              type: '{{ default "transit" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-seal") }}'
+              static:
+                # Opaque label -- it MUST change whenever the key does.
+                keyId: '{{ default "" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-seal-key-id") }}'
+                secretName: openbao-static-seal
+                secretKey: key
+              transit:
+                address: '{{ default "" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-seal-address") }}'
+                keyName: '{{ default "openbao-unseal" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-seal-key-name") }}'
+                mountPath: '{{ default "transit/" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-seal-mount-path") }}'
+                secretName: openbao-transit-seal
+                secretKey: token
+                trustBundle:
+                  configMap: cluster-trust-bundle
+                  key: trust-bundle.pem
+              externalSecret:
+                enabled: true
+                store:
+                  kind: ClusterSecretStore
+                  # `vault-<cluster>`, the per-cluster store LabDA clusters get
+                  # (appset-external-secrets-stores), unless named explicitly.
+                  name: '{{ default (printf "vault-%s" .name) (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-secret-store") }}'
+                # An entry NAME in that store, never a path.
+                remoteKey: '{{ default "openbao" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-secret-key") }}'
+                # Fetch once: a key overwritten in the store under the same key
+                # ID must not reach the running instance by itself.
+                refreshInterval: "0"
+            init:
+              # none | self-init-userpass (needs seal static or transit).
+              mode: '{{ default "none" (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-init") }}'
+            httpRoute:
+              enabled: true
+              hostname: '{{ default (printf "openbao.%s" (trimPrefix "*." (default "" (index (default (dict) .metadata.annotations) "clusterbook.stuttgart-things.com/fqdn")))) (index (default (dict) .metadata.annotations) "security-platform.stuttgart-things.com/openbao-hostname") }}'
+              gateway:
+                name: '{{ .name }}-gateway'
+                namespace: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

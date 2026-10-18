@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "clusterscope probes sub-chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["namespace", "prometheusRelease", "targetsURL", "module", "address", "interval", "sdRefresh"],
+  "properties": {
+    "namespace": { "type": "string", "minLength": 1 },
+    "prometheusRelease": { "type": "string", "minLength": 1 },
+    "targetsURL": { "type": "string", "pattern": "^https?://" },
+    "module": { "type": "string", "minLength": 1 },
+    "address": { "type": "string", "pattern": "^[^/:]+:[0-9]+$", "description": "host:port of the blackbox exporter Service." },
+    "interval": { "type": "string", "pattern": "^[0-9]+(ms|s|m|h)$" },
+    "sdRefresh": { "type": "string", "pattern": "^[0-9]+(ms|s|m|h)$" }
+  }
+}

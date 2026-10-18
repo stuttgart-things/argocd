@@ -1,0 +1,241 @@
+---
+# Base name for the rendered Applications. Empty means derive it from the
+# destination as `clusterscope-<sha1(destination)[:8]>`, because the
+# Applications land in the `argocd` namespace of ONE management cluster: a fixed
+# name would make two clusters' deployments collide on the same object. The
+# sub-Applications append `-config`, `-httproute` and `-probes` to it.
+applicationName: ""
+
+# AppProject every rendered Application belongs to.
+project: default
+
+# Reference back to this catalog repo — the sub-Applications load
+# apps/clusterscope/{config,httproute,probes} from it.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# Where it deploys. Provide either `server` (cluster URL) or `name` (the
+# Argo-registered cluster name); if both are set, `name` wins.
+destination:
+  server: https://kubernetes.default.svc
+  # name: platform-sthings
+  namespace: clusterscope
+
+# Tag of the published kustomize artifact. Since v0.23.1 the base pins the
+# clusterscope image of the same version, so this pins the application too and
+# no image patch is needed. `config` below needs v0.24.0, `clusterbooks` in the
+# config v0.25.0.
+# renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterscope-kustomize
+version: v0.26.0
+
+# clusterscope's own flags. Every flag is rendered in the -flag=value form, so
+# an empty value stays a valid flag instead of an empty positional argument
+# that would end flag parsing.
+#
+# There is deliberately no port: the base's Service, containerPort and
+# liveness/readiness probes are all fixed at 8080, so moving -serve alone
+# restarts the pod forever on a failing liveness probe.
+clusterscope:
+  # GitOps tech of the cluster directories clusterscope reads: `flux` or
+  # `argocd`. It describes the REPOSITORY, not the tool deploying clusterscope.
+  tech: flux
+  # Lab name when the path has no `clusters/<lab>/…`.
+  lab: ""
+  # Live mode: GitOps status, workload health, endpoints. The own cluster is
+  # read with the in-cluster ServiceAccount; other clusters need a kubeconfig
+  # in `kubeconfigDir` (vaultKubeconfigs below). Boolean or the string
+  # "true"/"false" — an ApplicationSet can only template strings.
+  live: false
+  # Cluster clusterscope runs in (read in-cluster, no kubeconfig).
+  selfCluster: ""
+  # Directory with one kubeconfig per cluster. Empty = `/kubeconfigs` when
+  # vaultKubeconfigs is enabled (that is where its Secret is mounted), else no
+  # directory.
+  kubeconfigDir: ""
+  # Probe every HTTPRoute URL on each refresh (boolean or "true"/"false").
+  probe: false
+  # Live refresh interval in seconds.
+  refresh: 60
+
+# Trust the lab CAs for the endpoint probes (-probe): the trust-manager bundle
+# (default CAs + lab CAs) via SSL_CERT_DIR. Optional — without trust-manager
+# the image's own CA file still applies (Go loads it regardless of
+# SSL_CERT_DIR), and the ConfigMap volume is `optional: true`.
+trustBundle:
+  configMap: cluster-trust-bundle
+  key: trust-bundle.pem
+
+# The git-sync sidecar that clones the repository clusterscope renders into
+# the shared /data emptyDir. The checkout link is /data/<last URL segment> —
+# use a URL without ".git", and point `dir` at /data/<repo-name>/clusters.
+#
+# Until git-sync has cloned the repo, -root does not exist and clusterscope
+# restarts a few times; it settles after the first sync.
+gitSync:
+  # REQUIRED. The default is a loud placeholder: git-sync fails on it with a
+  # DNS error that names this value.
+  repo: https://set-gitSync-repo.invalid
+  branch: main
+  period: 60s
+  # -root for clusterscope (ignored by clusterscope when `config` is on —
+  # -config replaces -root).
+  dir: /data/repo/clusters
+  image:
+    repository: registry.k8s.io/git-sync/git-sync
+    # renovate: datasource=docker depName=registry.k8s.io/git-sync/git-sync
+    tag: v4.4.0
+  # Secret with keys `username` / `password` (HTTPS token) for private repos —
+  # from Vault via vaultGitAuth below, or created by hand:
+  #   kubectl create secret generic git-sync-auth \
+  #     --from-literal=username=token --from-literal=password=<TOKEN> -n clusterscope
+  # Optional: without the Secret git-sync clones anonymously (public repos).
+  authSecret: git-sync-auth  # pragma: allowlist secret -- names a Secret, holds none
+
+# A second repository next to gitSync.repo, for labs whose cluster directories
+# live in two repos. Needs `config` to scan it.
+#
+# Own git-sync container on its own emptyDir, mounted at /data-extra in
+# clusterscope: two git-syncs must not share a --root (each manages the
+# directory and cleans it when its checks fail). The checkout link is
+# /data-extra/<last URL segment> — use a URL without ".git". Uses
+# gitSync.image and gitSync.authSecret.
+gitSyncExtra:
+  enabled: false
+  # Required when enabled.
+  repo: ""
+  branch: main
+  period: 120s
+
+# clusterscope -config from a ConfigMap: several roots (repos) and
+# per-directory cluster name / lab overrides, and the lab's clusterbooks
+# (v0.25.0+, their IP / DNS allocations are matched against the clusters).
+# When enabled the chart sets -config=/etc/clusterscope/config.yaml itself.
+#
+# `content` is the file, YAML or one line of JSON (JSON is YAML) — the
+# ApplicationSet passes it from one annotation. Format: clusterscope
+# docs/lab.md (roots: path, name, lab, include; clusters: <dir>: {name, lab}),
+# e.g.
+#   {"roots":[{"path":"/data/stuttgart-things/clusters/labul"},
+#             {"path":"/data-extra/harvester/clusters","name":"harvester","include":["edge-test2"]}],
+#    "clusters":{"edge-test2":{"name":"edge-tt-test2","lab":"labul"}}}
+# clusterscope reads it at startup; with `reloader` on, the pod restarts when
+# it changes (where infra/reloader runs).
+config:
+  enabled: false
+  content: ""
+
+# git-sync credentials (HTTPS token) for a private repository, from Vault via
+# an ExternalSecret into `gitSync.authSecret` (keys username / password, as the
+# git-sync env expects).
+vaultGitAuth:
+  enabled: false
+  secretStore:
+    kind: ClusterSecretStore
+    # Required when enabled.
+    name: ""
+  # Vault key, e.g. homerun2-cd/data/kargo. Required when enabled.
+  path: ""
+  usernameProperty: username
+  passwordProperty: password
+
+# Kubeconfigs of the other clusters of the lab for live mode, from the KV mount
+# the ClusterStack plays write to (path = cluster name, property `kubeconfig`),
+# as ONE Secret with one key per cluster — the layout -kubeconfig-dir expects —
+# mounted at /kubeconfigs. Set clusterscope.live and clusterscope.selfCluster
+# too.
+#
+# The volume is optional: clusterscope starts without it (all other clusters
+# "no kubeconfig"), and kubelet fills it once ESO has synced — clusterscope
+# rereads the directory on every refresh, no restart needed.
+vaultKubeconfigs:
+  enabled: false
+  secretStore:
+    kind: ClusterSecretStore
+    name: vault-kubeconfigs
+  # Regexp over the Vault entry names, e.g. ^(infra-sthings|homerun2-dev2)$.
+  # `^$` selects nothing.
+  clusters: ^$
+
+# refreshInterval of both ExternalSecrets.
+esoRefreshInterval: 1h
+
+# Gateway API HTTPRoute for the UI (sub-Application `<name>-httproute`).
+httpRoute:
+  enabled: true
+  hostname: clusterscope.example.com
+  gateway:
+    name: cilium-gateway
+    namespace: default
+    # Listener to attach to. Empty attaches the route to every listener of the
+    # Gateway, which is what the flux app does.
+    sectionName: ""
+
+# Blackbox probes for every endpoint clusterscope lists (sub-Application
+# `<name>-probes`). With live mode on, clusterscope serves every HTTPRoute URL
+# of the lab at /api/targets (Prometheus http_sd format, labels cluster,
+# namespace, route, app); a Prometheus Operator ScrapeConfig probes each of
+# them through an existing blackbox exporter, so new routes are watched without
+# a per-app target list. The series carry `probe_source="clusterscope"`.
+#
+# Needs the ScrapeConfig CRD (infra/kube-prometheus-stack) and a blackbox
+# exporter next to the Prometheus (infra/blackbox-exporter). Requires
+# clusterscope.live — without it /api/targets is empty.
+blackboxProbes:
+  enabled: false
+  # Namespace of the ScrapeConfig — the Prometheus' namespace. The catalog's
+  # kube-prometheus-stack selects ScrapeConfigs in every namespace
+  # (scrapeConfigNamespaceSelector: {}), so this is about ownership, not reach.
+  namespace: monitoring
+  # `release` label the Prometheus' scrapeConfigSelector matches.
+  # infra/kube-prometheus-stack leaves scrapeConfigSelectorNilUsesHelmValues at
+  # the upstream default (true) and installs with the fixed release name
+  # `kube-prometheus-stack`, so the selector is `release: kube-prometheus-stack`.
+  prometheusRelease: kube-prometheus-stack
+  # Blackbox module for every endpoint. Pick one that matches clusterscope's
+  # own probe: a route counts as reachable when it answers below 500, including
+  # 401/403 behind a login and 404 on an app without a root page — http_2xx
+  # pages for those. infra/blackbox-exporter ships only http_2xx and
+  # http_2xx_untrusted_ca; a "reachable" module has to be added to its
+  # `config.modules` first.
+  module: http_2xx
+  # The exporter's Service. Matches infra/blackbox-exporter (release
+  # `blackbox-exporter` of prometheus-blackbox-exporter → Service
+  # blackbox-exporter-prometheus-blackbox-exporter, port 9115) in `monitoring`.
+  address: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc:9115
+  interval: 60s
+  # How often the target list is re-read from /api/targets.
+  sdRefresh: 5m
+
+# Stakater Reloader annotation on the Deployment: roll clusterscope when the
+# -config ConfigMap changes (clusterscope reads it only at startup). A no-op
+# without the Reloader controller (infra/reloader/install) or without `config`.
+reloader: true
+
+# Whether deleting the parent Application also prunes what it deployed.
+#
+# ON (the default) puts a `resources-finalizer.argocd.argoproj.io` on every
+# child Application, so Argo prunes the workloads before removing the child.
+#
+# OFF is what a long-lived PLATFORM install wants, and the platforms/ AppSet
+# sets it: an opt-out should stop Argo CD managing the app, not delete it — and
+# against an already deregistered cluster the prune can never complete, so the
+# children hang in Terminating and block their AppProject (argocd#324).
+cascadingDelete: true
+
+# Sync policy applied to every rendered Application. CreateNamespace=true lets
+# the `-config` Application (wave -1) land before the base's Namespace exists.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
