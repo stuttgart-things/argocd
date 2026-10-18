@@ -64,7 +64,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.82.2
+        targetRevision: v0.83.0
         path: apps/clusterbook-operator/install
         helm:
           releaseName: 'clusterbook-operator-{{ .name }}'
