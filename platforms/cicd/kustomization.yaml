@@ -26,3 +26,5 @@ resources:
   - appset-machinery.yaml
   - appset-clusterbook-operator.yaml
   - appset-komoplane.yaml
+  - appset-harbor.yaml
+  - appset-zot.yaml

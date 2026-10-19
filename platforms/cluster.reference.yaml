@@ -104,6 +104,9 @@ spec:
     cicd-platform/dapr-workflows: 'false'      # → appset-dapr-workflows (redis + secrets) [ann: secret-store REQUIRED]
     cicd-platform/template-execution: 'false'  # value label: backstage template-execution worker + BackstageTemplateRun RGD
     cicd-platform/cluster-build-watch: 'false' # value label: cluster-build-watch worker + ClusterBuildWatch RGD
+    # registries (opt-in, clusterbook clusters only) [ann: secret-store REQUIRED]
+    cicd-platform/harbor: 'false'              # → appset-harbor (official goharbor chart) on harbor.<fqdn>
+    cicd-platform/zot: 'false'                 # → appset-zot on zot.<fqdn>
 
     # ---- profile: network-platform (Cilium + cert-manager + trust) ----
     network-platform: 'true'            # umbrella
@@ -253,7 +256,13 @@ spec:
     # cicd-platform.stuttgart-things.com/machinery-token-secret-key: ''           # set = machinery gRPC auth on (property token)
     # cicd-platform.stuttgart-things.com/homerun-pitch-url: ''                    # '' = no homerun sink for cluster-build-watch
     # cicd-platform.stuttgart-things.com/backstage-url: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
-    # cicd-platform.stuttgart-things.com/storage-class: openebs-hostpath           # redis PVC
+    # cicd-platform.stuttgart-things.com/storage-class: openebs-hostpath           # redis / harbor / zot PVCs
+    # ---- [user] cicd: registries (appset-harbor, appset-zot) -- secret-store above is shared ----
+    # cicd-platform.stuttgart-things.com/harbor-secret-key: harbor               # KV entry, see cicd/harbor/README.md
+    # cicd-platform.stuttgart-things.com/harbor-registry-size: 50Gi
+    # cicd-platform.stuttgart-things.com/zot-secret-key: zot                     # KV entry, property htpasswd
+    # cicd-platform.stuttgart-things.com/zot-storage-size: 50Gi
+    # cicd-platform.stuttgart-things.com/zot-anonymous-read: 'true'              # 'false' = authenticated pulls only
 
     # ---- [user] security: the KV mounts this cluster opens ----
     # One ClusterSecretStore per mount, named vault-<mount>, rendered by

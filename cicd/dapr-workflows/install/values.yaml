@@ -1,6 +1,6 @@
 ---
 # Reference back to this catalog repo -- the secrets and redis sub-Applications
-# load cicd/dapr-workflows/secrets and apps/redis-stack/install from here.
+# load cicd/externalsecrets and apps/redis-stack/install from here.
 catalog:
   repoURL: https://github.com/stuttgart-things/argocd.git
   targetRevision: HEAD

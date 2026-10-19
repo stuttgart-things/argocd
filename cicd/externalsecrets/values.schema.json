@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "dapr-workflows-secrets values",
+  "title": "externalsecrets values",
   "type": "object",
   "required": ["namespace", "clusterSecretStoreName", "secrets"],
   "additionalProperties": false,

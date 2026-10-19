@@ -1,0 +1,65 @@
+{{- /* Nothing without a hostname: lint and the catalog probe render the
+       defaults. With one, a missing Gateway or store is a hard error. */}}
+{{- if .Values.hostname }}
+{{- if not .Values.gateway.name }}
+{{- fail "gateway.name is required: the Gateway the HTTPRoute attaches to" }}
+{{- end }}
+{{- if not .Values.secrets.clusterSecretStoreName }}
+{{- fail "secrets.clusterSecretStoreName is required: the generated secrets come from ESO" }}
+{{- end }}
+{{- $appName := include "harborCicd.appName" . }}
+{{- $sc := .Values.storageClass }}
+{{- $s := .Values.sizes }}
+{{- $values := dict
+      "expose" (dict
+        "type" "route"
+        "tls" (dict "enabled" false)
+        "route" (dict
+          "parentRefs" (list (dict "group" "gateway.networking.k8s.io" "kind" "Gateway" "name" .Values.gateway.name "namespace" .Values.gateway.namespace))
+          "hosts" (list .Values.hostname)))
+      "externalURL" (printf "https://%s" .Values.hostname)
+      "existingSecretAdminPassword" "harbor-eso-admin"
+      "existingSecretSecretKey" "harbor-eso-secretkey"
+      "core" (dict "existingSecret" "harbor-eso-core-secret" "secretName" "harbor-eso-core-token" "existingXsrfSecret" "harbor-eso-xsrf")
+      "jobservice" (dict "existingSecret" "harbor-eso-jobservice" "existingSecretKey" "JOBSERVICE_SECRET")
+      "registry" (dict "existingSecret" "harbor-eso-registry-http" "existingSecretKey" "REGISTRY_HTTP_SECRET"
+                       "credentials" (dict "existingSecret" "harbor-eso-registry-credentials"))
+      "trivy" (dict "enabled" .Values.trivy.enabled)
+      "persistence" (dict
+        "enabled" true
+        "resourcePolicy" "keep"
+        "persistentVolumeClaim" (dict
+          "registry" (dict "storageClass" $sc "size" $s.registry)
+          "jobservice" (dict "jobLog" (dict "storageClass" $sc "size" $s.jobLog))
+          "database" (dict "storageClass" $sc "size" $s.database)
+          "redis" (dict "storageClass" $sc "size" $s.redis)
+          "trivy" (dict "storageClass" $sc "size" $s.trivy)))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://helm.goharbor.io
+    chart: harbor
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: harbor
+      valuesObject:
+        {{- toYaml $values | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

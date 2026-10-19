@@ -8,7 +8,7 @@ stuttgart-things/argocd#658).
 | Application | Source | Namespace | Renders |
 |---|---|---|---|
 | `<app>-redis` | `apps/redis-stack/install` | `dapr-redis` | redis (sentinel, one replica) — dapr state store for both workers |
-| `<app>-secrets-<ns>` | `cicd/dapr-workflows/secrets` | per namespace | ExternalSecrets, see below |
+| `<app>-secrets-<ns>` | `cicd/externalsecrets` | per namespace | ExternalSecrets, see below |
 | `<app>-template-execution` | OCI `dapr-backstage-template-execution-kustomize` | `backstage-workflows` | worker that runs Backstage scaffolder templates (`request-vm` → `create-terraform-vm`) and follows the GitHub Actions run |
 | `<app>-template-execution-trigger` | same artifact, `<tag>-trigger` | cluster | kro RGD `backstage-template-run` (kind `BackstageTemplateRun`) |
 | `<app>-cluster-build-watch` | OCI `dapr-cluster-build-watch-kustomize` | `cluster-build-watch` | worker that follows a cluster build and reports each checkpoint |

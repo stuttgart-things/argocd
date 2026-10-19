@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "zot-cicd values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog",
+    "project",
+    "destination",
+    "chartVersion",
+    "hostname",
+    "gateway",
+    "secrets",
+    "syncPolicy"
+  ],
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ],
+      "properties": {
+        "repoURL": {
+          "type": "string"
+        },
+        "targetRevision": {
+          "type": "string"
+        }
+      }
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server",
+        "namespace"
+      ],
+      "properties": {
+        "server": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "applicationName": {
+      "type": "string"
+    },
+    "cascadingDelete": {
+      "type": "boolean"
+    },
+    "chartVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hostname": {
+      "type": "string",
+      "description": "Public hostname; required to render"
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "namespace"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Gateway the HTTPRoute attaches to; required to render"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "storageClass": {
+      "type": "string",
+      "minLength": 1
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clusterSecretStoreName",
+        "vaultSecretName"
+      ],
+      "properties": {
+        "clusterSecretStoreName": {
+          "type": "string",
+          "description": "required to render"
+        },
+        "vaultSecretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$"
+        }
+      }
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "storageSize": {
+      "type": "string",
+      "pattern": "^[0-9]+(Mi|Gi|Ti)$"
+    },
+    "anonymousRead": {
+      "type": "boolean"
+    }
+  }
+}
