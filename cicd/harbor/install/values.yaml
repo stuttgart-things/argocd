@@ -44,11 +44,13 @@ trivy:
 # Every value the chart would otherwise generate at render time. Argo renders
 # with `helm template` -- the chart's `lookup` of the live Secret returns
 # nothing there, so each render would mint a new key, token CA and htpasswd
-# salt: endless OutOfSync and a pod restart per sync. ONE KV entry carries
-# them all (see README for how to generate it):
-#   admin_password, secret_key (16), core_secret (16), xsrf_key (32),
-#   jobservice_secret (16), registry_http_secret (16), registry_password,
-#   registry_htpasswd (bcrypt, user harbor_registry_user), token_key, token_crt
+# salt: endless OutOfSync and a pod restart per sync. Here:
+#   - ONE KV entry, every property a random string the stack can generate:
+#     admin_password, secret_key (16), core_secret (16), xsrf_key (32),
+#     jobservice_secret (16), registry_http_secret (16), registry_password
+#   - REGISTRY_HTPASSWD is built by ESO from registry_password (bcrypt)
+#   - the token signing key comes from cert-manager (cicd/harbor/token-cert),
+#     so the cluster needs cert-manager
 secrets:
   clusterSecretStoreName: ""
   vaultSecretName: harbor

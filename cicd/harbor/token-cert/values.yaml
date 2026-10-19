@@ -1,0 +1,7 @@
+---
+namespace: harbor
+# Secret Harbor core reads (core.secretName): tls.key + tls.crt.
+secretName: harbor-core-token-cert
+# Token signing is internal to Harbor; nothing outside verifies this chain.
+duration: 87600h
+renewBefore: 720h

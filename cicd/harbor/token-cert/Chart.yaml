@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: harbor-token-cert
+description: Self-signed Issuer + Certificate for Harbor core's token signing key (tls.key/tls.crt), so the chart need not generate one per render.
+type: application
+version: 0.1.0

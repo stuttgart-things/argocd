@@ -7,7 +7,8 @@ Not the Bitnami chart in `apps/harbor`: its images are frozen under
 
 | Application | Source | Renders |
 |---|---|---|
-| `<app>-secrets` | `cicd/externalsecrets` | 8 ExternalSecrets `harbor-eso-*` (wave -5) |
+| `<app>-secrets` | `cicd/externalsecrets` | 7 ExternalSecrets `harbor-eso-*` (wave -5); the registry credentials one builds `REGISTRY_HTPASSWD` (bcrypt) from the fetched password with an ESO template |
+| `<app>-token-cert` | `cicd/harbor/token-cert` | self-signed Issuer + Certificate → `harbor-core-token-cert` (token signing key, RSA 4096 PKCS#1; needs cert-manager) |
 | `<app>` | `helm.goharbor.io/harbor` | Harbor, internal PostgreSQL + Redis, Trivy, HTTPRoute on `hostname` via `gateway` (TLS terminates at the Gateway) |
 
 ## Why every secret comes from ESO
@@ -21,36 +22,23 @@ render is deterministic (verified: two renders, byte-identical).
 ## The KV entry
 
 One entry (`secrets.vaultSecretName`, default `harbor`) in the store
-`secrets.clusterSecretStoreName`:
+`secrets.clusterSecretStoreName`. **Every property is a random string**, so an
+AppSecretProfile can generate the whole entry:
 
-| property | content |
+| property | length |
 |---|---|
-| `admin_password` | initial admin password |
-| `secret_key` | 16 characters |
-| `core_secret` | 16 characters |
-| `xsrf_key` | 32 characters |
-| `jobservice_secret` | 16 characters |
-| `registry_http_secret` | 16 characters |
-| `registry_password` | password of `harbor_registry_user` |
-| `registry_htpasswd` | `harbor_registry_user:<bcrypt>` of that password |
-| `token_key`, `token_crt` | RSA key + self-signed cert for token signing |
+| `admin_password` | any |
+| `secret_key` | 16 |
+| `core_secret` | 16 |
+| `xsrf_key` | 32 |
+| `jobservice_secret` | 16 |
+| `registry_http_secret` | 16 |
+| `registry_password` | any |
 
-Generate once (values never printed, written straight to a JSON file for your
-KV tooling):
-
-```bash
-r() { openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
-pw=$(r 24); openssl req -x509 -newkey rsa:4096 -nodes -days 3650 \
-  -subj /CN=harbor-token-ca -keyout token.key -out token.crt 2>/dev/null
-jq -n --arg admin "$(r 20)" --arg sk "$(r 16)" --arg cs "$(r 16)" --arg xs "$(r 32)" \
-  --arg js "$(r 16)" --arg rh "$(r 16)" --arg rp "$pw" \
-  --arg ht "$(htpasswd -nbB harbor_registry_user "$pw" | tr -d '\n')" \
-  --rawfile tk token.key --rawfile tc token.crt \
-  '{admin_password:$admin, secret_key:$sk, core_secret:$cs, xsrf_key:$xs,
-    jobservice_secret:$js, registry_http_secret:$rh, registry_password:$rp,
-    registry_htpasswd:$ht, token_key:$tk, token_crt:$tc}' > harbor-kv.json
-rm token.key token.crt
-```
+The two values that are NOT random strings are derived instead: the registry
+htpasswd line by ESO (`{{ htpasswd "harbor_registry_user" .registry_password "bcrypt" }}`,
+verified on ESO v2.12 — the line changes salt on each refresh, every one of
+them verifies the same password), the token key pair by cert-manager.
 
 The internal database keeps the chart's default password: it is reachable only
 inside the namespace's ClusterIP Service.

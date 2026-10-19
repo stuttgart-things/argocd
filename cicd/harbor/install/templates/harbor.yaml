@@ -20,7 +20,7 @@
       "externalURL" (printf "https://%s" .Values.hostname)
       "existingSecretAdminPassword" "harbor-eso-admin"
       "existingSecretSecretKey" "harbor-eso-secretkey"
-      "core" (dict "existingSecret" "harbor-eso-core-secret" "secretName" "harbor-eso-core-token" "existingXsrfSecret" "harbor-eso-xsrf")
+      "core" (dict "existingSecret" "harbor-eso-core-secret" "secretName" "harbor-core-token-cert" "existingXsrfSecret" "harbor-eso-xsrf")
       "jobservice" (dict "existingSecret" "harbor-eso-jobservice" "existingSecretKey" "JOBSERVICE_SECRET")
       "registry" (dict "existingSecret" "harbor-eso-registry-http" "existingSecretKey" "REGISTRY_HTTP_SECRET"
                        "credentials" (dict "existingSecret" "harbor-eso-registry-credentials"))

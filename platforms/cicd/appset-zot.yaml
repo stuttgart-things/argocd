@@ -50,7 +50,7 @@ spec:
         # that points at a path that does not exist there). Then pin it and
         # catalog.targetRevision below, like the other AppSets here.
         targetRevision: HEAD
-        path: cicd/zot
+        path: cicd/zot/install
         helm:
           releaseName: 'zot-{{ .name }}'
           # `default ""`: missingkey=error does not cover `index`, and an
