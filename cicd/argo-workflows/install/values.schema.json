@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "argo-workflows-cicd values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "destination",
+    "chartVersion",
+    "hostname",
+    "gateway",
+    "authMode",
+    "syncPolicy"
+  ],
+  "properties": {
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server",
+        "namespace"
+      ],
+      "properties": {
+        "server": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "applicationName": {
+      "type": "string"
+    },
+    "cascadingDelete": {
+      "type": "boolean"
+    },
+    "chartVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hostname": {
+      "type": "string",
+      "description": "Public hostname of the server UI; required to render"
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "namespace"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Gateway the HTTPRoute attaches to; required to render"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "authMode": {
+      "type": "string",
+      "enum": [
+        "client",
+        "server"
+      ],
+      "description": "client = bearer token per user (default); server = everyone who reaches the route acts as the server ServiceAccount"
+    },
+    "artifactRepository": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Upstream artifactRepository (s3/gcs/azure/archiveLogs); empty = none"
+    },
+    "extraValues": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

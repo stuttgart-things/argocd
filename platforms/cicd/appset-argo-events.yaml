@@ -1,0 +1,70 @@
+# Argo Events (argo-helm chart): CRDs + controller only. EventBus,
+# EventSources and Sensors are user content -- nothing here creates them.
+#
+# OPT-IN (cicd-platform/argo-events: "true") rather than this profile's usual
+# opt-out, so the umbrella label alone does not install it. No route and no
+# clusterbook requirement: the controller has no UI.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: argo-events-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            # Opt-IN: only an explicit "true".
+            - key: cicd-platform/argo-events
+              operator: In
+              values: ["true"]
+  template:
+    metadata:
+      # `-platform` suffix so the parent cannot share a name with the chart's
+      # child (`argo-events-<cluster>`).
+      name: 'argo-events-platform-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # HEAD until the first release that carries cicd/argo-events (a tag
+        # pin before that points at a path that does not exist there). Then
+        # pin it like the other AppSets here.
+        targetRevision: HEAD
+        path: cicd/argo-events/install
+        helm:
+          releaseName: 'argo-events-{{ .name }}'
+          values: |
+            enabled: true
+            project: '{{ .name }}'
+            applicationName: 'argo-events-{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: argo-events
+            cascadingDelete: false
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

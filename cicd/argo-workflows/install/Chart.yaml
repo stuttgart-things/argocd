@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: argo-workflows-cicd
+description: App-of-apps for Argo Workflows (argo-helm chart) -- workflow controller + server UI behind a Gateway API route, client (token) auth by default, no artifact repository unless one is configured.
+type: application
+version: 0.1.0
+appVersion: "v4.1.5"

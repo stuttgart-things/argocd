@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: argo-events-cicd
+description: App-of-apps for the Argo Events controller (argo-helm chart) -- CRDs and controller only; EventBus, EventSources and Sensors are user content.
+type: application
+version: 0.1.0
+appVersion: "v1.9.11"

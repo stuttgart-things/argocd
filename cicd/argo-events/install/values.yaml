@@ -1,0 +1,38 @@
+---
+# false renders nothing (lint and the catalog probe use the defaults); the
+# AppSet sets it.
+enabled: false
+
+project: default
+
+destination:
+  server: https://kubernetes.default.svc
+  namespace: argo-events
+
+# Name of the rendered Application. Default argo-events-<sha1(server)[:8]>.
+applicationName: ""
+
+# false: an opt-out stops managing Argo Events instead of deleting it.
+cascadingDelete: false
+
+# renovate: datasource=helm depName=argo-events registryUrl=https://argoproj.github.io/argo-helm
+chartVersion: 2.4.27
+
+# Deep-merged over the computed upstream values (controller resources,
+# configs.jetstream versions, createAggregateRoles, ...). The admission
+# webhook stays off unless enabled here (`webhook.enabled`).
+extraValues: {}
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

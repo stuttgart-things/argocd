@@ -1,0 +1,57 @@
+---
+project: default
+
+destination:
+  server: https://kubernetes.default.svc
+  namespace: argo-workflows
+
+# Name of the rendered Application. Default argo-workflows-<sha1(server)[:8]>.
+applicationName: ""
+
+# false: an opt-out stops managing Argo Workflows instead of deleting it.
+cascadingDelete: false
+
+# renovate: datasource=helm depName=argo-workflows registryUrl=https://argoproj.github.io/argo-helm
+chartVersion: 2.0.13
+
+# Public hostname of the server UI, e.g. workflows.<cluster>.<zone>.
+# Empty renders nothing.
+hostname: ""
+
+# Gateway the HTTPRoute attaches to. TLS terminates there; the server itself
+# runs plain HTTP (upstream `server.secure: false`) on 2746.
+gateway:
+  name: ""
+  namespace: default
+
+# Server auth mode (upstream `server.authModes`):
+#   client  the UI asks for a bearer token and every call runs with that
+#           token's RBAC -- default, nothing reachable without a token.
+#   server  every call runs as the server's ServiceAccount, i.e. ANYONE who
+#           reaches the hostname can read, submit and delete workflows in
+#           every namespace. Test clusters on a lab-internal gateway only.
+authMode: client
+
+# Upstream `artifactRepository` (s3 / gcs / azure, archiveLogs). Empty: no
+# default artifact repository -- workflows that pass artifacts need their own
+# `artifactRepositoryRef` or an inline repository. Credentials are Secret
+# references in the workflow namespace, not values.
+artifactRepository: {}
+
+# Deep-merged over the computed upstream values (controller.workflowNamespaces,
+# resources, images, ...). The upstream Ingress stays off; the route is above.
+extraValues: {}
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

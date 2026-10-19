@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "argo-events-cicd values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled",
+    "project",
+    "destination",
+    "chartVersion",
+    "syncPolicy"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "description": "false renders nothing"
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server",
+        "namespace"
+      ],
+      "properties": {
+        "server": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "applicationName": {
+      "type": "string"
+    },
+    "cascadingDelete": {
+      "type": "boolean"
+    },
+    "chartVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "extraValues": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

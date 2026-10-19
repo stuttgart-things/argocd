@@ -1,0 +1,51 @@
+{{- /* Nothing without a hostname: lint and the catalog probe render the
+       defaults. With one, a missing Gateway is a hard error. */}}
+{{- if .Values.hostname }}
+{{- if not .Values.gateway.name }}
+{{- fail "gateway.name is required: the Gateway the HTTPRoute attaches to" }}
+{{- end }}
+{{- $appName := .Values.applicationName | default (printf "argo-workflows-%s" (sha1sum .Values.destination.server | trunc 8)) }}
+{{- $computed := dict
+      "server" (dict
+        "authModes" (list .Values.authMode)
+        "secure" false
+        "ingress" (dict "enabled" false)
+        "httproute" (dict
+          "enabled" true
+          "parentRefs" (list (dict "group" "gateway.networking.k8s.io" "kind" "Gateway" "name" .Values.gateway.name "namespace" .Values.gateway.namespace))
+          "hostnames" (list .Values.hostname)))
+}}
+{{- if .Values.artifactRepository }}
+{{- $_ := set $computed "artifactRepository" .Values.artifactRepository }}
+{{- end }}
+{{- $values := mergeOverwrite $computed (deepCopy (.Values.extraValues | default dict)) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-workflows
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      # Fixed: the Service the route points at (argo-workflows-server:2746)
+      # derives from the release name.
+      releaseName: argo-workflows
+      valuesObject:
+        {{- toYaml $values | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
