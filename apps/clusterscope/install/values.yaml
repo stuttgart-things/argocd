@@ -27,7 +27,7 @@ destination:
 # no image patch is needed. `config` below needs v0.24.0, `clusterbooks` in the
 # config v0.25.0.
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/clusterscope-kustomize
-version: v0.26.0
+version: v0.28.0
 
 # clusterscope's own flags. Every flag is rendered in the -flag=value form, so
 # an empty value stays a valid flag instead of an empty positional argument
