@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: dapr-workflows-install
+description: App-of-apps for the dapr workflow workers -- backstage template-execution (VM requests via Backstage) and cluster-build-watch (cluster builds to homerun2) -- with their kro triggers, a redis state store and ESO secrets.
+type: application
+version: 0.1.0

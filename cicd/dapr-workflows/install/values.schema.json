@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dapr-workflows-install values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog",
+    "project",
+    "destination",
+    "secrets",
+    "redis",
+    "templateExecution",
+    "clusterBuildWatch",
+    "syncPolicy"
+  ],
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ],
+      "properties": {
+        "repoURL": {
+          "type": "string"
+        },
+        "targetRevision": {
+          "type": "string"
+        }
+      }
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server"
+      ],
+      "properties": {
+        "server": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "applicationName": {
+      "type": "string"
+    },
+    "cascadingDelete": {
+      "type": "boolean"
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clusterSecretStoreName",
+        "vaultSecretName"
+      ],
+      "properties": {
+        "clusterSecretStoreName": {
+          "type": "string",
+          "description": "ClusterSecretStore on the workload cluster; required as soon as a worker is enabled"
+        },
+        "vaultSecretName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "KV entry with github_token, backstage_token, redis_password, homerun_auth_token"
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$"
+        },
+        "machineryToken": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "vaultSecretName",
+            "property"
+          ],
+          "properties": {
+            "vaultSecretName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "namespace",
+        "chartVersion"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "chartVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "storageClass": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "string",
+          "pattern": "^[0-9]+(Mi|Gi|Ti)$"
+        }
+      }
+    },
+    "templateExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "namespace",
+        "kustomize",
+        "image",
+        "trigger"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "kustomize": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repoURL",
+            "targetRevision"
+          ],
+          "properties": {
+            "repoURL": {
+              "type": "string",
+              "minLength": 1,
+              "description": "OCI kustomize artifact; oci:// is prepended when missing"
+            },
+            "targetRevision": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "tag"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "backstageURL": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "caConfigMap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "key"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "targetRevision"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "targetRevision": {
+              "type": "string",
+              "minLength": 1,
+              "description": "<worker tag>-trigger"
+            }
+          }
+        }
+      }
+    },
+    "clusterBuildWatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "namespace",
+        "kustomize",
+        "image",
+        "trigger"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "kustomize": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repoURL",
+            "targetRevision"
+          ],
+          "properties": {
+            "repoURL": {
+              "type": "string",
+              "minLength": 1,
+              "description": "OCI kustomize artifact; oci:// is prepended when missing"
+            },
+            "targetRevision": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "tag"
+          ],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "homerunPitchURL": {
+          "type": "string",
+          "description": "omni-pitcher /pitch URL; empty disables the homerun sink"
+        },
+        "machineryAuth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "targetRevision"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "targetRevision": {
+              "type": "string",
+              "minLength": 1,
+              "description": "<worker tag>-trigger"
+            }
+          }
+        }
+      }
+    }
+  }
+}

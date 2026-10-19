@@ -1,0 +1,93 @@
+{{- if .Values.clusterBuildWatch.enabled }}
+{{- $appName := include "daprWorkflows.appName" . }}
+{{- $cbw := .Values.clusterBuildWatch }}
+{{- /* Optional sinks as JSON patches, like the flux components
+       cluster-build-watch-homerun / -machinery-auth-on. The Secrets are
+       mounted optional: a missing token degrades the sink, not the pod. */}}
+{{- $ops := list (dict "op" "test" "path" "/spec/template/spec/containers/0/name" "value" "workflow") }}
+{{- $ops = append $ops (dict "op" "replace" "path" "/spec/template/spec/containers/0/image" "value" (printf "%s:%s" $cbw.image.repository $cbw.image.tag)) }}
+{{- if $cbw.homerunPitchURL }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/containers/0/env/-" "value" (dict "name" "HOMERUN_PITCH_URL" "value" $cbw.homerunPitchURL)) }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/containers/0/env/-" "value" (dict "name" "HOMERUN_AUTH_TOKEN_FILE" "value" "/var/run/secrets/homerun/token")) }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/containers/0/volumeMounts/-" "value" (dict "name" "homerun-token" "mountPath" "/var/run/secrets/homerun" "readOnly" true)) }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/volumes/-" "value" (dict "name" "homerun-token" "secret" (dict "secretName" "homerun-pitcher-token" "optional" true "items" (list (dict "key" "token" "path" "token"))))) }}
+{{- end }}
+{{- if $cbw.machineryAuth.enabled }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/containers/0/env/-" "value" (dict "name" "MACHINERY_AUTH_TOKEN_FILE" "value" "/var/run/secrets/machinery/token")) }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/containers/0/volumeMounts/-" "value" (dict "name" "machinery-token" "mountPath" "/var/run/secrets/machinery" "readOnly" true)) }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/volumes/-" "value" (dict "name" "machinery-token" "secret" (dict "secretName" "machinery-auth-token" "optional" true "items" (list (dict "key" "token" "path" "token"))))) }}
+{{- end }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-cluster-build-watch" $appName | quote }}
+  namespace: argocd
+  {{- include "daprWorkflows.leafFinalizer" . | nindent 0 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "daprWorkflows.oci" $cbw.kustomize.repoURL | quote }}
+    targetRevision: {{ $cbw.kustomize.targetRevision | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $cbw.namespace | quote }}
+      patches:
+        - target:
+            kind: Deployment
+            name: cluster-build-watch
+          patch: |
+{{ toYaml $ops | indent 12 }}
+        - target:
+            group: dapr.io
+            kind: Component
+            name: statestore
+          patch: |
+            - op: test
+              path: /spec/metadata/0/name
+              value: redisHost
+            - op: replace
+              path: /spec/metadata/0/value
+              value: {{ include "daprWorkflows.redisHost" . }}
+        {{- /* ESO writes redis-password. notify-webhooks stays: the base ships
+               it with empty teams/webhook, which the container requires and
+               which turns those two sinks off. */}}
+        - target:
+            kind: Secret
+            name: redis-password
+          patch: |
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: redis-password
+            $patch: delete
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $cbw.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- if $cbw.trigger.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-cluster-build-watch-trigger" $appName | quote }}
+  namespace: argocd
+  {{- include "daprWorkflows.leafFinalizer" . | nindent 0 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "daprWorkflows.oci" $cbw.kustomize.repoURL | quote }}
+    targetRevision: {{ $cbw.trigger.targetRevision | quote }}
+    path: .
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $cbw.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
+{{- end }}

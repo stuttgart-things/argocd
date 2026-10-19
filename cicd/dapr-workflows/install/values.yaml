@@ -1,0 +1,103 @@
+---
+# Reference back to this catalog repo -- the secrets and redis sub-Applications
+# load cicd/dapr-workflows/secrets and apps/redis-stack/install from here.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# AppProject of every rendered Application.
+project: default
+
+# The workload cluster. `namespace` is unused (each component has its own).
+destination:
+  server: https://kubernetes.default.svc
+  namespace: argocd
+
+# Parent name; defaults to dapr-workflows-<hash of destination.server>.
+applicationName: ""
+
+# false (platform install): an opt-out stops managing the workers instead of
+# deleting them, and a deregistered cluster cannot hang the delete
+# (stuttgart-things/argocd#324).
+cascadingDelete: false
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m
+
+# ESO. One KV entry carries the per-cluster values, read by every component:
+#   github_token, backstage_token, redis_password, homerun_auth_token
+# The machinery gRPC client token lives in its own entry (shared with the
+# machinery side): machineryToken.vaultSecretName / .property.
+secrets:
+  clusterSecretStoreName: ""
+  vaultSecretName: dapr-workflows
+  refreshInterval: 1h
+  machineryToken:
+    vaultSecretName: machinery-grpc
+    property: token
+
+# Dapr state store (actor + workflow state) for both workers.
+redis:
+  enabled: true
+  namespace: dapr-redis
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/redis/redis
+  chartVersion: 17.1.4
+  storageClass: openebs-hostpath
+  size: 8Gi
+
+# Worker that runs Backstage scaffolder templates (request-vm -> create-terraform-vm)
+# and follows the GitHub Actions run behind them.
+templateExecution:
+  enabled: false
+  namespace: backstage-workflows
+  kustomize:
+    repoURL: ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
+    targetRevision: 2338624484dd
+  image:
+    repository: ghcr.io/stuttgart-things/dapr-backstage-template-execution
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution
+    tag: 2338624484dd
+  backstageURL: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
+  # CA the worker trusts for Backstage: trust-manager's bundle ConfigMap.
+  caConfigMap:
+    name: cluster-trust-bundle
+    key: trust-bundle.pem
+  # kro RGD `backstage-template-run` (kind BackstageTemplateRun). Needs kro.
+  trigger:
+    enabled: true
+    targetRevision: 2338624484dd-trigger
+
+# Worker that follows a cluster build (GitOps sync -> XR Ready -> Argo apps)
+# and reports every checkpoint.
+clusterBuildWatch:
+  enabled: false
+  namespace: cluster-build-watch
+  kustomize:
+    repoURL: ghcr.io/stuttgart-things/dapr-cluster-build-watch-kustomize
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-cluster-build-watch-kustomize
+    targetRevision: e7f3ffa21992
+  image:
+    repository: ghcr.io/stuttgart-things/dapr-cluster-build-watch
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-cluster-build-watch
+    tag: e7f3ffa21992
+  # homerun2 omni-pitcher /pitch endpoint. Empty: no homerun sink.
+  homerunPitchURL: ""
+  # Bearer token for a machinery gRPC server with auth on (machinery-auth).
+  machineryAuth:
+    enabled: false
+  # kro RGD `cluster-build-watch` (kind ClusterBuildWatch). Needs kro.
+  trigger:
+    enabled: true
+    targetRevision: e7f3ffa21992-trigger
