@@ -1,0 +1,38 @@
+{{- /* Nothing unless enabled: lint and the catalog probe render the defaults. */}}
+{{- if .Values.enabled }}
+{{- $appName := .Values.applicationName | default (printf "argo-events-%s" (sha1sum .Values.destination.server | trunc 8)) }}
+{{- /* Controller only: EventBus, EventSources and Sensors are user content. */}}
+{{- $computed := dict
+      "crds" (dict "install" true "keep" true)
+      "controller" (dict "rbac" (dict "enabled" true "namespaced" false))
+      "webhook" (dict "enabled" false)
+}}
+{{- $values := mergeOverwrite $computed (deepCopy (.Values.extraValues | default dict)) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-events
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: argo-events
+      valuesObject:
+        {{- toYaml $values | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

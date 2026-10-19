@@ -1,0 +1,89 @@
+# Argo Workflows (argo-helm chart): workflow controller + server UI on a
+# Gateway API route workflows.<fqdn>.
+#
+# OPT-IN (cicd-platform/argo-workflows: "true") and clusterbook clusters only:
+# the route needs the <cluster>-gateway Gateway and the reserved FQDN. Opt-in
+# rather than this profile's usual opt-out, so the umbrella label alone does
+# not put a workflow engine (and a UI) on every cicd cluster.
+#
+# Annotations (cicd-platform.stuttgart-things.com/...):
+#   argo-workflows-auth-mode  'client' (default): the UI asks for a bearer
+#                       token, calls run with its RBAC. 'server': everyone who
+#                       reaches the route acts as the server ServiceAccount --
+#                       test clusters on a lab-internal gateway only.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: argo-workflows-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            # Opt-IN: only an explicit "true".
+            - key: cicd-platform/argo-workflows
+              operator: In
+              values: ["true"]
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
+  template:
+    metadata:
+      # `-platform` suffix so the parent cannot share a name with the chart's
+      # child (`argo-workflows-<cluster>`).
+      name: 'argo-workflows-platform-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # HEAD until the first release that carries cicd/argo-workflows (a tag
+        # pin before that points at a path that does not exist there). Then
+        # pin it like the other AppSets here.
+        targetRevision: HEAD
+        path: cicd/argo-workflows/install
+        helm:
+          releaseName: 'argo-workflows-{{ .name }}'
+          # `default ""`: missingkey=error does not cover `index`, and an
+          # absent annotation still has to read as "not set".
+          values: |
+            {{- $a := default (dict) .metadata.annotations }}
+            project: '{{ .name }}'
+            applicationName: 'argo-workflows-{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: argo-workflows
+            cascadingDelete: false
+            hostname: 'workflows.{{ trimPrefix "*." (index $a "clusterbook.stuttgart-things.com/fqdn") }}'
+            gateway:
+              name: '{{ .name }}-gateway'
+              namespace: default
+            authMode: '{{ default "client" (index $a "cicd-platform.stuttgart-things.com/argo-workflows-auth-mode") }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

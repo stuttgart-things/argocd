@@ -107,6 +107,9 @@ spec:
     # registries (opt-in, clusterbook clusters only) [ann: <app>-secret-store, derived]
     cicd-platform/harbor: 'false'              # → appset-harbor (official goharbor chart) on harbor.<fqdn>
     cicd-platform/zot: 'false'                 # → appset-zot on zot.<fqdn>
+    # Argo Workflows / Argo Events (opt-in)
+    cicd-platform/argo-workflows: 'false'      # → appset-argo-workflows on workflows.<fqdn> (clusterbook clusters only) [ann: argo-workflows-auth-mode]
+    cicd-platform/argo-events: 'false'         # → appset-argo-events (CRDs + controller; EventBus/EventSources are user content)
 
     # ---- profile: network-platform (Cilium + cert-manager + trust) ----
     network-platform: 'true'            # umbrella
@@ -263,6 +266,8 @@ spec:
     # cicd-platform.stuttgart-things.com/harbor-registry-size: 50Gi
     # cicd-platform.stuttgart-things.com/zot-storage-size: 50Gi
     # cicd-platform.stuttgart-things.com/zot-anonymous-read: 'true'              # 'false' = authenticated pulls only
+    # ---- [user] cicd: argo workflows (appset-argo-workflows) ----
+    # cicd-platform.stuttgart-things.com/argo-workflows-auth-mode: client         # 'server' = NO login, anyone on the route acts as the server SA (test clusters only)
 
     # ---- [user] security: the KV mounts this cluster opens ----
     # One ClusterSecretStore per mount, named vault-<mount>, rendered by
