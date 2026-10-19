@@ -1,0 +1,105 @@
+# dapr workflow workers (stuttgart-things/argocd#658): backstage
+# template-execution (Backstage `request-vm` -> create-terraform-vm, the "VM
+# build worker") and cluster-build-watch (cluster builds -> homerun2), each with
+# its kro trigger, plus a redis state store and ESO secrets. What
+# cicd-machinery-test5 runs through Flux today (apps/dapr in the flux repo),
+# so a Backstage-built cluster can take it over (stuttgart-things#3796).
+#
+# OPT-IN, one gate for the bundle and one value label per worker:
+#   cicd-platform/dapr-workflows: "true"      the parent (redis + secrets)
+#   cicd-platform/template-execution: "true"  read as a value, not a selector
+#   cicd-platform/cluster-build-watch: "true" read as a value, not a selector
+# Needs dapr and kro (both opt-out in this bundle) and trust-manager's
+# `cluster-trust-bundle` ConfigMap in the worker namespaces.
+#
+# Annotations (cicd-platform.stuttgart-things.com/...):
+#   secret-store                ClusterSecretStore with the KV entry. REQUIRED --
+#                               the parent fails to render without it.
+#   dapr-workflows-secret-key   KV entry (default dapr-workflows): github_token,
+#                               backstage_token, redis_password, homerun_auth_token
+#   machinery-token-secret-key  KV entry with the machinery gRPC client token
+#                               (property `token`); presence turns machinery
+#                               auth on for cluster-build-watch
+#   homerun-pitch-url           omni-pitcher /pitch URL; empty: no homerun sink
+#   backstage-url               Backstage the template worker drives
+#   storage-class               redis PVC (default openebs-hostpath)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: dapr-workflows-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/dapr-workflows: "true"
+  template:
+    metadata:
+      # `-platform` suffix: the chart's children derive from applicationName
+      # (`dapr-workflows-<cluster>-...`), and a child with the parent's name
+      # would be the same object (see platforms/homerun2).
+      name: 'dapr-workflows-platform-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # HEAD until the first release that carries cicd/dapr-workflows; a pin
+        # at an older tag points at a path that does not exist there (the four
+        # AppSets that were broken at v0.82.2). Then pin it, and
+        # catalog.targetRevision below, like the other AppSets here.
+        targetRevision: HEAD
+        path: cicd/dapr-workflows/install
+        helm:
+          releaseName: 'dapr-workflows-{{ .name }}'
+          # `default ""`: missingkey=error does not cover `index`, and an absent
+          # label or annotation still has to read as "not set".
+          values: |
+            {{- $l := .metadata.labels }}
+            {{- $a := default (dict) .metadata.annotations }}
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              targetRevision: HEAD
+            project: '{{ .name }}'
+            applicationName: 'dapr-workflows-{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+            cascadingDelete: false
+            secrets:
+              clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/secret-store") }}'
+              vaultSecretName: '{{ default "dapr-workflows" (index $a "cicd-platform.stuttgart-things.com/dapr-workflows-secret-key") }}'
+              machineryToken:
+                vaultSecretName: '{{ default "machinery-grpc" (index $a "cicd-platform.stuttgart-things.com/machinery-token-secret-key") }}'
+                property: token
+            redis:
+              storageClass: '{{ default "openebs-hostpath" (index $a "cicd-platform.stuttgart-things.com/storage-class") }}'
+            templateExecution:
+              enabled: {{ eq (default "" (index $l "cicd-platform/template-execution")) "true" }}
+              backstageURL: '{{ default "https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de" (index $a "cicd-platform.stuttgart-things.com/backstage-url") }}'
+            clusterBuildWatch:
+              enabled: {{ eq (default "" (index $l "cicd-platform/cluster-build-watch")) "true" }}
+              homerunPitchURL: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/homerun-pitch-url") }}'
+              machineryAuth:
+                enabled: {{ ne (default "" (index $a "cicd-platform.stuttgart-things.com/machinery-token-secret-key")) "" }}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

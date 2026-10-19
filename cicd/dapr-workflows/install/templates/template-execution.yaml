@@ -1,0 +1,115 @@
+{{- if .Values.templateExecution.enabled }}
+{{- $appName := include "daprWorkflows.appName" . }}
+{{- $te := .Values.templateExecution }}
+{{- $deploy := dict
+      "apiVersion" "apps/v1"
+      "kind" "Deployment"
+      "metadata" (dict "name" "backstage-template-execution")
+      "spec" (dict "template" (dict
+        "metadata" (dict "annotations" (dict "dapr.io/sidecar-listen-addresses" "0.0.0.0"))
+        "spec" (dict
+          "containers" (list (dict
+            "name" "workflow"
+            "image" (printf "%s:%s" $te.image.repository $te.image.tag)
+            "env" (list (dict "name" "BACKSTAGE_URL" "value" $te.backstageURL))
+          ))
+          "volumes" (list (dict
+            "name" "backstage-ca"
+            "configMap" (dict
+              "name" $te.caConfigMap.name
+              "items" (list (dict "key" $te.caConfigMap.key "path" "ca.pem"))
+            )
+          ))
+        )
+      ))
+}}
+{{- /* The base mounts ConfigMap backstage-ca at /etc/ssl/backstage and sets
+       SSL_CERT_FILE=/etc/ssl/backstage/ca.pem. The patch above points that
+       volume at trust-manager's bundle instead, keyed to the same file name,
+       so the base's own CA ConfigMap is dropped below.
+
+       dapr.io/sidecar-listen-addresses 0.0.0.0: the kro trigger Job curls the
+       sidecar Service; daprd listens on localhost only by default. */}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-template-execution" $appName | quote }}
+  namespace: argocd
+  {{- include "daprWorkflows.leafFinalizer" . | nindent 0 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "daprWorkflows.oci" $te.kustomize.repoURL | quote }}
+    targetRevision: {{ $te.kustomize.targetRevision | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $te.namespace | quote }}
+      patches:
+        - target:
+            kind: Deployment
+            name: backstage-template-execution
+          patch: |
+{{ toYaml $deploy | indent 12 }}
+        - target:
+            group: dapr.io
+            kind: Component
+            name: statestore
+          patch: |
+            - op: test
+              path: /spec/metadata/0/name
+              value: redisHost
+            - op: replace
+              path: /spec/metadata/0/value
+              value: {{ include "daprWorkflows.redisHost" . }}
+        {{- /* Placeholders (REPLACE_WITH_...) -- ESO writes the real ones. */}}
+        {{- range list "github-token" "backstage-auth-token" "redis-password" }}
+        - target:
+            kind: Secret
+            name: {{ . }}
+          patch: |
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ . }}
+            $patch: delete
+        {{- end }}
+        - target:
+            kind: ConfigMap
+            name: backstage-ca
+          patch: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: backstage-ca
+            $patch: delete
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $te.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- if $te.trigger.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-template-execution-trigger" $appName | quote }}
+  namespace: argocd
+  {{- include "daprWorkflows.leafFinalizer" . | nindent 0 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "daprWorkflows.oci" $te.kustomize.repoURL | quote }}
+    targetRevision: {{ $te.trigger.targetRevision | quote }}
+    path: .
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $te.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
+{{- end }}

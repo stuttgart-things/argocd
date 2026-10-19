@@ -4,6 +4,7 @@ namespace: argocd
 resources:
   - appset-openebs.yaml
   - appset-dapr.yaml
+  - appset-dapr-workflows.yaml
   - appset-kro.yaml
   - appset-argo-rollouts.yaml
   - appset-crossplane.yaml
