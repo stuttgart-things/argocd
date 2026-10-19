@@ -5,9 +5,10 @@
 # needs the <cluster>-gateway Gateway and the reserved FQDN.
 #
 # Annotations (cicd-platform.stuttgart-things.com/...):
-#   secret-store        ClusterSecretStore with the KV entry. REQUIRED -- the
-#                       secrets sub-Application fails without it.
-#   zot-secret-key      KV entry (default zot), property htpasswd (bcrypt lines)
+#   zot-secret-store/-key  store + entry, derived by the ClusterStack from the
+#                       AppSecretProfile zot; `secret-store` is the fallback.
+#                       No store: the secrets sub-Application fails loudly.
+#   zot-secret-key      KV entry (default zot), property admin_password (ESO builds the htpasswd)
 #   zot-storage-size    PVC (default 50Gi)
 #   zot-anonymous-read  'false' = authenticated pulls only
 #   storage-class       PVCs (default openebs-hostpath)
@@ -72,7 +73,7 @@ spec:
               namespace: default
             storageClass: '{{ default "openebs-hostpath" (index $a "cicd-platform.stuttgart-things.com/storage-class") }}'
             secrets:
-              clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/secret-store") }}'
+              clusterSecretStoreName: '{{ default (default "" (index $a "cicd-platform.stuttgart-things.com/secret-store")) (index $a "cicd-platform.stuttgart-things.com/zot-secret-store") }}'
               vaultSecretName: '{{ default "zot" (index $a "cicd-platform.stuttgart-things.com/zot-secret-key") }}'
             storageSize: '{{ default "50Gi" (index $a "cicd-platform.stuttgart-things.com/zot-storage-size") }}'
             anonymousRead: {{ ne (default "" (index $a "cicd-platform.stuttgart-things.com/zot-anonymous-read")) "false" }}

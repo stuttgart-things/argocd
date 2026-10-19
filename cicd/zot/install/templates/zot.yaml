@@ -62,9 +62,13 @@ spec:
         secrets:
           - secretName: zot-eso-htpasswd
             data:
-              - secretKey: htpasswd
+              - secretKey: admin_password
                 vaultSecretName: {{ .Values.secrets.vaultSecretName | quote }}
-                property: htpasswd
+                property: admin_password
+            {{- /* zot reads an htpasswd file; ESO builds the bcrypt line from the
+                   generated password (escaped: ESO evaluates it, not helm). */}}
+            template:
+              htpasswd: {{ printf "%s htpasswd \"admin\" .admin_password \"bcrypt\" %s" "{{" "}}" | quote }}
   destination:
     server: {{ .Values.destination.server | quote }}
     namespace: {{ .Values.destination.namespace | quote }}

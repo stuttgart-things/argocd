@@ -101,10 +101,10 @@ spec:
     cicd-platform/crossplane-cap-packer: 'false'        # → appset-crossplane-capabilities [ann: crossplane-cap-tekton-namespace]
     cicd-platform/crossplane-cap-harvester-vm: 'false'  # → appset-crossplane-capabilities [ann: crossplane-cap-harvester-*]
     # dapr workflow workers (opt-in; need dapr + kro on, trust-manager's cluster-trust-bundle)
-    cicd-platform/dapr-workflows: 'false'      # → appset-dapr-workflows (redis + secrets) [ann: secret-store REQUIRED]
+    cicd-platform/dapr-workflows: 'false'      # → appset-dapr-workflows (redis + secrets) [ann: <app>-secret-store, derived]
     cicd-platform/template-execution: 'false'  # value label: backstage template-execution worker + BackstageTemplateRun RGD
     cicd-platform/cluster-build-watch: 'false' # value label: cluster-build-watch worker + ClusterBuildWatch RGD
-    # registries (opt-in, clusterbook clusters only) [ann: secret-store REQUIRED]
+    # registries (opt-in, clusterbook clusters only) [ann: <app>-secret-store, derived]
     cicd-platform/harbor: 'false'              # → appset-harbor (official goharbor chart) on harbor.<fqdn>
     cicd-platform/zot: 'false'                 # → appset-zot on zot.<fqdn>
 
@@ -250,17 +250,17 @@ spec:
     # cicd-platform.stuttgart-things.com/crossplane-cap-storage-class: openebs-hostpath
     # cicd-platform.stuttgart-things.com/crossplane-cap-tekton-namespace: tekton-ci
     # cicd-platform.stuttgart-things.com/crossplane-cap-harvester-storage-class: harvester-longhorn  # also -environment, -provider-config, -namespace, -network, -image
+    # ---- [derived] cicd: secrets, set by the ClusterStack from the AppSecretProfiles ----
+    # cicd-platform.stuttgart-things.com/<app>-secret-store: vault-<mount>        # app = dapr-workflows | harbor | zot
+    # cicd-platform.stuttgart-things.com/<app>-secret-key: <entry>
+    # cicd-platform.stuttgart-things.com/shared-<name>-secret-store / -key       # git-pat, backstage-token, homerun-pitch, machinery-grpc
+    # cicd-platform.stuttgart-things.com/secret-store: vault-<mount>              # fallback when there is only one store
     # ---- [user] cicd: dapr workflows (appset-dapr-workflows) ----
-    # cicd-platform.stuttgart-things.com/secret-store: vault-cicd                 # REQUIRED with cicd-platform/dapr-workflows
-    # cicd-platform.stuttgart-things.com/dapr-workflows-secret-key: dapr-workflows # github_token, backstage_token, redis_password, homerun_auth_token
-    # cicd-platform.stuttgart-things.com/machinery-token-secret-key: ''           # set = machinery gRPC auth on (property token)
     # cicd-platform.stuttgart-things.com/homerun-pitch-url: ''                    # '' = no homerun sink for cluster-build-watch
     # cicd-platform.stuttgart-things.com/backstage-url: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
     # cicd-platform.stuttgart-things.com/storage-class: openebs-hostpath           # redis / harbor / zot PVCs
-    # ---- [user] cicd: registries (appset-harbor, appset-zot) -- secret-store above is shared ----
-    # cicd-platform.stuttgart-things.com/harbor-secret-key: harbor               # KV entry, see cicd/harbor/README.md
+    # ---- [user] cicd: registries (appset-harbor, appset-zot) ----
     # cicd-platform.stuttgart-things.com/harbor-registry-size: 50Gi
-    # cicd-platform.stuttgart-things.com/zot-secret-key: zot                     # KV entry, property htpasswd
     # cicd-platform.stuttgart-things.com/zot-storage-size: 50Gi
     # cicd-platform.stuttgart-things.com/zot-anonymous-read: 'true'              # 'false' = authenticated pulls only
 

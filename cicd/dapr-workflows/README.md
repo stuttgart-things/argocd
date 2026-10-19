@@ -25,17 +25,18 @@ homerun sink and machinery gRPC auth.
 
 - dapr and kro (`appset-dapr`, `appset-kro` in `platforms/cicd`)
 - trust-manager's `cluster-trust-bundle` ConfigMap in the worker namespaces
-- a ClusterSecretStore (`secrets.clusterSecretStoreName`) whose role can read:
+- ESO stores for the entries below. In the AppSecretProfile shape (what a
+  ClusterStack derives): the worker's own entry plus SHARED entries, each in its
+  own mount with its own store (`secrets.shared.*.clusterSecretStoreName`,
+  `""` = the own store).
 
-| KV entry | property | used by |
+| entry | property | used by |
 |---|---|---|
-| `secrets.vaultSecretName` (default `dapr-workflows`) | `redis_password` | redis, both workers |
-| | `github_token` | template-execution |
-| | `backstage_token` | template-execution |
-| | `homerun_auth_token` | cluster-build-watch, when `homerunPitchURL` is set |
-| `secrets.machineryToken.vaultSecretName` (default `machinery-grpc`) | `token` | cluster-build-watch, when `machineryAuth.enabled` |
-
-Property names are the Flux ones, so an existing entry can be reused.
+| own (`secrets.vaultSecretName`) | `redisPassword` (generated) | redis, both workers |
+| shared `git-pat` (`_git-pat`) | `githubToken` | template-execution |
+| shared `backstage-token` (`_backstage-token`) | `backstageToken` | template-execution |
+| shared `homerun-pitch` (`_homerun-pitch`) | `homerunAuthToken` | cluster-build-watch, with `homerunPitchURL` |
+| shared `machinery-grpc` (`_machinery-grpc`) | `machineryToken` | cluster-build-watch, with `machineryAuth.enabled` |
 
 ## Values
 

@@ -78,27 +78,89 @@
         "vaultSecretName": {
           "type": "string",
           "minLength": 1,
-          "description": "KV entry with github_token, backstage_token, redis_password, homerun_auth_token"
+          "description": "own entry (redisPassword)"
         },
         "refreshInterval": {
           "type": "string",
           "pattern": "^[0-9]+(s|m|h)$"
         },
-        "machineryToken": {
+        "shared": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "vaultSecretName",
-            "property"
+            "githubToken",
+            "backstageToken",
+            "homerunAuthToken",
+            "machineryToken"
           ],
           "properties": {
-            "vaultSecretName": {
-              "type": "string",
-              "minLength": 1
+            "githubToken": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "vaultSecretName"
+              ],
+              "properties": {
+                "clusterSecretStoreName": {
+                  "type": "string",
+                  "description": "\"\" = the own store"
+                },
+                "vaultSecretName": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             },
-            "property": {
-              "type": "string",
-              "minLength": 1
+            "backstageToken": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "vaultSecretName"
+              ],
+              "properties": {
+                "clusterSecretStoreName": {
+                  "type": "string",
+                  "description": "\"\" = the own store"
+                },
+                "vaultSecretName": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "homerunAuthToken": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "vaultSecretName"
+              ],
+              "properties": {
+                "clusterSecretStoreName": {
+                  "type": "string",
+                  "description": "\"\" = the own store"
+                },
+                "vaultSecretName": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "machineryToken": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "vaultSecretName"
+              ],
+              "properties": {
+                "clusterSecretStoreName": {
+                  "type": "string",
+                  "description": "\"\" = the own store"
+                },
+                "vaultSecretName": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             }
           }
         }

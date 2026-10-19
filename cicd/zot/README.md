@@ -11,5 +11,7 @@ opt-in cicd platform (`platforms/cicd/appset-zot.yaml`, gate `cicd-platform/zot`
 Access: anonymous pull (`anonymousRead`, default on), push/update/delete for
 every htpasswd user. The probes use `/livez`, so `anonymousRead: false` works too.
 
-KV entry `secrets.vaultSecretName` (default `zot`), property `htpasswd`: one
-bcrypt line per user, e.g. `htpasswd -nbB ci "$PASSWORD"`.
+KV entry `secrets.vaultSecretName` (default `zot`), property `admin_password`:
+a random string, so an AppSecretProfile can generate it. ESO builds the
+htpasswd file from it (`{{ htpasswd "admin" .admin_password "bcrypt" }}`, the
+same template verified for Harbor on ESO v2.12); log in as `admin`.

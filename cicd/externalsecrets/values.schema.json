@@ -74,6 +74,10 @@
               "type": "string"
             },
             "description": "Optional target.template.data (ESO engine v2): Secret key -> Go template over the fetched secretKeys. Without it the fetched keys are the Secret."
+          },
+          "clusterSecretStoreName": {
+            "type": "string",
+            "description": "Store for this Secret only -- a shared entry living in another mount has its own store."
           }
         }
       }

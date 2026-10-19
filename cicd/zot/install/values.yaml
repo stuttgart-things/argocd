@@ -31,8 +31,9 @@ storageSize: 50Gi
 # Off makes every pull authenticated; the probes hit /livez and are unaffected.
 anonymousRead: true
 
-# The htpasswd file (bcrypt lines, `htpasswd -nbB <user> <password>`) comes from
-# this KV entry, property `htpasswd`.
+# KV entry with property `admin_password` (a random string -- an
+# AppSecretProfile can generate it). ESO turns it into the htpasswd file
+# (user `admin`, bcrypt); every authenticated user may push.
 secrets:
   clusterSecretStoreName: ""
   vaultSecretName: zot

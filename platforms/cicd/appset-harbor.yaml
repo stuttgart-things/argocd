@@ -7,8 +7,9 @@
 # needs the <cluster>-gateway Gateway and the reserved FQDN.
 #
 # Annotations (cicd-platform.stuttgart-things.com/...):
-#   secret-store        ClusterSecretStore with the KV entry. REQUIRED -- the
-#                       secrets sub-Application fails without it.
+#   harbor-secret-store/-key  store + entry, derived by the ClusterStack from the
+#                       AppSecretProfile harbor; `secret-store` is the fallback.
+#                       No store: the secrets sub-Application fails loudly.
 #   harbor-secret-key   KV entry (default harbor), properties: see cicd/harbor
 #   harbor-registry-size  registry PVC (default 50Gi)
 #   storage-class       PVCs (default openebs-hostpath)
@@ -73,7 +74,7 @@ spec:
               namespace: default
             storageClass: '{{ default "openebs-hostpath" (index $a "cicd-platform.stuttgart-things.com/storage-class") }}'
             secrets:
-              clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/secret-store") }}'
+              clusterSecretStoreName: '{{ default (default "" (index $a "cicd-platform.stuttgart-things.com/secret-store")) (index $a "cicd-platform.stuttgart-things.com/harbor-secret-store") }}'
               vaultSecretName: '{{ default "harbor" (index $a "cicd-platform.stuttgart-things.com/harbor-secret-key") }}'
             sizes:
               registry: '{{ default "50Gi" (index $a "cicd-platform.stuttgart-things.com/harbor-registry-size") }}'
