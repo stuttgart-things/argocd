@@ -156,7 +156,7 @@ the env file says *how* it is configured for that env.
 
 | ApplicationSet | Cluster selector | Monorepo source | Keyed by | Wave |
 |---|---|---|---|---|
-| `crossplane-platform-baseline-cicd` | `cicd-platform=true` AND `cicd-platform/crossplane != false` (opt-**out**) | `crossplane/platform/baseline/*/vars/<env>.yaml` (Helm) | env | 0 |
+| `crossplane-platform-baseline-cicd` | `cicd-platform=true` AND `cicd-platform/crossplane != false` AND `cicd-platform/crossplane-baseline=true` (opt-**in**) | `crossplane/platform/baseline/*/vars/<env>.yaml` (Helm) | env | 0 |
 | `crossplane-platform-<cap>-cicd` | `cicd-platform/crossplane-<cap>=true` (opt-**in**) | `crossplane/platform/capabilities/<cap>/vars/<env>.yaml` (Helm) | env | 1 |
 | `crossplane-xrs-<cap>-cicd` | `cicd-platform/crossplane-<cap>=true` (opt-**in**) | `crossplane/xrs/<cap>/<env>/<cluster>/` (plain manifests) | **cluster** (grouped by env) | 2 |
 

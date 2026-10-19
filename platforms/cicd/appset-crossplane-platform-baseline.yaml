@@ -18,6 +18,14 @@ metadata:
 # Requires every selected cluster to carry an `env` label (e.g. env: LabUL); it
 # is lowercased to match the vars filename. A cluster missing the label matches
 # no files and gets nothing (no error).
+#
+# OPT-IN (`cicd-platform/crossplane-baseline: "true"`), on top of the
+# crossplane opt-out. A plain Crossplane (core, providers, functions,
+# in-cluster provider configs, generic configurations) needs none of this, and
+# the baseline cannot render on a ClusterStack cluster: provider-kubeconfig's
+# vars/<env>.yaml points at one lab's Vault with
+# `authMountPath: must-be-injected-per-cluster` (stuttgart-things#3819). A
+# management cluster that uses the capabilities sets the label next to them.
 spec:
   goTemplate: true
   goTemplateOptions:
@@ -35,6 +43,9 @@ spec:
                   - key: cicd-platform/crossplane
                     operator: NotIn
                     values: ["false"]
+                  - key: cicd-platform/crossplane-baseline
+                    operator: In
+                    values: ["true"]
           - git:
               repoURL: https://github.com/stuttgart-things/stuttgart-things.git
               revision: main
