@@ -25,7 +25,7 @@ Matrix of typical consumer shapes:
 
 ## operator/
 
-App-of-apps chart rendering one `Application` that pulls the upstream Tekton Operator manifests via a `directory:` source. The manifests (~1500 lines of upstream YAML) live in [`stuttgart-things/flux` — `cicd/tekton/components/operator`](https://github.com/stuttgart-things/flux/tree/main/cicd/tekton/components/operator) and aren't duplicated into this repo.
+App-of-apps chart rendering one `Application` that pulls the upstream Tekton Operator manifests via a `directory:` source, pinned to a flux tag (`source.targetRevision`, moved together with a re-vendor in flux). The manifests (~1500 lines of upstream YAML) live in [`stuttgart-things/flux` — `cicd/tekton/components/operator`](https://github.com/stuttgart-things/flux/tree/main/cicd/tekton/components/operator) and aren't duplicated into this repo.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
