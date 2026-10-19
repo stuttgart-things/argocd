@@ -1,6 +1,6 @@
 ---
 # Reference back to this catalog repo -- the secrets and redis sub-Applications
-# load cicd/dapr-workflows/secrets and apps/redis-stack/install from here.
+# load cicd/externalsecrets and apps/redis-stack/install from here.
 catalog:
   repoURL: https://github.com/stuttgart-things/argocd.git
   targetRevision: HEAD
@@ -35,17 +35,31 @@ syncPolicy:
       factor: 2
       maxDuration: 3m
 
-# ESO. One KV entry carries the per-cluster values, read by every component:
-#   github_token, backstage_token, redis_password, homerun_auth_token
-# The machinery gRPC client token lives in its own entry (shared with the
-# machinery side): machineryToken.vaultSecretName / .property.
+# ESO, in the AppSecretProfile shape (crossplane-configurations
+# vault/app-secret-profile): the worker's OWN entry carries `redisPassword`
+# (generated); the tokens are SHARED entries in their own mounts, each with
+# its own store. Property names are the profile's key names.
 secrets:
-  clusterSecretStoreName: ""
-  vaultSecretName: dapr-workflows
+  clusterSecretStoreName: ""      # own entry's store (vault-<mount>)
+  vaultSecretName: dapr-workflows # own entry: redisPassword
   refreshInterval: 1h
-  machineryToken:
-    vaultSecretName: machinery-grpc
-    property: token
+  shared:
+    # template-execution: GitHub PAT (homerun2/_git-pat in the labs)
+    githubToken:
+      clusterSecretStoreName: ""  # "" = the own store
+      vaultSecretName: _git-pat
+    # template-execution: Backstage static token
+    backstageToken:
+      clusterSecretStoreName: ""
+      vaultSecretName: _backstage-token
+    # cluster-build-watch: omni-pitcher /pitch bearer token
+    homerunAuthToken:
+      clusterSecretStoreName: ""
+      vaultSecretName: _homerun-pitch
+    # cluster-build-watch: machinery gRPC client token
+    machineryToken:
+      clusterSecretStoreName: ""
+      vaultSecretName: _machinery-grpc
 
 # Dapr state store (actor + workflow state) for both workers.
 redis:

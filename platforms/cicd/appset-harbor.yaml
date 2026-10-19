@@ -1,0 +1,93 @@
+# Harbor (official goharbor chart -- the Bitnami images are frozen under
+# bitnamilegacy) with a Gateway API route on harbor.<fqdn>. Every value the
+# chart would generate at render time comes from ESO, so Argo renders it
+# deterministically (see cicd/harbor).
+#
+# OPT-IN (cicd-platform/harbor: "true") and clusterbook clusters only: the route
+# needs the <cluster>-gateway Gateway and the reserved FQDN.
+#
+# Annotations (cicd-platform.stuttgart-things.com/...):
+#   harbor-secret-store/-key  store + entry, derived by the ClusterStack from the
+#                       AppSecretProfile harbor; `secret-store` is the fallback.
+#                       No store: the secrets sub-Application fails loudly.
+#   harbor-secret-key   KV entry (default harbor), properties: see cicd/harbor
+#   harbor-registry-size  registry PVC (default 50Gi)
+#   storage-class       PVCs (default openebs-hostpath)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: harbor-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+            cicd-platform/harbor: "true"
+          matchExpressions:
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: Exists
+            - key: clusterbook.stuttgart-things.com/allocation-ip
+              operator: NotIn
+              values: [""]
+  template:
+    metadata:
+      # `-platform` suffix so the parent cannot share a name with the chart's
+      # children (`harbor-<cluster>`, `harbor-<cluster>-secrets`).
+      name: 'harbor-platform-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # HEAD until the first release that carries cicd/harbor (a tag pin before
+        # that points at a path that does not exist there). Then pin it and
+        # catalog.targetRevision below, like the other AppSets here.
+        targetRevision: HEAD
+        path: cicd/harbor/install
+        helm:
+          releaseName: 'harbor-{{ .name }}'
+          # `default ""`: missingkey=error does not cover `index`, and an
+          # absent annotation still has to read as "not set".
+          values: |
+            {{- $a := default (dict) .metadata.annotations }}
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              targetRevision: HEAD
+            project: '{{ .name }}'
+            applicationName: 'harbor-{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: harbor
+            cascadingDelete: false
+            hostname: 'harbor.{{ trimPrefix "*." (index $a "clusterbook.stuttgart-things.com/fqdn") }}'
+            gateway:
+              name: '{{ .name }}-gateway'
+              namespace: default
+            storageClass: '{{ default "openebs-hostpath" (index $a "cicd-platform.stuttgart-things.com/storage-class") }}'
+            secrets:
+              clusterSecretStoreName: '{{ default (default "" (index $a "cicd-platform.stuttgart-things.com/secret-store")) (index $a "cicd-platform.stuttgart-things.com/harbor-secret-store") }}'
+              vaultSecretName: '{{ default "harbor" (index $a "cicd-platform.stuttgart-things.com/harbor-secret-key") }}'
+            sizes:
+              registry: '{{ default "50Gi" (index $a "cicd-platform.stuttgart-things.com/harbor-registry-size") }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

@@ -12,17 +12,18 @@
 # Needs dapr and kro (both opt-out in this bundle) and trust-manager's
 # `cluster-trust-bundle` ConfigMap in the worker namespaces.
 #
-# Annotations (cicd-platform.stuttgart-things.com/...):
-#   secret-store                ClusterSecretStore with the KV entry. REQUIRED --
-#                               the parent fails to render without it.
-#   dapr-workflows-secret-key   KV entry (default dapr-workflows): github_token,
-#                               backstage_token, redis_password, homerun_auth_token
-#   machinery-token-secret-key  KV entry with the machinery gRPC client token
-#                               (property `token`); presence turns machinery
-#                               auth on for cluster-build-watch
-#   homerun-pitch-url           omni-pitcher /pitch URL; empty: no homerun sink
-#   backstage-url               Backstage the template worker drives
-#   storage-class               redis PVC (default openebs-hostpath)
+# Annotations (cicd-platform.stuttgart-things.com/...), the secret ones derived
+# by the ClusterStack from the AppSecretProfile dapr-workflows:
+#   dapr-workflows-secret-store/-key  own entry (redisPassword); falls back to
+#                                     the single `secret-store`
+#   shared-<name>-secret-store/-key   git-pat (githubToken), backstage-token
+#                                     (backstageToken), homerun-pitch
+#                                     (homerunAuthToken), machinery-grpc
+#                                     (machineryToken; its presence turns
+#                                     machinery auth on)
+#   homerun-pitch-url                 omni-pitcher /pitch URL; empty: no homerun sink
+#   backstage-url                     Backstage the template worker drives
+#   storage-class                     redis PVC (default openebs-hostpath)
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -75,11 +76,23 @@ spec:
               server: '{{ .server }}'
             cascadingDelete: false
             secrets:
-              clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/secret-store") }}'
+              # Derived by the ClusterStack from the AppSecretProfile
+              # dapr-workflows: own store/entry, and per shared key its own.
+              clusterSecretStoreName: '{{ default (default "" (index $a "cicd-platform.stuttgart-things.com/secret-store")) (index $a "cicd-platform.stuttgart-things.com/dapr-workflows-secret-store") }}'
               vaultSecretName: '{{ default "dapr-workflows" (index $a "cicd-platform.stuttgart-things.com/dapr-workflows-secret-key") }}'
-              machineryToken:
-                vaultSecretName: '{{ default "machinery-grpc" (index $a "cicd-platform.stuttgart-things.com/machinery-token-secret-key") }}'
-                property: token
+              shared:
+                githubToken:
+                  clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/shared-git-pat-secret-store") }}'
+                  vaultSecretName: '{{ default "_git-pat" (index $a "cicd-platform.stuttgart-things.com/shared-git-pat-secret-key") }}'
+                backstageToken:
+                  clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/shared-backstage-token-secret-store") }}'
+                  vaultSecretName: '{{ default "_backstage-token" (index $a "cicd-platform.stuttgart-things.com/shared-backstage-token-secret-key") }}'
+                homerunAuthToken:
+                  clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/shared-homerun-pitch-secret-store") }}'
+                  vaultSecretName: '{{ default "_homerun-pitch" (index $a "cicd-platform.stuttgart-things.com/shared-homerun-pitch-secret-key") }}'
+                machineryToken:
+                  clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/shared-machinery-grpc-secret-store") }}'
+                  vaultSecretName: '{{ default "_machinery-grpc" (index $a "cicd-platform.stuttgart-things.com/shared-machinery-grpc-secret-key") }}'
             redis:
               storageClass: '{{ default "openebs-hostpath" (index $a "cicd-platform.stuttgart-things.com/storage-class") }}'
             templateExecution:
@@ -89,7 +102,7 @@ spec:
               enabled: {{ eq (default "" (index $l "cicd-platform/cluster-build-watch")) "true" }}
               homerunPitchURL: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/homerun-pitch-url") }}'
               machineryAuth:
-                enabled: {{ ne (default "" (index $a "cicd-platform.stuttgart-things.com/machinery-token-secret-key")) "" }}
+                enabled: {{ ne (default "" (index $a "cicd-platform.stuttgart-things.com/shared-machinery-grpc-secret-key")) "" }}
       syncPolicy:
         automated:
           prune: true

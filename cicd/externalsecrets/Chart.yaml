@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: externalsecrets
+description: Plain ExternalSecrets in ONE namespace from a ClusterSecretStore -- a list of Secrets with their KV entries and properties. The secrets sub-Application of the cicd app-of-apps charts (dapr-workflows, harbor, zot).
+type: application
+version: 0.1.0

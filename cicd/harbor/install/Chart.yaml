@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: harbor-cicd
+description: App-of-apps for Harbor from the official goharbor chart -- Gateway API route, every generated secret supplied by ESO so Argo renders it deterministically.
+type: application
+version: 0.1.0

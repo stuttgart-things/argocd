@@ -1,0 +1,71 @@
+---
+# Reference back to this catalog repo (the secrets sub-Application).
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+project: default
+
+destination:
+  server: https://kubernetes.default.svc
+  namespace: harbor
+
+# Parent name; defaults to harbor-<hash of destination.server>.
+applicationName: ""
+
+# false: an opt-out stops managing Harbor instead of deleting it (and its
+# registry data with the PVCs) -- stuttgart-things/argocd#324.
+cascadingDelete: false
+
+# Official chart (helm.goharbor.io), not the Bitnami one in apps/harbor: the
+# Bitnami images are frozen under docker.io/bitnamilegacy and get no updates.
+# renovate: datasource=helm depName=harbor registryUrl=https://helm.goharbor.io
+chartVersion: 1.19.4
+
+# Public hostname, e.g. harbor.<cluster>.<zone>. Empty renders nothing.
+hostname: ""
+
+# Gateway the HTTPRoute attaches to; TLS terminates there (wildcard cert).
+gateway:
+  name: ""
+  namespace: default
+
+storageClass: openebs-hostpath
+sizes:
+  registry: 50Gi
+  database: 2Gi
+  redis: 1Gi
+  jobLog: 1Gi
+  trivy: 5Gi
+
+trivy:
+  enabled: true
+
+# Every value the chart would otherwise generate at render time. Argo renders
+# with `helm template` -- the chart's `lookup` of the live Secret returns
+# nothing there, so each render would mint a new key, token CA and htpasswd
+# salt: endless OutOfSync and a pod restart per sync. Here:
+#   - ONE KV entry, every property a random string the stack can generate:
+#     admin_password, secret_key (16), core_secret (16), xsrf_key (32),
+#     jobservice_secret (16), registry_http_secret (16), registry_password
+#   - REGISTRY_HTPASSWD is built by ESO from registry_password (bcrypt)
+#   - the token signing key comes from cert-manager (cicd/harbor/token-cert),
+#     so the cluster needs cert-manager
+secrets:
+  clusterSecretStoreName: ""
+  vaultSecretName: harbor
+  refreshInterval: 1h
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

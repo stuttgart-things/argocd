@@ -1,0 +1,54 @@
+---
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+project: default
+
+destination:
+  server: https://kubernetes.default.svc
+  namespace: zot
+
+applicationName: ""
+
+# false: an opt-out stops managing zot instead of deleting it with its data.
+cascadingDelete: false
+
+# renovate: datasource=helm depName=zot registryUrl=https://zotregistry.dev/helm-charts
+chartVersion: 0.1.128
+
+# Public hostname, e.g. zot.<cluster>.<zone>. Empty renders nothing.
+hostname: ""
+
+gateway:
+  name: ""
+  namespace: default
+
+storageClass: openebs-hostpath
+storageSize: 50Gi
+
+# Anonymous pull. Push, update and delete always need a user from htpasswd.
+# Off makes every pull authenticated; the probes hit /livez and are unaffected.
+anonymousRead: true
+
+# KV entry with property `admin_password` (a random string -- an
+# AppSecretProfile can generate it). ESO turns it into the htpasswd file
+# (user `admin`, bcrypt); every authenticated user may push.
+secrets:
+  clusterSecretStoreName: ""
+  vaultSecretName: zot
+  refreshInterval: 1h
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

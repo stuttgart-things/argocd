@@ -1,0 +1,28 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: harbor-token-selfsigned
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor-token
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  secretName: {{ .Values.secretName | quote }}
+  commonName: harbor-token-ca
+  duration: {{ .Values.duration | quote }}
+  renewBefore: {{ .Values.renewBefore | quote }}
+  privateKey:
+    algorithm: RSA
+    size: 4096
+    {{- /* Harbor core reads tls.key as PKCS#1 ("RSA PRIVATE KEY"), the format
+           the chart's own genCA writes. */}}
+    encoding: PKCS1
+  issuerRef:
+    name: harbor-token-selfsigned
+    kind: Issuer

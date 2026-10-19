@@ -1,0 +1,104 @@
+{{- /* Nothing without a hostname: lint and the catalog probe render the
+       defaults. With one, a missing Gateway or store is a hard error. */}}
+{{- if .Values.hostname }}
+{{- if not .Values.gateway.name }}
+{{- fail "gateway.name is required: the Gateway the HTTPRoute attaches to" }}
+{{- end }}
+{{- if not .Values.secrets.clusterSecretStoreName }}
+{{- fail "secrets.clusterSecretStoreName is required: the generated secrets come from ESO" }}
+{{- end }}
+{{- $appName := .Values.applicationName | default (printf "zot-%s" (sha1sum .Values.destination.server | trunc 8)) }}
+{{- $repoPolicy := dict "defaultPolicy" (list "read" "create" "update" "delete") }}
+{{- if .Values.anonymousRead }}
+{{- $_ := set $repoPolicy "anonymousPolicy" (list "read") }}
+{{- end }}
+{{- $config := dict
+      "storage" (dict "rootDirectory" "/var/lib/registry" "dedupe" true "gc" true)
+      "http" (dict
+        "address" "0.0.0.0"
+        "port" "5000"
+        "externalUrl" (printf "https://%s" .Values.hostname)
+        "auth" (dict "htpasswd" (dict "path" "/secrets/htpasswd/htpasswd"))
+        "accessControl" (dict "repositories" (dict "**" $repoPolicy)))
+      "log" (dict "level" "info")
+      "extensions" (dict "search" (dict "enable" true) "ui" (dict "enable" true))
+}}
+{{- $values := dict
+      "mountConfig" true
+      "configFiles" (dict "config.json" (toPrettyJson $config))
+      "mountSecret" false
+      "externalSecrets" (list (dict "secretName" "zot-eso-htpasswd" "mountPath" "/secrets/htpasswd"))
+      "persistence" true
+      "pvc" (dict "create" true "storage" .Values.storageSize "storageClassName" .Values.storageClass)
+      "ingress" (dict "enabled" false)
+      "httproute" (dict
+        "enabled" true
+        "parentRefs" (list (dict "group" "gateway.networking.k8s.io" "kind" "Gateway" "name" .Values.gateway.name "namespace" .Values.gateway.namespace))
+        "hostnames" (list .Values.hostname))
+}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-secrets" $appName | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: cicd/externalsecrets
+    helm:
+      valuesObject:
+        namespace: {{ .Values.destination.namespace | quote }}
+        clusterSecretStoreName: {{ .Values.secrets.clusterSecretStoreName | quote }}
+        refreshInterval: {{ .Values.secrets.refreshInterval | quote }}
+        secrets:
+          - secretName: zot-eso-htpasswd
+            data:
+              - secretKey: admin_password
+                vaultSecretName: {{ .Values.secrets.vaultSecretName | quote }}
+                property: admin_password
+            {{- /* zot reads an htpasswd file; ESO builds the bcrypt line from the
+                   generated password (escaped: ESO evaluates it, not helm). */}}
+            template:
+              htpasswd: {{ printf "%s htpasswd \"admin\" .admin_password \"bcrypt\" %s" "{{" "}}" | quote }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://zotregistry.dev/helm-charts
+    chart: zot
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: zot
+      valuesObject:
+        {{- toYaml $values | nindent 8 }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
