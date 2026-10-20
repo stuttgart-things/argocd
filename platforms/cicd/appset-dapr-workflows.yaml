@@ -22,6 +22,11 @@
 #                                     (machineryToken; its presence turns
 #                                     machinery auth on)
 #   homerun-pitch-url                 omni-pitcher /pitch URL; empty: no homerun sink
+#   cluster-build-watch-discovery     "true": the worker discovers ClusterStacks
+#                                     on machinery itself (#3831) -- ONE
+#                                     cluster per fleet, or cards come twice
+#   cluster-build-watch-discovery-exclude      <ns>/<name> globs, comma-separated
+#   cluster-build-watch-discovery-argo-server  machinery on the Argo CD cluster
 #   backstage-url                     Backstage the template worker drives
 #   storage-class                     redis PVC (default openebs-hostpath)
 apiVersion: argoproj.io/v1alpha1
@@ -103,6 +108,10 @@ spec:
               homerunPitchURL: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/homerun-pitch-url") }}'
               machineryAuth:
                 enabled: {{ ne (default "" (index $a "cicd-platform.stuttgart-things.com/shared-machinery-grpc-secret-key")) "" }}
+              discovery:
+                enabled: {{ eq (default "" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery")) "true" }}
+                exclude: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-exclude") }}'
+                argoServer: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-argo-server") }}'
       syncPolicy:
         automated:
           prune: true

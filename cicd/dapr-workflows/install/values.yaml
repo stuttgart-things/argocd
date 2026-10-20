@@ -111,6 +111,22 @@ clusterBuildWatch:
   # Bearer token for a machinery gRPC server with auth on (machinery-auth).
   machineryAuth:
     enabled: false
+  # Discovery (stuttgart-things#3831): no ClusterBuildWatch per order -- the
+  # worker finds new and deleting ClusterStacks on `server` itself. Enable it
+  # on ONE cluster of the fleet only. The machinery needs the ClusterStack
+  # info field UID (flux cicd/machinery watch-config, flux v1.168.0+).
+  discovery:
+    enabled: false
+    # machinery gRPC host:port holding the ClusterStacks
+    server: machinery-grpc.machinery.4sthings.tiab.ssc.sva.de:443
+    # Flux Kustomization of the gitops phase; "" = no gitops phase
+    gitops: flux-system/machinery-xrs
+    # comma-separated <namespace>/<name> globs never watched
+    exclude: ""
+    # a stack created before the worker started is watched when younger
+    lookback: 30m
+    # machinery on the Argo CD cluster; set = Argo checkpoint per build
+    argoServer: ""
   # kro RGD `cluster-build-watch` (kind ClusterBuildWatch). Needs kro.
   trigger:
     enabled: true

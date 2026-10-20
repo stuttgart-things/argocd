@@ -17,6 +17,28 @@
 {{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/containers/0/volumeMounts/-" "value" (dict "name" "machinery-token" "mountPath" "/var/run/secrets/machinery" "readOnly" true)) }}
 {{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/volumes/-" "value" (dict "name" "machinery-token" "secret" (dict "secretName" "machinery-auth-token" "optional" true "items" (list (dict "key" "token" "path" "token"))))) }}
 {{- end }}
+{{- /* Discovery (stuttgart-things#3831, dapr-workflows#60): the worker lists
+       the ClusterStacks on machinery and starts a build watch per new order
+       and a teardown watch per deleting stack. Same token as machinery
+       watches: needs machineryAuth when that machinery checks one. ONE
+       worker per fleet -- two would send every card twice. */}}
+{{- with $cbw.discovery }}
+{{- if .enabled }}
+{{- if not .server }}
+{{- fail "clusterBuildWatch.discovery.server is required when discovery is enabled" }}
+{{- end }}
+{{- $env := list (dict "name" "CLUSTER_BUILD_WATCH_DISCOVERY" "value" "on") (dict "name" "CLUSTER_BUILD_WATCH_DISCOVERY_SERVER" "value" .server) (dict "name" "CLUSTER_BUILD_WATCH_DISCOVERY_GITOPS" "value" .gitops) (dict "name" "CLUSTER_BUILD_WATCH_DISCOVERY_LOOKBACK" "value" .lookback) }}
+{{- if .exclude }}
+{{- $env = append $env (dict "name" "CLUSTER_BUILD_WATCH_DISCOVERY_EXCLUDE" "value" .exclude) }}
+{{- end }}
+{{- if .argoServer }}
+{{- $env = append $env (dict "name" "CLUSTER_BUILD_WATCH_DISCOVERY_ARGO_SERVER" "value" .argoServer) }}
+{{- end }}
+{{- range $env }}
+{{- $ops = append $ops (dict "op" "add" "path" "/spec/template/spec/containers/0/env/-" "value" .) }}
+{{- end }}
+{{- end }}
+{{- end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
