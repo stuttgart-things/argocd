@@ -78,11 +78,11 @@ templateExecution:
   kustomize:
     repoURL: ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
-    targetRevision: 722e74be562d
+    targetRevision: 6e9fc1e70b37
   image:
     repository: ghcr.io/stuttgart-things/dapr-backstage-template-execution
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution
-    tag: 722e74be562d
+    tag: 6e9fc1e70b37
   backstageURL: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
   # CA the worker trusts for Backstage: trust-manager's bundle ConfigMap.
   caConfigMap:
@@ -91,7 +91,7 @@ templateExecution:
   # kro RGD `backstage-template-run` (kind BackstageTemplateRun). Needs kro.
   trigger:
     enabled: true
-    targetRevision: 722e74be562d-trigger
+    targetRevision: 6e9fc1e70b37-trigger
   # Directory of BackstageTemplateRun files (request-vm, request-vm-deletion)
   # applied by an Application of its own. Empty path: none.
   runs:
@@ -107,11 +107,11 @@ clusterBuildWatch:
   kustomize:
     repoURL: ghcr.io/stuttgart-things/dapr-cluster-build-watch-kustomize
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-cluster-build-watch-kustomize
-    targetRevision: 88a93956cee1
+    targetRevision: 70dec02eb15c
   image:
     repository: ghcr.io/stuttgart-things/dapr-cluster-build-watch
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-cluster-build-watch
-    tag: 88a93956cee1
+    tag: 70dec02eb15c
   # homerun2 omni-pitcher /pitch endpoint. Empty: no homerun sink.
   homerunPitchURL: ""
   # Bearer token for a machinery gRPC server with auth on (machinery-auth).
@@ -136,4 +136,4 @@ clusterBuildWatch:
   # kro RGD `cluster-build-watch` (kind ClusterBuildWatch). Needs kro.
   trigger:
     enabled: true
-    targetRevision: 88a93956cee1-trigger
+    targetRevision: 70dec02eb15c-trigger
