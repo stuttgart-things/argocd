@@ -10,7 +10,19 @@
 {{- end }}
 {{- /* Wave -1: the packages. Argo's built-in *.crossplane.io health check
        keeps the sync here until each Configuration reports Healthy, i.e.
-       its XRD is established. */}}
+       its XRD is established.
+
+       skipDependencyResolution: both packages dependsOn
+       xpkg.crossplane.io/crossplane-contrib/provider-helm, but
+       cicd/crossplane/providers installs provider-helm from xpkg.upbound.io
+       (load-bearing for the flux family, see its values.yaml). The lock keys
+       on the source string, so resolving would install a SECOND provider-helm
+       next to it, both claiming the helm.m.crossplane.io CRDs. All three
+       dependencies (provider-helm >=v1.0.0 <v2, function-go-templating
+       >=v0.12.1 <v0.13, function-auto-ready >=v0.6.5 <v0.7) are already
+       installed by the crossplane AppSets this one is gated on
+       (cicd-platform/crossplane not "false"), at matching versions. Same
+       reasoning as harvester-vm in cicd/crossplane/configs/profiles/flux.yaml. */}}
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Configuration
@@ -20,6 +32,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   package: {{ printf "ghcr.io/stuttgart-things/crossplane-configurations/github-arc-controller:%s" .Values.configurations.controller.version | quote }}
+  skipDependencyResolution: true
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Configuration
@@ -29,6 +42,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
   package: {{ printf "ghcr.io/stuttgart-things/crossplane-configurations/github-runner-set:%s" .Values.configurations.runnerSet.version | quote }}
+  skipDependencyResolution: true
 {{- /* Wave 0/1: the XRs. Their CRDs come from the Configurations above, so
        the dry-run of a first sync cannot know them -- SkipDryRunOnMissingResource
        lets it through to the waves. */}}

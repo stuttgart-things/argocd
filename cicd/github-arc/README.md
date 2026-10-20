@@ -17,6 +17,17 @@ Crossplane installs both charts on the cluster itself through the
 (Crossplane, provider-helm, function-go-templating, function-auto-ready) --
 which is why the AppSet also excludes `cicd-platform/crossplane: "false"`.
 
+Both Configurations set **`skipDependencyResolution: true`**. They `dependsOn`
+`xpkg.crossplane.io/crossplane-contrib/provider-helm`, while
+`cicd/crossplane/providers` installs provider-helm from `xpkg.upbound.io` (the
+source the flux family needs). Crossplane's lock keys on the source string, so
+resolving would install a second provider-helm next to the first, both claiming
+the `helm.m.crossplane.io` CRDs. All three dependencies -- provider-helm
+(`>=v1.0.0 <v2`, installed v1.5.0), function-go-templating (`>=v0.12.1 <v0.13`,
+installed v0.12.1), function-auto-ready (`>=v0.6.5 <v0.7`, installed v0.6.5) --
+come from the crossplane AppSets this one is gated on. If either side moves
+out of those ranges, revisit the flag.
+
 ## Ordering
 
 Everything that has to happen in order sits in ONE Application, so Argo's
