@@ -48,7 +48,7 @@ spec:
           # valuesObject override here if profiles diverge in the future.
           #
           # READ-ONLY DASHBOARD. The operator's default is `readonly: false`
-          # (a plain bool with no defaulting, tektoncd/operator v0.79.0,
+          # (a plain bool with no defaulting, tektoncd/operator v0.79.0..v0.81.2,
           # docs/TektonDashboard.md), and tekton-dashboard-httproute-cicd puts
           # the dashboard on tekton.<cluster-fqdn> with nothing in front of it.
           # Read-write, anyone who reaches that name can create PipelineRuns

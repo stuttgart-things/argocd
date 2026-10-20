@@ -8,18 +8,21 @@ destination:
   namespace: tekton-operator
 
 # Source for the vendored Tekton Operator manifests. The rendered Application
-# uses a `directory:` source — the manifests (~1500 lines of upstream YAML)
-# live in the Flux repo to avoid duplicating across repos.
+# uses a `directory:` source (non-recursive) — the upstream manifests (~15k
+# lines since the CRDs carry full schemas, one crd-<plural>.yaml per CRD) live
+# in the Flux repo to avoid duplicating across repos.
 #
 # PINNED to a flux tag, not HEAD: HEAD made every flux merge a possible
 # operator change on every cicd cluster, outside this catalog's own pin
-# (stuttgart-things/stuttgart-things#3798). v1.157.0 carries operator v0.79.0,
-# unchanged since 2026-03-23. No renovate comment on purpose: flux releases
-# several times a day and this directory almost never changes — move the tag
-# together with a re-vendor of cicd/tekton/components/operator in flux.
+# (stuttgart-things/stuttgart-things#3798). v1.164.0 carries
+# stuttgart-things/flux#779 = operator v0.81.2 (previous pin v1.157.0 =
+# operator v0.79.0). No renovate comment on purpose:
+# flux releases several times a day and this directory almost never changes —
+# move the tag together with a re-vendor of cicd/tekton/components/operator in
+# flux (hack/vendor-tekton-operator.py there).
 source:
   repoURL: https://github.com/stuttgart-things/flux.git
-  targetRevision: v1.157.0
+  targetRevision: v1.164.0
   path: cicd/tekton/components/operator
 
 # Sync policy applied to the rendered Application.

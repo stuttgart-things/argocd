@@ -331,4 +331,4 @@ For deeper overrides (long values trees), splitting out a dedicated `values.yaml
 
 ## Related
 
-Flux-based sibling: [`stuttgart-things/flux`](https://github.com/stuttgart-things/flux). The `cicd/tekton/operator` entry here still pulls vendored operator manifests from the Flux repo (`cicd/tekton/components/operator`) via a `directory:` source — those ~1500 lines of upstream YAML are shared between the Flux and Argo CD install paths rather than duplicated.
+Flux-based sibling: [`stuttgart-things/flux`](https://github.com/stuttgart-things/flux). The `cicd/tekton/operator` entry here still pulls vendored operator manifests from the Flux repo (`cicd/tekton/components/operator`) via a `directory:` source — those ~15k lines of upstream YAML are shared between the Flux and Argo CD install paths rather than duplicated.

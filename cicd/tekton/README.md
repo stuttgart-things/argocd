@@ -25,7 +25,7 @@ Matrix of typical consumer shapes:
 
 ## operator/
 
-App-of-apps chart rendering one `Application` that pulls the upstream Tekton Operator manifests via a `directory:` source, pinned to a flux tag (`source.targetRevision`, moved together with a re-vendor in flux). The manifests (~1500 lines of upstream YAML) live in [`stuttgart-things/flux` — `cicd/tekton/components/operator`](https://github.com/stuttgart-things/flux/tree/main/cicd/tekton/components/operator) and aren't duplicated into this repo.
+App-of-apps chart rendering one `Application` that pulls the upstream Tekton Operator manifests via a `directory:` source, pinned to a flux tag (`source.targetRevision`, moved together with a re-vendor in flux). The manifests (~15k lines of upstream YAML, Tekton Operator v0.81.2) live in [`stuttgart-things/flux` — `cicd/tekton/components/operator`](https://github.com/stuttgart-things/flux/tree/main/cicd/tekton/components/operator) and aren't duplicated into this repo.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -63,8 +63,23 @@ See `operator/values.yaml` / `operator/values.schema.json` for the full contract
 |---|---|---|
 | `project` | `default` | ArgoCD AppProject for the rendered Application |
 | `destination.server` / `namespace` | `https://kubernetes.default.svc` / `tekton-operator` | Target workload cluster + namespace |
-| `source.repoURL` / `targetRevision` / `path` | Flux repo / `HEAD` / `cicd/tekton/components/operator` | Directory source for the vendored manifests |
+| `source.repoURL` / `targetRevision` / `path` | Flux repo / pinned flux tag (operator v0.81.2) / `cicd/tekton/components/operator` | Directory source for the vendored manifests |
 | `syncPolicy` | automated + retry | Applied to the rendered child Application |
+
+### Operator v0.81 notes
+
+Upgrading from v0.79.0 (details in flux `cicd/tekton/README.md`):
+
+- CRDs are now structural: unknown `TektonConfig` fields are pruned. Everything
+  `config/` renders (incl. `dashboard.readonly` from `appset-tekton-config`)
+  exists in the v0.81.2 schema; check any `extraSpec` you add against it.
+- `TektonHub` is gone; the Application prunes its CRD.
+- With `profile: all` the operator now installs **Pipelines-as-Code** by
+  default on Kubernetes, and reconciles default-deny **NetworkPolicies** in
+  `tekton-pipelines` (metrics ingress only from the `monitoring` namespace).
+  Opt-outs via `extraSpec` (`platforms.kubernetes.pipelinesAsCode.enable:
+  false`, `networkPolicy.disabled: true`) — only once the cluster already runs
+  v0.81: the v0.79 webhook rejects both fields as unknown.
 
 ## config/
 
