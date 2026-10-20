@@ -290,6 +290,29 @@
               "description": "<worker tag>-trigger"
             }
           }
+        },
+        "runs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repoURL",
+            "targetRevision",
+            "path"
+          ],
+          "properties": {
+            "repoURL": {
+              "type": "string",
+              "minLength": 1
+            },
+            "targetRevision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "description": "directory of BackstageTemplateRun files; empty = no runs Application"
+            }
+          }
         }
       }
     },
@@ -379,6 +402,43 @@
               "type": "string",
               "minLength": 1,
               "description": "<worker tag>-trigger"
+            }
+          }
+        },
+        "discovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "server",
+            "gitops",
+            "exclude",
+            "lookback",
+            "argoServer"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "server": {
+              "type": "string",
+              "description": "machinery gRPC host:port holding the ClusterStacks; required when enabled"
+            },
+            "gitops": {
+              "type": "string",
+              "description": "<namespace>/<name> of the Flux Kustomization of the gitops phase; empty = no gitops phase"
+            },
+            "exclude": {
+              "type": "string",
+              "description": "comma-separated <namespace>/<name> globs never watched"
+            },
+            "lookback": {
+              "type": "string",
+              "pattern": "^[0-9]+(s|m|h)$"
+            },
+            "argoServer": {
+              "type": "string",
+              "description": "machinery on the Argo CD cluster; empty = no Argo checkpoint"
             }
           }
         }

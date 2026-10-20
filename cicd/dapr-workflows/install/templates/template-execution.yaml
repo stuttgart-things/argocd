@@ -112,4 +112,38 @@ spec:
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
 {{- end }}
+{{- with $te.runs }}
+{{- if .path }}
+---
+{{- /* The BackstageTemplateRun files of request-vm / request-vm-deletion:
+       Backstage commits one per request into <path>, the merge is the
+       approval, and this Application applies the directory -- what the Flux
+       Kustomization backstage-runs did on cicd-machinery-test5 (#3796).
+       prune: deleting a file removes the run's Job and ConfigMap, not the VM.
+       A private repo needs a repository Secret on the Argo CD cluster. */}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-template-execution-runs" $appName | quote }}
+  namespace: argocd
+  {{- include "daprWorkflows.leafFinalizer" $ | nindent 0 }}
+  annotations:
+    # after the trigger (5): the runs are instances of its RGD's kind
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  project: {{ $.Values.project | quote }}
+  source:
+    repoURL: {{ .repoURL | quote }}
+    targetRevision: {{ .targetRevision | quote }}
+    path: {{ .path | quote }}
+    directory:
+      recurse: false
+      include: "*.yaml"
+  destination:
+    server: {{ $.Values.destination.server | quote }}
+    namespace: {{ $te.namespace | quote }}
+  syncPolicy:
+    {{- toYaml $.Values.syncPolicy | nindent 4 }}
+{{- end }}
+{{- end }}
 {{- end }}
