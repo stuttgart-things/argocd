@@ -132,7 +132,7 @@ spec:
               image:
                 repository: registry.k8s.io/git-sync/git-sync
                 # renovate: datasource=docker depName=registry.k8s.io/git-sync/git-sync
-                tag: v4.4.0
+                tag: v4.7.1
               authSecret: git-sync-auth
             gitSyncExtra:
               enabled: '{{ if (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/clusterscope-git-extra-repo") }}true{{ else }}false{{ end }}'
