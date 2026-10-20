@@ -494,7 +494,7 @@ aiPitcher:
 schedulePitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-schedule-pitcher
-  version: v1.10.0
+  version: v1.11.0
   hostname: schedule-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — patch the HTTPRoute the
   # kustomize OCI ships instead of rendering one in the standalone
