@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "github-arc-cicd values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog",
+    "project",
+    "destination",
+    "clusterName",
+    "repositories",
+    "secrets",
+    "syncPolicy"
+  ],
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ],
+      "properties": {
+        "repoURL": {
+          "type": "string"
+        },
+        "targetRevision": {
+          "type": "string"
+        }
+      }
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server",
+        "namespace"
+      ],
+      "properties": {
+        "server": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Runner namespace: credential Secret + scale sets"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "applicationName": {
+      "type": "string"
+    },
+    "cascadingDelete": {
+      "type": "boolean"
+    },
+    "clusterName": {
+      "type": "string",
+      "description": "Argo cluster name; required to render. Scale sets are ghr-<repository>-<clusterName>."
+    },
+    "repositories": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Repositories in stuttgart-things that get a runner scale set",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+      }
+    },
+    "storageClass": {
+      "type": "string",
+      "minLength": 1
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clusterSecretStoreName",
+        "vaultSecretName"
+      ],
+      "properties": {
+        "clusterSecretStoreName": {
+          "type": "string",
+          "description": "required to render"
+        },
+        "vaultSecretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$"
+        }
+      }
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

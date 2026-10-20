@@ -1,0 +1,85 @@
+{{- /* Nothing without a clusterName: lint and the catalog probe render the
+       defaults. */}}
+{{- if .Values.clusterName }}
+{{- $r := .Values.runners }}
+{{- range $r.repositories }}
+{{- $scaleSet := printf "ghr-%s-%s" . $.Values.clusterName }}
+{{- if gt (len $scaleSet) 53 }}
+{{- fail (printf "runner scale set name %s is %d characters, Helm allows 53: shorten the repository or cluster name" $scaleSet (len $scaleSet)) }}
+{{- end }}
+{{- end }}
+{{- /* Wave -1: the packages. Argo's built-in *.crossplane.io health check
+       keeps the sync here until each Configuration reports Healthy, i.e.
+       its XRD is established. */}}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: github-arc-controller
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  package: {{ printf "ghcr.io/stuttgart-things/crossplane-configurations/github-arc-controller:%s" .Values.configurations.controller.version | quote }}
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: github-runner-set
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  package: {{ printf "ghcr.io/stuttgart-things/crossplane-configurations/github-runner-set:%s" .Values.configurations.runnerSet.version | quote }}
+{{- /* Wave 0/1: the XRs. Their CRDs come from the Configurations above, so
+       the dry-run of a first sync cannot know them -- SkipDryRunOnMissingResource
+       lets it through to the waves. */}}
+---
+apiVersion: resources.stuttgart-things.com/v1alpha1
+kind: GithubArcController
+metadata:
+  name: github-arc-controller
+  namespace: {{ .Values.xrNamespace | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  clusterName: {{ .Values.clusterName | quote }}
+  helmProviderConfigRef: {{ .Values.helmProviderConfigRef | quote }}
+  namespace: {{ .Values.controller.namespace | quote }}
+  releaseName: {{ .Values.controller.releaseName | quote }}
+  version: {{ .Values.arcVersion | quote }}
+{{- range $r.repositories }}
+---
+apiVersion: resources.stuttgart-things.com/v1alpha1
+kind: GithubRunnerSet
+metadata:
+  name: {{ printf "ghr-%s-%s" . $.Values.clusterName | quote }}
+  namespace: {{ $.Values.xrNamespace | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  # runs-on: ghr-{{ . }}-{{ $.Values.clusterName }}
+  clusterName: {{ $.Values.clusterName | quote }}
+  helmProviderConfigRef: {{ $.Values.helmProviderConfigRef | quote }}
+  namespace: {{ $r.namespace | quote }}
+  version: {{ $.Values.arcVersion | quote }}
+  organization: {{ $r.organization | quote }}
+  repository: {{ . | quote }}
+  githubConfigSecret: {{ $r.githubConfigSecret | quote }}
+  # Named, not discovered by label: the chart's lookup fails while the
+  # controller from wave 0 is still installing.
+  controllerServiceAccount:
+    namespace: {{ $.Values.controller.namespace | quote }}
+    name: {{ printf "%s-gha-rs-controller" $.Values.controller.releaseName | quote }}
+  {{- if ne (kindOf $r.minRunners) "invalid" }}
+  minRunners: {{ $r.minRunners }}
+  {{- end }}
+  {{- if ne (kindOf $r.maxRunners) "invalid" }}
+  maxRunners: {{ $r.maxRunners }}
+  {{- end }}
+  runnerImage:
+    tag: {{ $r.runnerImage.tag | quote }}
+  containerMode:
+    {{- toYaml $r.containerMode | nindent 4 }}
+{{- end }}
+{{- end }}

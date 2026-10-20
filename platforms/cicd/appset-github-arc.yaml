@@ -1,0 +1,102 @@
+# GitHub Actions runners (ARC) through the crossplane-configurations packages
+# github-arc-controller + github-runner-set: one controller, one runner scale
+# set per repository, PAT from ESO (see cicd/github-arc).
+#
+# OPT-IN (cicd-platform/github-arc: "true"), and only where Crossplane runs
+# (cicd-platform/crossplane not "false"): the XRs need Crossplane,
+# provider-helm, the go-templating/auto-ready functions and the `in-cluster`
+# ClusterProviderConfig from the crossplane AppSets. No route, so no
+# clusterbook precondition.
+#
+# Annotations (cicd-platform.stuttgart-things.com/...):
+#   github-arc-secret-store  ClusterSecretStore holding the PAT; `secret-store`
+#                       is the fallback. No store: the parent fails loudly.
+#   github-arc-secret-key    KV entry (default _github-arc), property github_token
+#   github-runner-repos      comma-separated repositories in stuttgart-things,
+#                       one scale set ghr-<repo>-<cluster> each (= runs-on:).
+#                       Absent: the controller only.
+#   storage-class       runner work volumes (default openebs-hostpath)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: github-arc-cicd
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            cicd-platform: "true"
+          matchExpressions:
+            # Opt-IN: only an explicit "true".
+            - key: cicd-platform/github-arc
+              operator: In
+              values: ["true"]
+            - key: cicd-platform/crossplane
+              operator: NotIn
+              values: ["false"]
+  template:
+    metadata:
+      # `-platform` suffix so the parent cannot share a name with the chart's
+      # children (`github-arc-<cluster>`, `github-arc-<cluster>-secrets`).
+      name: 'github-arc-platform-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # HEAD until the first release that carries cicd/github-arc (a tag pin
+        # before that points at a path that does not exist there). Then pin it
+        # and catalog.targetRevision below, like the other AppSets here.
+        targetRevision: HEAD
+        path: cicd/github-arc/install
+        helm:
+          releaseName: 'github-arc-{{ .name }}'
+          # `default ""`: missingkey=error does not cover `index`, and an
+          # absent annotation still has to read as "not set".
+          # Repositories: split on ",", trimmed, empties dropped -- an absent
+          # annotation is `[]`, not `[""]`.
+          values: |
+            {{- $a := default (dict) .metadata.annotations }}
+            {{- $repos := list }}
+            {{- range splitList "," (default "" (index $a "cicd-platform.stuttgart-things.com/github-runner-repos")) }}
+            {{- if trim . }}{{ $repos = append $repos (trim .) }}{{ end }}
+            {{- end }}
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              targetRevision: HEAD
+            project: '{{ .name }}'
+            applicationName: 'github-arc-{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: arc-runners
+            cascadingDelete: false
+            clusterName: '{{ .name }}'
+            repositories: {{ toJson $repos }}
+            storageClass: '{{ default "openebs-hostpath" (index $a "cicd-platform.stuttgart-things.com/storage-class") }}'
+            secrets:
+              clusterSecretStoreName: '{{ default (default "" (index $a "cicd-platform.stuttgart-things.com/secret-store")) (index $a "cicd-platform.stuttgart-things.com/github-arc-secret-store") }}'
+              vaultSecretName: '{{ default "_github-arc" (index $a "cicd-platform.stuttgart-things.com/github-arc-secret-key") }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

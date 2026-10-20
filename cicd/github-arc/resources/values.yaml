@@ -1,0 +1,62 @@
+---
+# Argo cluster name. Feeds the XRs' clusterName, so the scale set (= the
+# `runs-on:` label) is ghr-<repository>-<clusterName>. Empty renders nothing:
+# lint and the catalog probe render the defaults.
+clusterName: ""
+
+# provider-helm ClusterProviderConfig the Releases go through. `in-cluster`
+# comes from cicd/crossplane/provider-configs (InjectedIdentity).
+helmProviderConfigRef: in-cluster
+
+# Both XRDs are namespaced. The XRs sit next to the other Crossplane objects,
+# as in the packages' examples -- not in the runner namespace, whose deletion
+# would otherwise take the XRs (and with them the runner sets) along.
+xrNamespace: crossplane-system
+
+# The two Configurations from stuttgart-things/crossplane-configurations
+# (cicd/github-arc-controller, cicd/github-runner-set). Installed in wave -1;
+# the XRs wait for them (Argo's crossplane.io health check on Healthy=True).
+configurations:
+  controller:
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/crossplane-configurations/github-arc-controller
+    version: v0.1.0
+  runnerSet:
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/crossplane-configurations/github-runner-set
+    version: v0.1.0
+
+# ARC chart version for the controller AND every runner set: ARC releases both
+# charts together and supports only matching pairs. Helm installs the ARC CRDs
+# on the FIRST install only -- after a bump, apply the matching CRDs by hand
+# (see cicd/github-arc/README.md).
+# renovate: datasource=docker depName=ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
+arcVersion: "0.15.0"
+
+controller:
+  namespace: arc-systems
+  # The release the old stuttgart-things/crossplane github-controller package
+  # created, and the controller ServiceAccount the runner sets reference
+  # (<releaseName>-gha-rs-controller).
+  releaseName: github-controller
+
+runners:
+  # Namespace of the scale sets; the credential Secret has to exist HERE
+  # (the -secrets Application of cicd/github-arc/install).
+  namespace: arc-runners
+  organization: stuttgart-things
+  # One GithubRunnerSet per entry, repository-level runners. Empty: controller only.
+  repositories: []
+  # Secret with key github_token (PAT), materialised by ESO.
+  githubConfigSecret: github-arc
+  runnerImage:
+    # Keep current: GitHub deprecates runner versions server-side, and a
+    # deprecated runner exits 7 on every start (ARC phase Outdated, forever).
+    # renovate: datasource=docker depName=ghcr.io/actions/actions-runner
+    tag: "2.338.0"
+  containerMode:
+    type: kubernetes
+    # false: jobs without `container:` run inside the runner pod itself.
+    requireJobContainer: false
+    storageClassName: openebs-hostpath
+    storage: 1Gi
+  minRunners: 0
+  maxRunners: 3
