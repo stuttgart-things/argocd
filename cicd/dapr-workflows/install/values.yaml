@@ -78,11 +78,11 @@ templateExecution:
   kustomize:
     repoURL: ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
-    targetRevision: 88a93956cee1
+    targetRevision: 722e74be562d
   image:
     repository: ghcr.io/stuttgart-things/dapr-backstage-template-execution
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution
-    tag: 88a93956cee1
+    tag: 722e74be562d
   backstageURL: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
   # CA the worker trusts for Backstage: trust-manager's bundle ConfigMap.
   caConfigMap:
@@ -91,7 +91,7 @@ templateExecution:
   # kro RGD `backstage-template-run` (kind BackstageTemplateRun). Needs kro.
   trigger:
     enabled: true
-    targetRevision: 88a93956cee1-trigger
+    targetRevision: 722e74be562d-trigger
   # Directory of BackstageTemplateRun files (request-vm, request-vm-deletion)
   # applied by an Application of its own. Empty path: none.
   runs:
