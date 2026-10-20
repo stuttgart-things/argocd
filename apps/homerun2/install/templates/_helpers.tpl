@@ -263,3 +263,26 @@ Usage: include "homerun2.scoutProfile" . | fromYaml
 {{- end -}}
 {{- toYaml (dict "render" $render "spec" $spec) -}}
 {{- end -}}
+
+{{/*
+homerun2.portalServices -- PORTAL_SERVICES for homerun2-portal: `key=url`
+pairs, comma-separated, in navigation order. `portal.services` wins when set;
+otherwise every enabled UI component with a `basePath` is listed, its key
+being the basePath without the slash (`/led` -> `led=http://homerun2-led-catcher`).
+The portal forwards /<key>/... unchanged, so key and basePath must agree —
+deriving one from the other keeps them from drifting apart.
+*/}}
+{{- define "homerun2.portalServices" -}}
+{{- if .Values.portal.services }}
+{{- join "," .Values.portal.services }}
+{{- else }}
+{{- $services := list }}
+{{- range $c := list (list "ledCatcher" "led-catcher") (list "coreCatcher" "core-catcher") (list "lightCatcher" "light-catcher") (list "demoPitcher" "demo-pitcher") }}
+  {{- $v := index $.Values (index $c 0) }}
+  {{- if and $v.enabled $v.basePath }}
+    {{- $services = append $services (printf "%s=http://homerun2-%s" (trimPrefix "/" $v.basePath) (index $c 1)) }}
+  {{- end }}
+{{- end }}
+{{- join "," $services }}
+{{- end }}
+{{- end -}}

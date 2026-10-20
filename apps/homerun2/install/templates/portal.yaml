@@ -1,0 +1,75 @@
+{{- if .Values.portal.enabled }}
+{{- $appName := include "homerun2.appName" . }}
+{{- $name := "homerun2-portal" }}
+{{- $ns := .Values.destination.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-portal" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # After the services it fronts (wave 0): its first status check then
+    # finds them up.
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ include "homerun2.kustomizeRepo" "portal" | quote }}
+    targetRevision: {{ .Values.portal.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      patches:
+{{- if .Values.httpRoute.enabled }}
+        # The portal's kustomize OCI ships its HTTPRoute (the whole hostname:
+        # its own pages at /, every service under /<key>/); patch parentRef +
+        # hostname per env, as for the inline routes (stuttgart-things/argocd#116).
+        - target:
+            group: gateway.networking.k8s.io
+            version: v1
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |-
+{{ include "homerun2.httpRouteJSONPatch" (dict "gateway" .Values.httpRoute.gateway "hostname" .Values.portal.hostname) | indent 12 }}
+{{- else }}
+        - target:
+            kind: HTTPRoute
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.deletePatch" (dict "apiVersion" "gateway.networking.k8s.io/v1" "kind" "HTTPRoute" "name" $name) | indent 12 }}
+{{- end }}
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+{{ include "homerun2.imagePatch" (dict "name" $name "tag" .Values.portal.version "reloader" .Values.reloader) | indent 12 }}
+        # The services behind the portal. It reads PORTAL_SERVICES at start
+        # only; with `reloader` the Deployment rolls when this changes.
+        - target:
+            kind: ConfigMap
+            name: {{ printf "%s-config" $name }}
+          patch: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ printf "%s-config" $name }}
+            data:
+              PORTAL_SERVICES: {{ include "homerun2.portalServices" . | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ $ns | quote }}
+{{- if .Values.httpRoute.enabled }}
+  {{- include "homerun2.inlineRouteIgnoreDifferences" $name | nindent 2 }}
+{{- end }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

@@ -159,6 +159,12 @@ coreCatcher:
   # stuttgart-things/homerun2-core-catcher#63 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
+  # URL prefix (BASE_PATH), e.g. "/core" behind homerun2-portal (core-catcher v1.1.0 or
+  # later). Set, the app answers only under it -- on its own hostname too,
+  # where / redirects there; /health stays at the root. With `portal`
+  # enabled and `portal.services` empty, the portal lists every component
+  # with a basePath, keyed by it. Empty serves at the root.
+  basePath: ""
   # Optional override for REDIS_STREAM (the stream name core-catcher
   # consumes). When empty, the kustomize base default (messages) is
   # used. Set this when co-tenanting with a producer that writes to a
@@ -287,6 +293,12 @@ lightCatcher:
   # stuttgart-things/homerun2-light-catcher#16 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
+  # URL prefix (BASE_PATH), e.g. "/light" behind homerun2-portal (light-catcher v1.9.0 or
+  # later). Set, the app answers only under it -- on its own hostname too,
+  # where / redirects there; /health stays at the root. With `portal`
+  # enabled and `portal.services` empty, the portal lists every component
+  # with a basePath, keyed by it. Empty serves at the root.
+  basePath: ""
 
 # wled-mock (mock WLED device + dashboard, for dev/testing).
 # Note: the homerun2-wled-mock-kustomize OCI ships from the
@@ -326,6 +338,12 @@ demoPitcher:
   # stuttgart-things/homerun2-demo-pitcher#25 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
+  # URL prefix (BASE_PATH), e.g. "/pitch" behind homerun2-portal (demo-pitcher v2.1.0 or
+  # later). Set, the app answers only under it -- on its own hostname too,
+  # where / redirects there; /health stays at the root. With `portal`
+  # enabled and `portal.services` empty, the portal lists every component
+  # with a basePath, keyed by it. Empty serves at the root.
+  basePath: ""
   # When set, the chart patches the Deployment to add PITCH_TARGET=omni-pitcher +
   # OMNI_PITCHER_URL=<this URL>, flipping demo-pitcher's /pitch endpoint
   # from its default RedisPitcher backend to an HTTPPitcher that posts to
@@ -350,6 +368,28 @@ ledCatcher:
   # stuttgart-things/homerun2-led-catcher#32 (which enables HTTPRoute
   # rendering in the kustomize base).
   inlineHttpRoute: false
+  # URL prefix (BASE_PATH), e.g. "/led" behind homerun2-portal (led-catcher v0.18.0 or
+  # later). Set, the app answers only under it -- on its own hostname too,
+  # where / redirects there; /health stays at the root. With `portal`
+  # enabled and `portal.services` empty, the portal lists every component
+  # with a basePath, keyed by it. Empty serves at the root.
+  basePath: ""
+
+# homerun2-portal: one web frontend for the homerun2 UIs -- a shell with
+# navigation and service status, and a reverse proxy serving each service under
+# /<key>/ (its whole hostname). Each service it fronts must run with
+# BASE_PATH=/<key>: set `<component>.basePath`. The portal's kustomize OCI ships
+# its HTTPRoute; the chart patches parentRef + hostname like the inline routes.
+portal:
+  enabled: false
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-portal
+  version: v0.4.0
+  hostname: portal.example.com
+  # PORTAL_SERVICES as a list of `key=url` (or `key|Title=url`), in navigation
+  # order. Empty: every enabled led-/core-/light-catcher and demo-pitcher with
+  # a `basePath` is listed, keyed by it (basePath "/led" ->
+  # "led=http://homerun2-led-catcher").
+  services: []
 
 # notification-catcher (Redis Streams consumer → MS Teams / generic webhooks).
 # The other half of the Alertmanager/Grafana chain: omni-pitcher takes the
