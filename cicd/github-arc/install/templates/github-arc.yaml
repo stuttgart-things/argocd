@@ -1,0 +1,81 @@
+{{- /* Nothing without a clusterName: lint and the catalog probe render the
+       defaults. With one, a missing store is a hard error. */}}
+{{- if .Values.clusterName }}
+{{- if not .Values.secrets.clusterSecretStoreName }}
+{{- fail "secrets.clusterSecretStoreName is required: the GitHub PAT comes from ESO" }}
+{{- end }}
+{{- $appName := .Values.applicationName | default (printf "github-arc-%s" (sha1sum .Values.destination.server | trunc 8)) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-secrets" $appName | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # Before the runner sets: their listeners read this Secret. Creates the
+    # runner namespace too (CreateNamespace).
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: cicd/externalsecrets
+    helm:
+      valuesObject:
+        namespace: {{ .Values.destination.namespace | quote }}
+        clusterSecretStoreName: {{ .Values.secrets.clusterSecretStoreName | quote }}
+        refreshInterval: {{ .Values.secrets.refreshInterval | quote }}
+        secrets:
+          - secretName: github-arc
+            data:
+              - secretKey: github_token
+                vaultSecretName: {{ .Values.secrets.vaultSecretName | quote }}
+                property: github_token
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  {{- if .Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: cicd/github-arc/resources
+    helm:
+      valuesObject:
+        clusterName: {{ .Values.clusterName | quote }}
+        runners:
+          namespace: {{ .Values.destination.namespace | quote }}
+          githubConfigSecret: github-arc
+          repositories:
+            {{- toYaml .Values.repositories | nindent 12 }}
+          containerMode:
+            type: kubernetes
+            requireJobContainer: false
+            storageClassName: {{ .Values.storageClass | quote }}
+            storage: 1Gi
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    # The XRs' namespace (crossplane-system); the Configurations are cluster-scoped.
+    namespace: crossplane-system
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

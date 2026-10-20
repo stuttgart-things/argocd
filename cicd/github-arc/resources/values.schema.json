@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "github-arc-resources values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "clusterName",
+    "helmProviderConfigRef",
+    "xrNamespace",
+    "configurations",
+    "arcVersion",
+    "controller",
+    "runners"
+  ],
+  "properties": {
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through so verify-catalog's probe values validate; not consumed."
+    },
+    "clusterName": {
+      "type": "string",
+      "description": "Argo cluster name; required to render. Scale sets are ghr-<repository>-<clusterName>."
+    },
+    "helmProviderConfigRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "xrNamespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "configurations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controller",
+        "runnerSet"
+      ],
+      "properties": {
+        "controller": {
+          "$ref": "#/$defs/packageVersion"
+        },
+        "runnerSet": {
+          "$ref": "#/$defs/packageVersion"
+        }
+      }
+    },
+    "arcVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "ARC chart version, controller and runner sets in lockstep"
+    },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "releaseName"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "releaseName": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "runners": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "organization",
+        "repositories",
+        "githubConfigSecret",
+        "runnerImage",
+        "containerMode"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "organization": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repositories": {
+          "type": "array",
+          "uniqueItems": true,
+          "description": "Repository names in the organization; each becomes a scale set name, so DNS-1123 only",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          }
+        },
+        "githubConfigSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runnerImage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tag"
+          ],
+          "properties": {
+            "tag": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "containerMode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "kubernetes",
+                "kubernetes-novolume",
+                "dind",
+                "none"
+              ]
+            },
+            "requireJobContainer": {
+              "type": "boolean"
+            },
+            "storageClassName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "storage": {
+              "type": "string",
+              "pattern": "^[0-9]+(Mi|Gi|Ti)$"
+            }
+          }
+        },
+        "minRunners": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxRunners": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "$defs": {
+    "packageVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    }
+  }
+}

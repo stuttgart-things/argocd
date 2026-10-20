@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: github-arc-resources
+description: GitHub Actions Runner Controller on the cluster itself -- the two crossplane-configurations packages, then one GithubArcController XR and one GithubRunnerSet XR per repository, in sync-waves.
+type: application
+version: 0.1.0
+appVersion: "0.15.0"

@@ -1,0 +1,53 @@
+---
+# Reference back to this catalog repo (both sub-Applications).
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+project: default
+
+# Target cluster. `namespace` is the RUNNER namespace: the credential Secret
+# lands there and the scale sets run there.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: arc-runners
+
+# Parent name; defaults to github-arc-<hash of destination.server>.
+applicationName: ""
+
+# false: an opt-out stops managing ARC instead of deleting the XRs (and with
+# them the controller and every runner set) -- stuttgart-things/argocd#324.
+cascadingDelete: false
+
+# Argo cluster name -> the XRs' clusterName -> scale sets ghr-<repo>-<cluster>.
+# Empty renders nothing.
+clusterName: ""
+
+# Repositories in stuttgart-things that get a runner scale set. Empty: the
+# controller only.
+repositories: []
+
+# Work volume of the kubernetes container mode.
+storageClass: openebs-hostpath
+
+# The PAT: KV entry `vaultSecretName`, property github_token, in the store
+# `clusterSecretStoreName`. Materialised as Secret `github-arc` (key
+# github_token) in destination.namespace.
+secrets:
+  clusterSecretStoreName: ""
+  vaultSecretName: _github-arc
+  refreshInterval: 1h
+
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

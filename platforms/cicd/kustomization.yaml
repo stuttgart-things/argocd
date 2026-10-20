@@ -30,3 +30,4 @@ resources:
   - appset-zot.yaml
   - appset-argo-workflows.yaml
   - appset-argo-events.yaml
+  - appset-github-arc.yaml
