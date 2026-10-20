@@ -34,7 +34,7 @@ homerun sink and machinery gRPC auth.
 | entry | property | used by |
 |---|---|---|
 | own (`secrets.vaultSecretName`) | `redisPassword` (generated) | redis, both workers |
-| shared `git-pat` (`_git-pat`) | `githubToken` | template-execution |
+| shared `github-merge` (`_github-merge`; before: `git-pat`) | `githubToken` | template-execution -- merges the VM PRs: fine-grained PAT with Contents RW, Pull requests RW, Actions R |
 | shared `backstage-token` (`_backstage-token`) | `backstageToken` | template-execution |
 | shared `homerun-pitch` (`_homerun-pitch`) | `homerunAuthToken` | cluster-build-watch, with `homerunPitchURL` |
 | shared `machinery-grpc` (`_machinery-grpc`) | `machineryToken` | cluster-build-watch, with `machineryAuth.enabled` |

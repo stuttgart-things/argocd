@@ -16,7 +16,8 @@
 # by the ClusterStack from the AppSecretProfile dapr-workflows:
 #   dapr-workflows-secret-store/-key  own entry (redisPassword); falls back to
 #                                     the single `secret-store`
-#   shared-<name>-secret-store/-key   git-pat (githubToken), backstage-token
+#   shared-<name>-secret-store/-key   github-merge or (older) git-pat
+#                                     (githubToken), backstage-token
 #                                     (backstageToken), homerun-pitch
 #                                     (homerunAuthToken), machinery-grpc
 #                                     (machineryToken; its presence turns
@@ -89,9 +90,12 @@ spec:
               clusterSecretStoreName: '{{ default (default "" (index $a "cicd-platform.stuttgart-things.com/secret-store")) (index $a "cicd-platform.stuttgart-things.com/dapr-workflows-secret-store") }}'
               vaultSecretName: '{{ default "dapr-workflows" (index $a "cicd-platform.stuttgart-things.com/dapr-workflows-secret-key") }}'
               shared:
+                # github-merge (the worker's own token: it merges the VM PRs,
+                # stuttgart-things#3796) wins over the read-only git-pat it
+                # replaces; both are read so either profile version renders.
                 githubToken:
-                  clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/shared-git-pat-secret-store") }}'
-                  vaultSecretName: '{{ default "_git-pat" (index $a "cicd-platform.stuttgart-things.com/shared-git-pat-secret-key") }}'
+                  clusterSecretStoreName: '{{ default (default "" (index $a "cicd-platform.stuttgart-things.com/shared-git-pat-secret-store")) (index $a "cicd-platform.stuttgart-things.com/shared-github-merge-secret-store") }}'
+                  vaultSecretName: '{{ default (default "_git-pat" (index $a "cicd-platform.stuttgart-things.com/shared-git-pat-secret-key")) (index $a "cicd-platform.stuttgart-things.com/shared-github-merge-secret-key") }}'
                 backstageToken:
                   clusterSecretStoreName: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/shared-backstage-token-secret-store") }}'
                   vaultSecretName: '{{ default "_backstage-token" (index $a "cicd-platform.stuttgart-things.com/shared-backstage-token-secret-key") }}'
