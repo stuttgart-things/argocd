@@ -32,6 +32,7 @@ apps/homerun2/
 │       ├── schedule-pitcher.yaml              Application "...-schedule-pitcher"   (sync-wave 0, central instance: UI + API)
 │       ├── schedule-pitcher-profile.yaml      Application "...-schedule-pitcher-profile" (sync-wave -10, its profile ConfigMap + secret-check Roles)
 │       ├── sound-catcher.yaml                 Application "...-sound-catcher"      (sync-wave 0, browser player page, route from its base)
+│       ├── portal.yaml                        Application "...-portal"             (sync-wave 5, one frontend for the UIs, route from its base)
 │       ├── httproute.yaml                     Application "...-httproute"          (sync-wave 10, builds routes from enabled components)
 │       └── smoke-test.yaml                    Application "...-smoke-test"         (sync-wave 20, opt-in via smokeTest.enabled)
 ├── httproute/                                 multi-HTTPRoute sub-chart (driven by a values list)
@@ -74,6 +75,7 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `aiPitcher` | CronJobs: AI summaries of scout's digest + the schedule-pitcher's open findings via OpenRouter, pitched to omni (morning / evening / week-ahead / weekly) | no | reads omni's + scout's |
 | `schedulePitcher` | Central schedule-pitcher: token/cert expiry checks, reminders, findings from agents → omni, web UI + API | yes | own (`schedulePitcherAuthToken`) |
 | `soundCatcher` | Redis Streams consumer → clips and spoken announcements on a browser player page (no speaker in a Pod) | yes | `/play` (`authToken`) |
+| `portal` | One web frontend for the homerun2 UIs: shell with navigation and service status, reverse proxy serving each service under `/<key>/` ([homerun2-portal](https://github.com/stuttgart-things/homerun2-portal)) | yes (whole hostname) | no |
 
 ## What gets deployed (per component)
 
@@ -257,6 +259,35 @@ annotation can carry (`platforms/homerun2`: `…/scout-profile`). It must parse 
 the whole chart fails to render. Scout pitches alerts and its digest to
 `alerting.pitcherURL`; the chart then hands it omni-pitcher's token.
 
+## Portal
+
+`portal` puts the homerun2 UIs behind one hostname: the portal's overview at `/`, and
+each service under `/<key>/` through its reverse proxy, which forwards the path unchanged.
+So every service it fronts runs with `BASE_PATH=/<key>` — set `<component>.basePath`
+(led-catcher v0.18.0+, core-catcher v1.1.0+, light-catcher v1.9.0+, demo-pitcher v2.1.0+;
+the service fragments on the overview, shared colours and compact header need led-catcher
+v0.20.0+, core-catcher v1.3.0+, light-catcher v1.12.0+, demo-pitcher v2.3.0+ and portal
+v0.4.0+). With a basePath the service answers only under it, on its own hostname too, where
+`/` redirects there; `/health` stays at the root for probes and the portal's status check.
+
+```yaml
+        portal:
+          enabled: true
+          hostname: homerun2.my-cluster.example.com
+        ledCatcher:   { enabled: true, basePath: /led }
+        coreCatcher:  { enabled: true, basePath: /core }
+        lightCatcher: { enabled: true, basePath: /light }
+        demoPitcher:  { enabled: true, basePath: /pitch }
+```
+
+`portal.services` empty lists every enabled one of these four with a basePath, keyed by it
+(`/led` → `led=http://homerun2-led-catcher`), in that order — key and prefix cannot drift
+apart. Set `portal.services` (`key=url` or `key|Title=url`) to choose the order, titles or
+other services. The portal's kustomize OCI ships its HTTPRoute (the whole hostname); the
+chart patches parentRef + hostname, or deletes it with `httpRoute.enabled: false`. Same
+setup as flux `apps/homerun2/profiles/portal` (`HOMERUN2_PORTAL_SERVICES`,
+`HOMERUN2_<COMPONENT>_BASE_PATH`).
+
 ## Sound-catcher
 
 `soundCatcher` runs the catcher with the browser sink only — a Pod has no speaker. Open
@@ -350,6 +381,8 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `aiPitcher.enabled` / `version` / `modes.<mode>.{enabled,schedule}` / `timeZone` / `suspend` / `model` / `language` / `retries` / `schedulePitcherURL` / `schedulePitcherTokenSecret` | `false` / `v0.4.1` / all four on, base schedules / `Europe/Berlin` / `false` / free-model list / `German` / `2` / `""` / `homerun2-schedule-pitcher-token` | AI summaries, see above. The two `schedulePitcher…` keys only matter while `schedulePitcher` is off |
 | `schedulePitcher.enabled` / `version` / `hostname` / `inlineHttpRoute` / `profileConfigMap` / `profileContent` / `secretAccess` | `false` / `v1.10.0` / `schedule-pitcher.example.com` / `false` / `homerun2-schedule-pitcher-profile` / `""` (minimal profile) / `[]` | Central schedule-pitcher, see above |
 | `soundCatcher.enabled` / `version` / `hostname` / `redisStreams` | `false` / `v1.0.0` / `sound-catcher.example.com` / `messages` | Browser-only sound-catcher |
+| `ledCatcher.basePath` / `coreCatcher.basePath` / `lightCatcher.basePath` / `demoPitcher.basePath` | `""` | `BASE_PATH`, one segment such as `/led`, for serving behind the portal; see [Portal](#portal) |
+| `portal.enabled` / `version` / `hostname` / `services` | `false` / `v0.4.0` / `portal.example.com` / `[]` (derived from the basePaths) | homerun2-portal, see [Portal](#portal) |
 | `scout.profile.content` / `scout.retentionTTL` | `""` / `""` | ScoutProfile spec as a YAML string (replaces `spec`, renders on its own); `SCOUT_RETENTION_TTL` (360h with the ai-pitcher's weekly mode) |
 | `k8sPitcher.profileContent` / `extraRbacRules` | `""` / `[]` | K8sPitcherProfile document (chart creates the ConfigMap); extra rules for the base's ClusterRole |
 | `smokeTest.enabled` / `external.*` / `extraProbes` / `events` | `false` / verify TLS via `cluster-trust-bundle`, dial the gateway Service / one fixture event | Opt-in Job asserting `/health`, an unauthenticated `POST /pitch` → 401, and an authenticated pitch — in-cluster and through the HTTPRoute — plus a `/health` probe per enabled core-catcher/scout. Needs the auth-token Secret (inline `authToken` or `secrets.enabled`). See [`smoke-test/`](./smoke-test/) |

@@ -245,6 +245,11 @@
         },
         "redisStream": {
           "type": "string"
+        },
+        "basePath": {
+          "type": "string",
+          "pattern": "^(/[a-z0-9][a-z0-9-]*)?$",
+          "description": "BASE_PATH: one path segment, e.g. /led behind homerun2-portal; empty serves at the root"
         }
       },
       "required": [
@@ -402,6 +407,11 @@
         },
         "inlineHttpRoute": {
           "type": "boolean"
+        },
+        "basePath": {
+          "type": "string",
+          "pattern": "^(/[a-z0-9][a-z0-9-]*)?$",
+          "description": "BASE_PATH: one path segment, e.g. /led behind homerun2-portal; empty serves at the root"
         }
       },
       "required": [
@@ -471,6 +481,11 @@
         },
         "omniPitcherUrl": {
           "type": "string"
+        },
+        "basePath": {
+          "type": "string",
+          "pattern": "^(/[a-z0-9][a-z0-9-]*)?$",
+          "description": "BASE_PATH: one path segment, e.g. /led behind homerun2-portal; empty serves at the root"
         }
       },
       "required": [
@@ -494,6 +509,38 @@
         },
         "inlineHttpRoute": {
           "type": "boolean"
+        },
+        "basePath": {
+          "type": "string",
+          "pattern": "^(/[a-z0-9][a-z0-9-]*)?$",
+          "description": "BASE_PATH: one path segment, e.g. /led behind homerun2-portal; empty serves at the root"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "portal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*(\\|[^=,]+)?=https?://[^,/]+/?$"
+          }
         }
       },
       "required": [

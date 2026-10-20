@@ -78,6 +78,12 @@ spec:
        default (messages). */ -}}
 {{- $ccExtraEnv = append $ccExtraEnv (dict "name" "REDIS_STREAM" "value" .Values.coreCatcher.redisStream) }}
 {{- end }}
+{{- if .Values.coreCatcher.basePath }}
+{{- /* BASE_PATH=/<key> behind homerun2-portal: the app answers under the
+       prefix and puts it on every URL it hands out; /health stays at the
+       root. Strategic-merge merges container env by name. */ -}}
+{{- $ccExtraEnv = append $ccExtraEnv (dict "name" "BASE_PATH" "value" .Values.coreCatcher.basePath) }}
+{{- end }}
 {{ include "homerun2.redisAddrPatch" (dict "name" $name "namespace" $ns "extraEnv" $ccExtraEnv) | indent 12 }}
   destination:
     {{- if .Values.destination.name }}
