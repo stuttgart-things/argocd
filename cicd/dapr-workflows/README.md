@@ -11,6 +11,7 @@ stuttgart-things/argocd#658).
 | `<app>-secrets-<ns>` | `cicd/externalsecrets` | per namespace | ExternalSecrets, see below |
 | `<app>-template-execution` | OCI `dapr-backstage-template-execution-kustomize` | `backstage-workflows` | worker that runs Backstage scaffolder templates (`request-vm` → `create-terraform-vm`) and follows the GitHub Actions run |
 | `<app>-template-execution-trigger` | same artifact, `<tag>-trigger` | cluster | kro RGD `backstage-template-run` (kind `BackstageTemplateRun`) |
+| `<app>-template-execution-runs` | git, `templateExecution.runs.path` (only when set) | `backstage-workflows` | the `BackstageTemplateRun` files `request-vm` / `request-vm-deletion` commit; the merge is the approval. The repo is private: the Argo CD cluster needs a repository Secret for it |
 | `<app>-cluster-build-watch` | OCI `dapr-cluster-build-watch-kustomize` | `cluster-build-watch` | worker that follows a cluster build and reports each checkpoint |
 | `<app>-cluster-build-watch-trigger` | same artifact, `<tag>-trigger` | cluster | kro RGD `cluster-build-watch` (kind `ClusterBuildWatch`) |
 

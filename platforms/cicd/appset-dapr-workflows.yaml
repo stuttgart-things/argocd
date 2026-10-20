@@ -28,6 +28,9 @@
 #   cluster-build-watch-discovery-exclude      <ns>/<name> globs, comma-separated
 #   cluster-build-watch-discovery-argo-server  machinery on the Argo CD cluster
 #   backstage-url                     Backstage the template worker drives
+#   backstage-runs-path               directory of BackstageTemplateRun files
+#                                     (request-vm) in stuttgart-things, applied
+#                                     by Argo CD; empty: none (#3796)
 #   storage-class                     redis PVC (default openebs-hostpath)
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -103,6 +106,8 @@ spec:
             templateExecution:
               enabled: {{ eq (default "" (index $l "cicd-platform/template-execution")) "true" }}
               backstageURL: '{{ default "https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de" (index $a "cicd-platform.stuttgart-things.com/backstage-url") }}'
+              runs:
+                path: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/backstage-runs-path") }}'
             clusterBuildWatch:
               enabled: {{ eq (default "" (index $l "cicd-platform/cluster-build-watch")) "true" }}
               homerunPitchURL: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/homerun-pitch-url") }}'

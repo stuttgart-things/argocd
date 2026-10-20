@@ -264,6 +264,7 @@ spec:
     # cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-exclude: ''          # <ns>/<name> globs, comma-separated
     # cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-argo-server: ''      # machinery on the Argo CD cluster; '' = no Argo checkpoint
     # cicd-platform.stuttgart-things.com/backstage-url: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
+    # cicd-platform.stuttgart-things.com/backstage-runs-path: ''                 # e.g. clusters/labda/vsphere/<cluster>-backstage-runs; '' = none
     # cicd-platform.stuttgart-things.com/storage-class: openebs-hostpath           # redis / harbor / zot PVCs
     # ---- [user] cicd: registries (appset-harbor, appset-zot) ----
     # cicd-platform.stuttgart-things.com/harbor-registry-size: 50Gi

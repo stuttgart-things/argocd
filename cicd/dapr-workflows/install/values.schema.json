@@ -290,6 +290,29 @@
               "description": "<worker tag>-trigger"
             }
           }
+        },
+        "runs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repoURL",
+            "targetRevision",
+            "path"
+          ],
+          "properties": {
+            "repoURL": {
+              "type": "string",
+              "minLength": 1
+            },
+            "targetRevision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "description": "directory of BackstageTemplateRun files; empty = no runs Application"
+            }
+          }
         }
       }
     },

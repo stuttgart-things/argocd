@@ -92,6 +92,12 @@ templateExecution:
   trigger:
     enabled: true
     targetRevision: 88a93956cee1-trigger
+  # Directory of BackstageTemplateRun files (request-vm, request-vm-deletion)
+  # applied by an Application of its own. Empty path: none.
+  runs:
+    repoURL: https://github.com/stuttgart-things/stuttgart-things.git
+    targetRevision: main
+    path: ""
 
 # Worker that follows a cluster build (GitOps sync -> XR Ready -> Argo apps)
 # and reports every checkpoint.
