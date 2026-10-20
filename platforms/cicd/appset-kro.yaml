@@ -34,7 +34,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.85.0
+        targetRevision: v0.87.0
         path: cicd/kro/install
         helm:
           valuesObject:
