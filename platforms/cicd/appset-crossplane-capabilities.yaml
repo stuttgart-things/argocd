@@ -100,7 +100,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.87.0
+        targetRevision: v0.89.0
         path: cicd/crossplane/capabilities
         helm:
           releaseName: 'crossplane-cap-vspherevm-{{ .name }}'
@@ -182,7 +182,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.87.0
+        targetRevision: v0.89.0
         path: cicd/crossplane/capabilities
         helm:
           releaseName: 'crossplane-cap-proxmoxvm-{{ .name }}'
@@ -264,7 +264,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.87.0
+        targetRevision: v0.89.0
         path: cicd/crossplane/capabilities
         helm:
           releaseName: 'crossplane-cap-ansible-run-{{ .name }}'
@@ -336,7 +336,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.87.0
+        targetRevision: v0.89.0
         path: cicd/crossplane/capabilities
         helm:
           releaseName: 'crossplane-cap-packer-{{ .name }}'
@@ -405,7 +405,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.87.0
+        targetRevision: v0.89.0
         path: cicd/crossplane/capabilities
         helm:
           releaseName: 'crossplane-cap-harvester-vm-{{ .name }}'
@@ -421,7 +421,7 @@ spec:
             # ./harvester-vm is read from git at the same release as this chart.
             catalog:
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.87.0
+              targetRevision: v0.89.0
             # chartVersion is NOT set here: it inherits the chart's values.yaml,
             # which Renovate keeps bumped.
             capabilities:
