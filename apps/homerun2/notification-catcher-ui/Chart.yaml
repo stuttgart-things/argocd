@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: homerun2-notification-catcher-ui
+description: Service for notification-catcher's read-only HTTP UI (/healthz, config, event log, /metrics) — loaded as a sub-Application by apps/homerun2/install when `notificationCatcher.ui.enabled` is set. The catcher's kustomize base ships no Service (it is a pure consumer unless HTTP_ADDR is set), and a kustomize patch cannot add one.
+type: application
+version: 0.1.0

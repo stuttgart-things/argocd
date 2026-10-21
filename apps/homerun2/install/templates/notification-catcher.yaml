@@ -53,6 +53,21 @@ spec:
               {{- with .Values.notificationCatcher.redisStreams }}
               REDIS_STREAMS: {{ . | quote }}
               {{- end }}
+              {{- /* The read-only UI (v3.8.0+): /healthz, config, event log,
+                     /metrics. SINK_URL makes the event log link each
+                     message to its notification in the sink. */}}
+              {{- with .Values.notificationCatcher.ui }}
+              {{- if .enabled }}
+              HTTP_ADDR: ":8080"
+              {{- $sinkUrl := .sinkUrl }}
+              {{- if and (not $sinkUrl) $.Values.notificationCatcher.sink.enabled }}
+              {{- $sinkUrl = printf "https://%s" $.Values.notificationCatcher.sink.hostname }}
+              {{- end }}
+              {{- with $sinkUrl }}
+              SINK_URL: {{ . | quote }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
         - target:
             kind: Deployment
             name: {{ $name }}
@@ -69,6 +84,22 @@ spec:
                       env:
                         - name: DRY_RUN
                           value: {{ .Values.notificationCatcher.dryRun | quote }}
+                      {{- if .Values.notificationCatcher.ui.enabled }}
+                      ports:
+                        - name: http
+                          containerPort: 8080
+                          protocol: TCP
+                      # /healthz pings Redis: not ready while it is away. No
+                      # liveness probe -- the catcher exits on its own when
+                      # Redis stays away at startup (REDIS_STARTUP_TIMEOUT).
+                      readinessProbe:
+                        httpGet:
+                          path: /healthz
+                          port: http
+                        periodSeconds: 10
+                        timeoutSeconds: 3
+                        failureThreshold: 3
+                      {{- end }}
         {{- /* The routing config (which stream entries go to which webhook)
                is mounted from a ConfigMap. With notificationCatcher.notifyConfig
                set, templates/notification-catcher-notify.yaml creates it;

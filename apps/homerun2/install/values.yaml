@@ -398,7 +398,7 @@ notificationCatcher:
   enabled: false
   # v3.0.1 waits for Redis at startup (REDIS_STARTUP_TIMEOUT) instead of exiting.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-  version: v3.5.0
+  version: v3.9.0
   # Stream to consume. `messages` is where omni-pitcher's default_stream puts
   # everything; a cluster that routes alerts onto their own stream (the flux
   # side sends /pitch/grafana to `alerts`) sets that here instead.
@@ -455,10 +455,25 @@ notificationCatcher:
     # Tag of the sink base; it pins the catcher image to the same tag. Every
     # catcher release from v3.5.0 on publishes one, so this follows `version`.
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-    version: v3.5.0
+    version: v3.9.0
     # Route to the UI (rendered by the homerun2-httproute Application when
     # httpRoute.enabled).
     hostname: notification-sink.example.com
+  # The catcher's own read-only UI (v3.8.0+, homerun2-notification-catcher
+  # docs/http-ui.md): /healthz with a Redis ping (patched in as readiness
+  # probe), the loaded routing config with secrets redacted, the event log of
+  # the last dispatched messages with each output's result
+  # (sent/failed/filtered/dry-run), and /metrics
+  # (notification_catcher_dispatch_total). In-memory, per Pod. No token: the
+  # page is read-only and behind the gateway, like the sink's.
+  ui:
+    enabled: false
+    # Route to the UI (rendered by the homerun2-httproute Application when
+    # httpRoute.enabled).
+    hostname: notification-catcher.example.com
+    # Where the event log links each message (objectId) to: the sink's UI.
+    # Empty: https://<sink.hostname> when the sink is enabled, else no links.
+    sinkUrl: ""
 
 # git-pitcher (watches Git repos → Redis Streams).
 gitPitcher:

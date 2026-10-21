@@ -25,7 +25,8 @@ apps/homerun2/
 │       ├── config-viewer.yaml                 Application "...-config-viewer"      (sync-wave 0, reads the Kubernetes API — no Redis, no Secrets)
 │       ├── demo-pitcher.yaml                  Application "...-demo-pitcher"       (sync-wave 0)
 │       ├── led-catcher.yaml                   Application "...-led-catcher"        (sync-wave 0)
-│       ├── notification-catcher.yaml          Application "...-notification-catcher" (sync-wave 0, consumer only — no Service, no route)
+│       ├── notification-catcher.yaml          Application "...-notification-catcher" (sync-wave 0, consumer; with notificationCatcher.ui.enabled also HTTP_ADDR, port, readiness probe)
+│       ├── notification-catcher-ui.yaml       Application "...-notification-catcher-ui" (sync-wave 0, the UI's Service, only with notificationCatcher.ui.enabled)
 │       ├── notification-catcher-notify.yaml   Application "...-notification-catcher-notify" (sync-wave -10, only with notificationCatcher.notifyConfig)
 │       ├── notification-catcher-sink.yaml     Application "...-notification-catcher-sink" (sync-wave 0, only with notificationCatcher.sink.enabled)
 │       ├── git-pitcher.yaml                   Application "...-git-pitcher"        (sync-wave 0)
@@ -74,6 +75,7 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `gitPitcher` | Watches Git repos → pitches | no | no |
 | `notificationCatcher` | Redis Streams consumer → MS Teams / generic webhooks (the other half of the Alertmanager/Grafana chain) | no | no |
 | `notificationCatcher.sink` | Stand-in receiver for the catcher's outputs: lists each notification with its channels, Teams posts as cards | yes | no |
+| `notificationCatcher.ui` | The catcher's read-only UI: loaded config (secrets redacted), event log with each output's result, `/metrics` | yes | no |
 | `aiPitcher` | CronJobs: AI summaries of scout's digest + the schedule-pitcher's open findings via OpenRouter, pitched to omni (morning / evening / week-ahead / weekly) | no | reads omni's + scout's |
 | `schedulePitcher` | Central schedule-pitcher: token/cert expiry checks, reminders, findings from agents → omni, web UI + API | yes | own (`schedulePitcherAuthToken`) |
 | `soundCatcher` | Redis Streams consumer → clips and spoken announcements on a browser player page (no speaker in a Pod) | yes | `/play` (`authToken`) |
@@ -378,6 +380,20 @@ See [homerun2-notification-catcher `docs/sink.md`](https://github.com/stuttgart-
 
 Leave `dryRun: true` until the filters are known-good: the first wrong one posts to a real
 Teams channel.
+
+### Notification catcher UI
+
+`notificationCatcher.ui.enabled` (catcher v3.8.0+) turns on the catcher's read-only HTTP
+surface: the `…-notification-catcher` Application patches `HTTP_ADDR=:8080`, the container
+port and a readiness probe on `/healthz` (a Redis ping) into the Deployment, and
+`SINK_URL` when the sink is on; a `…-notification-catcher-ui` Application
+(`apps/homerun2/notification-catcher-ui`) adds the Service, since the base ships none and
+a patch cannot add one. With `httpRoute.enabled` the UI gets a route at `ui.hostname`:
+the loaded routing config with secrets redacted, the event log of the last dispatched
+messages with what each output did (sent / failed / filtered / dry-run, linked to the
+sink by objectId), and `/metrics` (`notification_catcher_dispatch_total{output,result}`).
+In memory, per Pod; no token, like the sink. See
+[homerun2-notification-catcher `docs/http-ui.md`](https://github.com/stuttgart-things/homerun2-notification-catcher/blob/main/docs/http-ui.md).
 
 ## Trust bundle (k8s-pitcher TLS)
 
