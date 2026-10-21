@@ -68,7 +68,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.90.0
+        targetRevision: v0.91.0
         path: apps/backstage-rag-postgres/install
         helm:
           # Fixed, not derived: Helm caps release names at 53 characters and
@@ -83,7 +83,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.90.0
+              targetRevision: v0.91.0
             destination:
               server: '{{ .server }}'
               namespace: '{{ default "portal" (index (default (dict) .metadata.annotations) "storage-platform.stuttgart-things.com/backstage-namespace") }}'
