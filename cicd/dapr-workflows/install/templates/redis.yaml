@@ -11,6 +11,7 @@
       "chartVersion"    .Values.redis.chartVersion
       "auth"            (dict "existingSecret" "redis-auth" "existingSecretPasswordKey" "redis-password")
       "persistence"     (dict "enabled" true "storageClass" .Values.redis.storageClass "size" .Values.redis.size)
+      "image"           .Values.redis.image
       "syncPolicy"      .Values.syncPolicy
       "cascadingDelete" .Values.cascadingDelete
 }}

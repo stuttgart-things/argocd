@@ -69,6 +69,14 @@ redis:
   chartVersion: 17.1.4
   storageClass: openebs-hostpath
   size: 8Gi
+  # Redis Stack 7.4 for the dapr state store (stuttgart-things#3798 wave 3);
+  # apps/redis-stack still defaults to 7.2 for homerun2. 7.4 writes RDB v12,
+  # which 7.2 cannot load -- going back means dropping the PVC.
+  image:
+    registry: ghcr.io
+    repository: stuttgart-things/redis-stack-server
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/redis-stack-server
+    tag: 7.4.0-v8
 
 # Worker that runs Backstage scaffolder templates (request-vm -> create-terraform-vm)
 # and follows the GitHub Actions run behind them.
