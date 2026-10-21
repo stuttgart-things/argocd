@@ -18,7 +18,8 @@
 #   extra  OFF unless `homerun2-platform/<component>: "true"`
 #          light-catcher, wled-mock, demo-pitcher, config-viewer,
 #          notification-catcher, git-pitcher, k8s-pitcher, smoke-test,
-#          schedule-pitcher, ai-pitcher, sound-catcher
+#          schedule-pitcher, ai-pitcher, sound-catcher,
+#          notification-catcher-sink
 #          -- dev/lab tools, hardware, or things that need more than the
 #          AppSecretProfile provides (see the notes at each below). Opt-in, not
 #          opt-out: under "absent means on" every cluster carrying the umbrella
@@ -263,6 +264,16 @@ spec:
               # by the one Deployment (REDIS_STREAMS). Empty = the chart's
               # redisStream alone, i.e. `messages`, and no new ConfigMap key.
               redisStreams: {{ toJson (default "" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/notification-catcher-streams")) }}
+              # The notification sink (stand-in receiver for the outputs, UI
+              # under notification-sink.<fqdn>). Rendered only for a labelled
+              # cluster: a catalog pin from before the chart knew `sink`
+              # rejects the key, so an unlabelled fleet stays valid whatever
+              # the pin. Outputs point at it from the notify config above.
+              {{- if eq (default "" (index $l "homerun2-platform/notification-catcher-sink")) "true" }}
+              sink:
+                enabled: true
+                hostname: 'notification-sink.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              {{- end }}
             gitPitcher:
               enabled: {{ eq (default "" (index $l "homerun2-platform/git-pitcher")) "true" }}
               hostname: 'git-pitcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
