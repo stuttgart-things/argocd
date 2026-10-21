@@ -78,11 +78,11 @@ templateExecution:
   kustomize:
     repoURL: ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution-kustomize
-    targetRevision: b83ee5da7401
+    targetRevision: 5ee8cfd79425
   image:
     repository: ghcr.io/stuttgart-things/dapr-backstage-template-execution
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-backstage-template-execution
-    tag: b83ee5da7401
+    tag: 5ee8cfd79425
   backstageURL: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
   # CA the worker trusts for Backstage: trust-manager's bundle ConfigMap.
   caConfigMap:
@@ -91,7 +91,7 @@ templateExecution:
   # kro RGD `backstage-template-run` (kind BackstageTemplateRun). Needs kro.
   trigger:
     enabled: true
-    targetRevision: b83ee5da7401-trigger
+    targetRevision: 5ee8cfd79425-trigger
   # homerun2 omni-pitcher /pitch endpoint: every run checkpoint (started,
   # build-started/-failed/-succeeded, merged, merge-refused, timeout) goes to
   # homerun2 -> notification-catcher -> Teams (dapr-workflows#55; needs an
