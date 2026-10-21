@@ -29,6 +29,11 @@
 {{- if and .Values.lightCatcher.enabled (not .Values.lightCatcher.inlineHttpRoute) }}
   {{- $routes = append $routes (dict "name" "homerun2-light-catcher" "hostname" .Values.lightCatcher.hostname "backend" (dict "name" "homerun2-light-catcher" "port" 80)) }}
 {{- end }}
+{{- /* The notification sink's UI. Its base has no route (hostname and
+       gateway are per cluster), so it always comes from here. */ -}}
+{{- if .Values.notificationCatcher.sink.enabled }}
+  {{- $routes = append $routes (dict "name" "homerun2-notification-catcher-sink" "hostname" .Values.notificationCatcher.sink.hostname "backend" (dict "name" "homerun2-notification-catcher-sink" "port" 80)) }}
+{{- end }}
 {{- if .Values.wledMock.enabled }}
   {{- $routes = append $routes (dict "name" "homerun2-wled-mock" "hostname" .Values.wledMock.hostname "backend" (dict "name" "homerun2-wled-mock" "port" 80)) }}
 {{- end }}

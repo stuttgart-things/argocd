@@ -27,6 +27,7 @@ apps/homerun2/
 │       ├── led-catcher.yaml                   Application "...-led-catcher"        (sync-wave 0)
 │       ├── notification-catcher.yaml          Application "...-notification-catcher" (sync-wave 0, consumer only — no Service, no route)
 │       ├── notification-catcher-notify.yaml   Application "...-notification-catcher-notify" (sync-wave -10, only with notificationCatcher.notifyConfig)
+│       ├── notification-catcher-sink.yaml     Application "...-notification-catcher-sink" (sync-wave 0, only with notificationCatcher.sink.enabled)
 │       ├── git-pitcher.yaml                   Application "...-git-pitcher"        (sync-wave 0)
 │       ├── ai-pitcher.yaml                    Application "...-ai-pitcher"         (sync-wave 0, four CronJobs — one per mode)
 │       ├── schedule-pitcher.yaml              Application "...-schedule-pitcher"   (sync-wave 0, central instance: UI + API)
@@ -72,6 +73,7 @@ The flux repo ships pre-composed [`profiles/base`](https://github.com/stuttgart-
 | `ledCatcher` | Redis Streams consumer → LED display | yes | no |
 | `gitPitcher` | Watches Git repos → pitches | no | no |
 | `notificationCatcher` | Redis Streams consumer → MS Teams / generic webhooks (the other half of the Alertmanager/Grafana chain) | no | no |
+| `notificationCatcher.sink` | Stand-in receiver for the catcher's outputs: lists each notification with its channels, Teams posts as cards | yes | no |
 | `aiPitcher` | CronJobs: AI summaries of scout's digest + the schedule-pitcher's open findings via OpenRouter, pitched to omni (morning / evening / week-ahead / weekly) | no | reads omni's + scout's |
 | `schedulePitcher` | Central schedule-pitcher: token/cert expiry checks, reminders, findings from agents → omni, web UI + API | yes | own (`schedulePitcherAuthToken`) |
 | `soundCatcher` | Redis Streams consumer → clips and spoken announcements on a browser player page (no speaker in a Pod) | yes | `/play` (`authToken`) |
@@ -348,6 +350,32 @@ The webhook URL itself lives in the Secret `homerun2-notification-catcher-secret
   ClusterSecretStore as the rest — the same pattern as `githubTokenVaultSecretName`.
 - neither → the base Secret is deleted and an out-of-band Secret of that name has to exist.
 
+### Notification sink
+
+`notificationCatcher.sink.enabled` adds a `…-notification-catcher-sink` Application on
+`oci://ghcr.io/stuttgart-things/homerun2-notification-catcher-sink-kustomize`
+(published by every catcher release from v3.5.0 on, image pinned to the same tag): the
+catcher image running `notification-catcher sink`, a stand-in receiver that keeps what the
+outputs send in memory and lists every notification once with the channels it went to,
+Teams posts rendered as cards. It is a base of its own because an Application can patch
+the catcher's base but not add to it; it needs no patches (no Namespace, no Secret, no
+route in it). With `httpRoute.enabled` the UI gets a route at `sink.hostname`.
+
+Nothing is sent to it until outputs point there — add them to `notifyConfig` next to the
+real ones, in-cluster and without a token:
+
+```yaml
+outputs:
+  - name: teams-platform-sink          # same filters as the real output
+    type: msteams
+    webhook_url: http://homerun2-notification-catcher-sink.homerun2.svc/teams/platform
+  - name: sink-inbox                   # optional: everything, also what matched nothing
+    type: webhook
+    url: http://homerun2-notification-catcher-sink.homerun2.svc/inbox
+```
+
+See [homerun2-notification-catcher `docs/sink.md`](https://github.com/stuttgart-things/homerun2-notification-catcher/blob/main/docs/sink.md).
+
 Leave `dryRun: true` until the filters are known-good: the first wrong one posts to a real
 Teams channel.
 
@@ -377,6 +405,7 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `httpRoute.enabled` / `gateway.{name,namespace}` | `true` / `cilium-gateway` / `default` | Render Gateway API HTTPRoutes for every enabled component that exposes one |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the redis-stack + httpRoute Applications fetch manifests from |
 | `notificationCatcher.enabled` / `version` / `redisStream` / `redisStreams` / `dryRun` / `notifyConfigMap` / `notifyConfig` / `teamsWebhookUrl` | `false` / `v3.0.3` / `messages` / `""` / `false` / `homerun2-notification-catcher-notify` / `""` / `""` | Fan-out to MS Teams / webhooks. Consumer only — no Service, no route. `redisStreams` (comma list, e.g. `messages,tabletennis`) → `REDIS_STREAMS`, which the catcher prefers over `redisStream`: one Deployment consumes them all. `notifyConfig` set → the chart creates the notify ConfigMap, empty → out-of-band; an empty `teamsWebhookUrl` deletes the base's placeholder Secret so an ESO-managed one takes over |
+| `notificationCatcher.sink.enabled` / `version` / `hostname` | `false` / `v3.5.0` / `notification-sink.example.com` | Notification sink as its own Application (`homerun2-notification-catcher-sink-kustomize`); `hostname` is its UI route when `httpRoute.enabled`. Outputs reach it at `http://homerun2-notification-catcher-sink.<namespace>.svc/teams/<channel>` |
 | `secrets.enabled` / `clusterSecretStoreName` / `vaultSecretName` / `githubTokenVaultSecretName` / `teamsWebhookVaultSecretName` / `openrouterVaultSecretName` / `refreshInterval` | `false` / `vault-homerun2-pr` / `preview-env` / `""` / `""` / `""` / `1h` | ExternalSecrets sub-Application. The three `…VaultSecretName` overrides point one component at a shared entry in the same store: git-pitcher's `githubToken`, notification-catcher's `teamsWebhookUrl` (→ Secret `homerun2-notification-catcher-secrets`, key `TEAMS_WEBHOOK_URL`; rendered only when set), ai-pitcher's `openrouterApiKey` (→ `homerun2-ai-pitcher-openrouter`, key `api-key`; rendered only when set) |
 | `aiPitcher.enabled` / `version` / `modes.<mode>.{enabled,schedule}` / `timeZone` / `suspend` / `model` / `language` / `retries` / `schedulePitcherURL` / `schedulePitcherTokenSecret` | `false` / `v0.4.1` / all four on, base schedules / `Europe/Berlin` / `false` / free-model list / `German` / `2` / `""` / `homerun2-schedule-pitcher-token` | AI summaries, see above. The two `schedulePitcher…` keys only matter while `schedulePitcher` is off |
 | `schedulePitcher.enabled` / `version` / `hostname` / `inlineHttpRoute` / `profileConfigMap` / `profileContent` / `secretAccess` | `false` / `v1.10.0` / `schedule-pitcher.example.com` / `false` / `homerun2-schedule-pitcher-profile` / `""` (minimal profile) / `[]` | Central schedule-pitcher, see above |
