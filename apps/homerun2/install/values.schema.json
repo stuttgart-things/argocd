@@ -550,7 +550,7 @@
     "notificationCatcher": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Redis Streams consumer that fans messages out to MS Teams / generic webhooks \u2014 the other half of the Alertmanager/Grafana chain. No Service and no route. Needs the notify ConfigMap (notifyConfig, or out-of-band) and a Secret carrying the webhook URL (teamsWebhookUrl, secrets.teamsWebhookVaultSecretName, or out-of-band).",
+      "description": "Redis Streams consumer that fans messages out to MS Teams / generic webhooks \u2014 the other half of the Alertmanager/Grafana chain. No Service and no route (the optional sink has both). Needs the notify ConfigMap (notifyConfig, or out-of-band) and a Secret carrying the webhook URL (teamsWebhookUrl, secrets.teamsWebhookVaultSecretName, or out-of-band).",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -581,6 +581,28 @@
         "teamsWebhookUrl": {
           "type": "string",
           "description": "Empty deletes the Secret the base ships, so an out-of-band/ESO-managed one of the same name takes over. Inline literals only via ArgoCD Vault Plugin / SOPS."
+        },
+        "sink": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Notification sink (stand-in receiver for the outputs) from homerun2-notification-catcher-sink-kustomize, as its own Application. Outputs reach it in-cluster at http://homerun2-notification-catcher-sink.<namespace>.svc/teams/<channel>; the UI gets a route at hostname when httpRoute.enabled.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Tag of the sink kustomize base (published from catcher v3.5.0 on); the image is pinned to the same tag."
+            },
+            "hostname": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "enabled"
+          ]
         }
       },
       "required": [

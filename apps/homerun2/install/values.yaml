@@ -440,6 +440,25 @@ notificationCatcher:
   # Setting it here inlines a literal (and suppresses the ExternalSecret), so
   # only do that from an ArgoCD Vault Plugin / SOPS overlay.
   teamsWebhookUrl: ""                       # pragma: allowlist secret
+  # Notification sink: a stand-in receiver for the catcher's outputs (the
+  # same image, `notification-catcher sink`), deployed from its own kustomize
+  # base homerun2-notification-catcher-sink-kustomize as a separate
+  # Application. Point an msteams output at
+  # http://homerun2-notification-catcher-sink.<namespace>.svc/teams/<channel>
+  # (or a webhook output at /webhook/<channel>, a filterless catch-all at
+  # /inbox) and the UI at `hostname` lists every notification with the
+  # channels it went to, Teams posts rendered as cards. In-memory, one Pod,
+  # no token: in-cluster outputs need none, the UI is behind the gateway.
+  # See homerun2-notification-catcher docs/sink.md.
+  sink:
+    enabled: false
+    # Tag of the sink base; it pins the catcher image to the same tag. Every
+    # catcher release from v3.5.0 on publishes one, so this follows `version`.
+    # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
+    version: v3.5.0
+    # Route to the UI (rendered by the homerun2-httproute Application when
+    # httpRoute.enabled).
+    hostname: notification-sink.example.com
 
 # git-pitcher (watches Git repos → Redis Streams).
 gitPitcher:
