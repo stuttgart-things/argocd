@@ -1,6 +1,31 @@
 {{- if .Values.templateExecution.enabled }}
 {{- $appName := include "daprWorkflows.appName" . }}
 {{- $te := .Values.templateExecution }}
+{{- $env := list (dict "name" "BACKSTAGE_URL" "value" $te.backstageURL) }}
+{{- $volumes := list (dict
+      "name" "backstage-ca"
+      "configMap" (dict
+        "name" $te.caConfigMap.name
+        "items" (list (dict "key" $te.caConfigMap.key "path" "ca.pem"))
+      )) }}
+{{- $mounts := list }}
+{{- /* homerun2 sink (dapr-workflows#55): run checkpoints -> omni-pitcher ->
+       notification-catcher -> Teams. Same wiring as cluster-build-watch's;
+       the token Secret is mounted optional, so a missing token degrades the
+       sink, not the pod. */}}
+{{- if $te.homerunPitchURL }}
+{{- $env = append $env (dict "name" "HOMERUN_PITCH_URL" "value" $te.homerunPitchURL) }}
+{{- $env = append $env (dict "name" "HOMERUN_AUTH_TOKEN_FILE" "value" "/var/run/secrets/homerun/token") }}
+{{- $volumes = append $volumes (dict "name" "homerun-token" "secret" (dict "secretName" "homerun-pitcher-token" "optional" true "items" (list (dict "key" "token" "path" "token")))) }}
+{{- $mounts = append $mounts (dict "name" "homerun-token" "mountPath" "/var/run/secrets/homerun" "readOnly" true) }}
+{{- end }}
+{{- $container := dict
+      "name" "workflow"
+      "image" (printf "%s:%s" $te.image.repository $te.image.tag)
+      "env" $env }}
+{{- if $mounts }}
+{{- $_ := set $container "volumeMounts" $mounts }}
+{{- end }}
 {{- $deploy := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"
@@ -8,18 +33,8 @@
       "spec" (dict "template" (dict
         "metadata" (dict "annotations" (dict "dapr.io/sidecar-listen-addresses" "0.0.0.0"))
         "spec" (dict
-          "containers" (list (dict
-            "name" "workflow"
-            "image" (printf "%s:%s" $te.image.repository $te.image.tag)
-            "env" (list (dict "name" "BACKSTAGE_URL" "value" $te.backstageURL))
-          ))
-          "volumes" (list (dict
-            "name" "backstage-ca"
-            "configMap" (dict
-              "name" $te.caConfigMap.name
-              "items" (list (dict "key" $te.caConfigMap.key "path" "ca.pem"))
-            )
-          ))
+          "containers" (list $container)
+          "volumes" $volumes
         )
       ))
 }}

@@ -22,7 +22,7 @@
 #                                     (homerunAuthToken), machinery-grpc
 #                                     (machineryToken; its presence turns
 #                                     machinery auth on)
-#   homerun-pitch-url                 omni-pitcher /pitch URL; empty: no homerun sink
+#   homerun-pitch-url                 omni-pitcher /pitch URL, for BOTH workers; empty: no homerun sink
 #   cluster-build-watch-discovery     "true": the worker discovers ClusterStacks
 #                                     on machinery itself (#3831) -- ONE
 #                                     cluster per fleet, or cards come twice
@@ -110,6 +110,8 @@ spec:
             templateExecution:
               enabled: {{ eq (default "" (index $l "cicd-platform/template-execution")) "true" }}
               backstageURL: '{{ default "https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de" (index $a "cicd-platform.stuttgart-things.com/backstage-url") }}'
+              # Same pitcher as cluster-build-watch: VM runs -> Teams (dapr-workflows#55).
+              homerunPitchURL: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/homerun-pitch-url") }}'
               runs:
                 path: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/backstage-runs-path") }}'
             clusterBuildWatch:

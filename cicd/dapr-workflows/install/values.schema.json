@@ -273,6 +273,10 @@
             }
           }
         },
+        "homerunPitchURL": {
+          "type": "string",
+          "description": "omni-pitcher /pitch URL; empty disables the homerun sink (dapr-workflows#55)"
+        },
         "trigger": {
           "type": "object",
           "additionalProperties": false,
