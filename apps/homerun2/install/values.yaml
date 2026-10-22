@@ -481,6 +481,13 @@ notificationCatcher:
     # Where the event log links each message (objectId) to: the sink's UI.
     # Empty: https://<sink.hostname> when the sink is enabled, else no links.
     sinkUrl: ""
+    # URL prefix (BASE_PATH), e.g. "/notify" behind homerun2-portal (catcher
+    # v3.8.0 or later; the portal's overview fragment needs the release after
+    # v3.13.0). Set, the UI answers only under it -- on its own hostname too,
+    # where / redirects there; /health, /healthz and /metrics stay at the root.
+    # With `portal` enabled and `portal.services` empty, the portal lists the
+    # catcher (needs ui.enabled) keyed by it. Empty serves at the root.
+    basePath: ""
 
 # git-pitcher (watches Git repos → Redis Streams).
 gitPitcher:

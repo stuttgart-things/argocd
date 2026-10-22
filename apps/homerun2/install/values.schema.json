@@ -619,6 +619,11 @@
             "sinkUrl": {
               "type": "string",
               "description": "The sink's UI the event log links each objectId to (SINK_URL). Empty: https://<sink.hostname> when the sink is enabled."
+            },
+            "basePath": {
+              "type": "string",
+              "pattern": "^(/[a-z0-9][a-z0-9-]*)?$",
+              "description": "BASE_PATH of the UI: one path segment, e.g. /notify behind homerun2-portal; empty serves at the root"
             }
           },
           "required": [

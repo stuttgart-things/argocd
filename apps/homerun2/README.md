@@ -282,10 +282,14 @@ v0.4.0+). With a basePath the service answers only under it, on its own hostname
         coreCatcher:  { enabled: true, basePath: /core }
         lightCatcher: { enabled: true, basePath: /light }
         demoPitcher:  { enabled: true, basePath: /pitch }
+        notificationCatcher:
+          enabled: true
+          ui: { enabled: true, basePath: /notify }
 ```
 
-`portal.services` empty lists every enabled one of these four with a basePath, keyed by it
-(`/led` → `led=http://homerun2-led-catcher`), in that order — key and prefix cannot drift
+`portal.services` empty lists every enabled one of these with a basePath, keyed by it
+(`/led` → `led=http://homerun2-led-catcher`), in that order; the notification-catcher's
+is `notificationCatcher.ui.basePath` and needs `ui.enabled` — key and prefix cannot drift
 apart. Set `portal.services` (`key=url` or `key|Title=url`) to choose the order, titles or
 other services. The portal's kustomize OCI ships its HTTPRoute (the whole hostname); the
 chart patches parentRef + hostname, or deletes it with `httpRoute.enabled: false`. Same
@@ -406,7 +410,9 @@ a patch cannot add one. With `httpRoute.enabled` the UI gets a route at `ui.host
 the loaded routing config with secrets redacted, the event log of the last dispatched
 messages with what each output did (sent / failed / filtered / dry-run, linked to the
 sink by objectId), and `/metrics` (`notification_catcher_dispatch_total{output,result}`).
-In memory, per Pod; no token, like the sink. See
+In memory, per Pod; no token, like the sink. `ui.basePath` (e.g. `/notify`) serves it
+under that prefix for the [portal](#portal), which then shows the latest dispatched
+messages on its overview (catcher release after v3.13.0). See
 [homerun2-notification-catcher `docs/http-ui.md`](https://github.com/stuttgart-things/homerun2-notification-catcher/blob/main/docs/http-ui.md).
 
 ## Trust bundle (k8s-pitcher TLS)
@@ -440,7 +446,7 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `aiPitcher.enabled` / `version` / `modes.<mode>.{enabled,schedule}` / `timeZone` / `suspend` / `model` / `language` / `retries` / `schedulePitcherURL` / `schedulePitcherTokenSecret` | `false` / `v0.4.1` / all four on, base schedules / `Europe/Berlin` / `false` / free-model list / `German` / `2` / `""` / `homerun2-schedule-pitcher-token` | AI summaries, see above. The two `schedulePitcher…` keys only matter while `schedulePitcher` is off |
 | `schedulePitcher.enabled` / `version` / `hostname` / `inlineHttpRoute` / `profileConfigMap` / `profileContent` / `secretAccess` | `false` / `v1.10.0` / `schedule-pitcher.example.com` / `false` / `homerun2-schedule-pitcher-profile` / `""` (minimal profile) / `[]` | Central schedule-pitcher, see above |
 | `soundCatcher.enabled` / `version` / `hostname` / `redisStreams` | `false` / `v1.0.0` / `sound-catcher.example.com` / `messages` | Browser-only sound-catcher |
-| `ledCatcher.basePath` / `coreCatcher.basePath` / `lightCatcher.basePath` / `demoPitcher.basePath` | `""` | `BASE_PATH`, one segment such as `/led`, for serving behind the portal; see [Portal](#portal) |
+| `ledCatcher.basePath` / `coreCatcher.basePath` / `lightCatcher.basePath` / `demoPitcher.basePath` / `notificationCatcher.ui.basePath` | `""` | `BASE_PATH`, one segment such as `/led`, for serving behind the portal; see [Portal](#portal) |
 | `portal.enabled` / `version` / `hostname` / `services` | `false` / `v0.4.0` / `portal.example.com` / `[]` (derived from the basePaths) | homerun2-portal, see [Portal](#portal) |
 | `scout.profile.content` / `scout.retentionTTL` | `""` / `""` | ScoutProfile spec as a YAML string (replaces `spec`, renders on its own); `SCOUT_RETENTION_TTL` (360h with the ai-pitcher's weekly mode) |
 | `k8sPitcher.profileContent` / `extraRbacRules` | `""` / `[]` | K8sPitcherProfile document (chart creates the ConfigMap); extra rules for the base's ClusterRole |
