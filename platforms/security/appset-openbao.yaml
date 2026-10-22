@@ -82,7 +82,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.94.0
+        targetRevision: v0.96.0
         path: apps/openbao/install
         helm:
           releaseName: 'openbao-{{ .name }}'
@@ -95,7 +95,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.94.0
+              targetRevision: v0.96.0
             destination:
               server: '{{ .server }}'
               namespace: openbao
