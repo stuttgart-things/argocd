@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "homerun2-notification-catcher-ui chart",
+  "type": "object",
+  "_comment": "additionalProperties left open so the catalog verifier (call-argocd-verify-catalog) can inject its common probe values like `destination` without tripping the schema. The chart only consumes `name`, `port` and `targetPort`.",
+  "additionalProperties": true,
+  "required": ["name", "port", "targetPort"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Service name, also the app.kubernetes.io/name and instance labels of the catcher pods it selects."
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "targetPort": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "The catcher's HTTP_ADDR port."
+    }
+  }
+}

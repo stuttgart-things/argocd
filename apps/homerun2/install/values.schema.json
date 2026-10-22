@@ -603,6 +603,27 @@
           "required": [
             "enabled"
           ]
+        },
+        "ui": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The catcher's read-only HTTP UI (v3.8.0+): HTTP_ADDR, port and a /healthz readiness probe patched into the Deployment, a Service from the notification-catcher-ui sub-Application, a route at hostname when httpRoute.enabled. Shows the loaded config (secrets redacted), the event log with each output's result, /metrics.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "hostname": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sinkUrl": {
+              "type": "string",
+              "description": "The sink's UI the event log links each objectId to (SINK_URL). Empty: https://<sink.hostname> when the sink is enabled."
+            }
+          },
+          "required": [
+            "enabled"
+          ]
         }
       },
       "required": [

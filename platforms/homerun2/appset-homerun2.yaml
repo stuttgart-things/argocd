@@ -19,7 +19,7 @@
 #          light-catcher, wled-mock, demo-pitcher, config-viewer,
 #          notification-catcher, git-pitcher, k8s-pitcher, smoke-test,
 #          schedule-pitcher, ai-pitcher, sound-catcher,
-#          notification-catcher-sink
+#          notification-catcher-sink, notification-catcher-ui
 #          -- dev/lab tools, hardware, or things that need more than the
 #          AppSecretProfile provides (see the notes at each below). Opt-in, not
 #          opt-out: under "absent means on" every cluster carrying the umbrella
@@ -273,6 +273,14 @@ spec:
               sink:
                 enabled: true
                 hostname: 'notification-sink.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
+              {{- end }}
+              # The catcher's read-only UI (config, event log, /metrics) under
+              # notification-catcher.<fqdn>; links to the sink when that is on.
+              # Labelled clusters only, same reason as `sink`.
+              {{- if eq (default "" (index $l "homerun2-platform/notification-catcher-ui")) "true" }}
+              ui:
+                enabled: true
+                hostname: 'notification-catcher.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
               {{- end }}
             gitPitcher:
               enabled: {{ eq (default "" (index $l "homerun2-platform/git-pitcher")) "true" }}

@@ -1,0 +1,9 @@
+---
+# Service name, and the catcher's pod labels it selects
+# (app.kubernetes.io/name + instance of the base's Deployment).
+name: homerun2-notification-catcher
+# Service port; the HTTPRoute in apps/homerun2/install points here.
+port: 80
+# Container port the catcher listens on (HTTP_ADDR, patched in by
+# apps/homerun2/install templates/notification-catcher.yaml).
+targetPort: 8080
