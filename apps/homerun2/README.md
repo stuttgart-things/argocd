@@ -333,7 +333,21 @@ data:
           match:
             author: grafana                     # omni-pitcher's grafana transformer hard-codes this
           severity_min: warning
+      - name: teams-alertmanager-alerts
+        type: msteams
+        webhook_url: "${TEAMS_WEBHOOK_URL}"
+        filters:
+          match:
+            author: alertmanager                # /pitch/alertmanager (omni-pitcher v2.4.0+)
+          severity_min: warning
 ```
+
+An Alertmanager receiver on `/pitch/alertmanager` (omni-pitcher v2.4.0+) pitches with
+`author: alertmanager` and tags `status=firing|resolved,fingerprint=<fp>`; one on
+`/pitch/grafana` keeps `author: grafana`. Moving a receiver over needs an output for the
+new author (above), else its alerts match nothing. A resolved alert is severity `success`
+on both, below a `severity_min: warning` floor — a second output with
+`match: {author: alertmanager, severity: success}` sends resolutions.
 
 `${TEAMS_WEBHOOK_URL}` here is expanded by the catcher from its Secret at runtime. Its env
 interpolation is regex-only, so a `${…}` inside a YAML **comment** is treated as a real
