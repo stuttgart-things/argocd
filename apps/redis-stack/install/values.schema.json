@@ -115,6 +115,10 @@
           "type": "integer",
           "minimum": 1
         },
+        "getMasterTimeout": {
+          "type": "integer",
+          "minimum": 1
+        },
         "serviceType": {
           "type": "string",
           "enum": [

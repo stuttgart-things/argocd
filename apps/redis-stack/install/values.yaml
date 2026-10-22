@@ -34,6 +34,13 @@ sentinel:
   masterSet: mymaster
   quorum: 1
   parallelSyncs: 1
+  # Seconds the sentinel's start script asks the Service for a master before
+  # it starts as master itself. The chart's 220 s eats the whole startup
+  # probe budget (10 s + 22 x 10 s): with one node, the Service has no ready
+  # endpoint until this very sentinel runs, and where the CNI drops instead
+  # of rejecting (Cilium), the sentinel was killed in a loop
+  # (stuttgart-things#3923, edge-tt-test1). Single node: nothing to find.
+  getMasterTimeout: 15
   serviceType: ClusterIP
   image:
     registry: ghcr.io
