@@ -240,8 +240,10 @@ scout:
 # namespace from the rest of the stack; override `namespace` if needed.
 k8sPitcher:
   enabled: false
+  # v1.2.2: a Kubernetes Event's severity follows its type (Warning ->
+  # warning, Normal -> info) instead of add/update -> SUCCESS (k8s-pitcher#85).
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
-  version: v1.2.1
+  version: v1.2.2
   namespace: homerun2
   # When true, keep the K8sPitcherProfile ConfigMap shipped inside the
   # k8s-pitcher kustomize OCI instead of deleting it and remounting an
