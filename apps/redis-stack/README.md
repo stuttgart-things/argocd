@@ -74,7 +74,7 @@ spec:
 | `destination.namespace` | `redis-stack` | Namespace for Redis |
 | `chartVersion` | `17.1.4` | Upstream stuttgart-things/redis OCI chart version |
 | `auth.password` | empty | Root Redis password (use ArgoCD Vault Plugin / SOPS — not inline) |
-| `image.registry` / `repository` / `tag` | `ghcr.io` / `stuttgart-things/redis-stack-server` / `7.2.0-v18` | Redis Stack server image |
+| `image.registry` / `repository` / `tag` | `ghcr.io` / `stuttgart-things/redis-stack-server` / `7.4.0-v8` | Redis Stack server image |
 | `sentinel.enabled` | `true` | Enable the sentinel sidecar (HA) |
 | `sentinel.serviceType` | `ClusterIP` | Sentinel service type |
 | `sentinel.image.*` | `ghcr.io/stuttgart-things/redis-sentinel:7.4.2-debian-12-r9` | Sentinel image |
