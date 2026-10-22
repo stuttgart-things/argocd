@@ -401,9 +401,11 @@ notificationCatcher:
   enabled: false
   # v3.0.1 waits for Redis at startup (REDIS_STARTUP_TIMEOUT) instead of exiting.
   # v3.11.0: resolved alerts get a green "RESOLVED: …" card; filters gain
-  # match.status and send_resolved (catcher#71).
+  # match.status and send_resolved (catcher#71). v3.12.0: fallback outputs
+  # (catcher#74). v3.13.0: `replay` for the dead-letter stream, and with the
+  # UI a Dead letter tab and the pending gauge (catcher#70).
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-  version: v3.11.0
+  version: v3.13.0
   # Stream to consume. `messages` is where omni-pitcher's default_stream puts
   # everything; a cluster that routes alerts onto their own stream (the flux
   # side sends /pitch/grafana to `alerts`) sets that here instead.
@@ -460,7 +462,7 @@ notificationCatcher:
     # Tag of the sink base; it pins the catcher image to the same tag. Every
     # catcher release from v3.5.0 on publishes one, so this follows `version`.
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-    version: v3.11.0
+    version: v3.13.0
     # Route to the UI (rendered by the homerun2-httproute Application when
     # httpRoute.enabled).
     hostname: notification-sink.example.com
