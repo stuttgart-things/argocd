@@ -408,6 +408,7 @@ spec:
     #   the entry needs: authToken, redisPassword
     # homerun2-platform.stuttgart-things.com/storage-class: openebs-hostpath # default openebs-hostpath
     # homerun2-platform.stuttgart-things.com/redis-storage-size: 8Gi         # default 8Gi
+    # homerun2-platform.stuttgart-things.com/redis-image-tag: 7.4.0-v8     # default = chart's redisStack.image.tag (one-way: RDB v12)
 
     # ---- [user] tabletennis-platform (needs the secrets-config gate label above) ----
     # tabletennis-platform.stuttgart-things.com/secret-store: vault-<cluster>  # [req] ClusterSecretStore

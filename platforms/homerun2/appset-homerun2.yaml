@@ -175,6 +175,14 @@ spec:
                 # that uses longhorn or an NFS class.
                 storageClass: '{{ default "openebs-hostpath" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/storage-class") }}'
                 size: '{{ default "8Gi" (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/redis-storage-size") }}'
+              # Image tag per cluster, rendered only when the annotation is set:
+              # without it the chart default stays (Renovate keeps it bumped).
+              # Redis Stack 7.4 writes RDB v12, which 7.2 cannot load -- each
+              # cluster moves on purpose (stuttgart-things#3923).
+              {{- with (index (default (dict) .metadata.annotations) "homerun2-platform.stuttgart-things.com/redis-image-tag") }}
+              image:
+                tag: '{{ . }}'
+              {{- end }}
               # Read the password from the ESO-managed Secret rather than an
               # inline literal. `secrets.enabled` below materializes it under
               # exactly this name.
