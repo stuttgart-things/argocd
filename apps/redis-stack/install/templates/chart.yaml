@@ -142,6 +142,7 @@ prefers existingSecret over password when both are set.
         "masterSet"     .Values.sentinel.masterSet
         "quorum"        .Values.sentinel.quorum
         "parallelSyncs" .Values.sentinel.parallelSyncs
+        "getMasterTimeout" (.Values.sentinel.getMasterTimeout | default 15)
         "service"       (dict "type" .Values.sentinel.serviceType)
         "image"         (dict
           "registry"   .Values.sentinel.image.registry
