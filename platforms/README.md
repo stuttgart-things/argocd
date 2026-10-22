@@ -120,7 +120,7 @@ bundle changes the behaviour of nothing already running. See
 ### `homerun2-platform` — the homerun2 event bus
 | Label | AppSet | Needs annotations |
 |---|---|---|
-| `homerun2-platform` | `appset-homerun2` → by default redis-stack + omni-pitcher + core-catcher + scout + led-catcher (the `flux/apps/homerun2/profiles/platform` set), their routes and their ExternalSecrets; every component is a label (below) | **gate** `homerun2-platform.stuttgart-things.com/secrets-config: 'true'` + `…/secret-store` **(user)**; optional `…/secret-key` (def cluster name), `…/storage-class` (def `openebs-hostpath`), `…/redis-storage-size` (def `8Gi`); `…/fqdn` *(auto)* for every hostname |
+| `homerun2-platform` | `appset-homerun2` → by default redis-stack + omni-pitcher + core-catcher + scout + led-catcher (the `flux/apps/homerun2/profiles/platform` set), their routes and their ExternalSecrets; every component is a label (below) | **gate** `homerun2-platform.stuttgart-things.com/secrets-config: 'true'` + `…/secret-store` **(user)**; optional `…/secret-key` (def cluster name), `…/storage-class` (def `openebs-hostpath`), `…/redis-storage-size` (def `8Gi`), `…/redis-image-tag` (def chart); `…/fqdn` *(auto)* for every hostname |
 
 Opt one cluster out with `homerun2-platform/stack: 'false'`. Components are
 per-cluster labels: **core** ones are on unless `homerun2-platform/<component>:
