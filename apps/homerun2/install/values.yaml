@@ -106,8 +106,11 @@ omniPitcher:
   # v2.1.1+ retries Redis at startup (REDIS_STARTUP_TIMEOUT, 120s) and v2.1.2
   # adds the startupProbe that keeps liveness from killing it meanwhile;
   # v2.1.3 ends that wait on SIGTERM instead of sitting out the timeout.
+  # v2.4.0 adds POST /pitch/alertmanager (homerun2-omni-pitcher#210): author
+  # alertmanager, tags status=firing|resolved,fingerprint=<fp>. /pitch/grafana
+  # is unchanged, so receivers can move over after this is rolled out.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-omni-pitcher
-  version: v2.3.3
+  version: v2.4.0
   hostname: omni-pitcher.example.com
   # Option B from stuttgart-things/argocd#116 — when true, the chart patches
   # the HTTPRoute shipped inside the omni-pitcher kustomize OCI (parentRef +
