@@ -283,6 +283,12 @@ deriving one from the other keeps them from drifting apart.
     {{- $services = append $services (printf "%s=http://homerun2-%s" (trimPrefix "/" $v.basePath) (index $c 1)) }}
   {{- end }}
 {{- end }}
+{{- /* The notification-catcher's basePath belongs to its UI. */}}
+{{- with .Values.notificationCatcher }}
+  {{- if and .enabled .ui.enabled .ui.basePath }}
+    {{- $services = append $services (printf "%s=http://homerun2-notification-catcher" (trimPrefix "/" .ui.basePath)) }}
+  {{- end }}
+{{- end }}
 {{- join "," $services }}
 {{- end }}
 {{- end -}}

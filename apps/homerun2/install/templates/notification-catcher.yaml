@@ -59,6 +59,11 @@ spec:
               {{- with .Values.notificationCatcher.ui }}
               {{- if .enabled }}
               HTTP_ADDR: ":8080"
+              {{- with .basePath }}
+              {{- /* BASE_PATH=/<key> behind homerun2-portal; health and
+                     /metrics stay at the root. */}}
+              BASE_PATH: {{ . | quote }}
+              {{- end }}
               {{- $sinkUrl := .sinkUrl }}
               {{- if and (not $sinkUrl) $.Values.notificationCatcher.sink.enabled }}
               {{- $sinkUrl = printf "https://%s" $.Values.notificationCatcher.sink.hostname }}
