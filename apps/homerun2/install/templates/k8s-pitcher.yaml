@@ -2,6 +2,21 @@
 {{- $appName := include "homerun2.appName" . }}
 {{- $name := "homerun2-k8s-pitcher" }}
 {{- $ns := .Values.k8sPitcher.namespace }}
+{{- $preset := include "homerun2.k8sPitcherPreset" . | fromYaml }}
+{{- /* central, cluster and fluxInformers configure the preset's profile; a
+       hand-written profileContent or the out-of-band ConfigMap would ignore
+       them silently, so they need a preset. */}}
+{{- if .Values.k8sPitcher.preset }}
+  {{- if .Values.k8sPitcher.profileContent }}
+    {{- fail "k8sPitcher: set either preset or profileContent, not both" }}
+  {{- end }}
+  {{- if .Values.k8sPitcher.inlineProfile }}
+    {{- fail "k8sPitcher: preset needs inlineProfile: false (the preset's profile is mounted from k8sPitcherProfileConfigMap)" }}
+  {{- end }}
+{{- else if or .Values.k8sPitcher.central.url .Values.k8sPitcher.cluster .Values.k8sPitcher.fluxInformers }}
+  {{- fail "k8sPitcher: central.url, cluster and fluxInformers configure k8sPitcher.preset; set a preset (or put them into profileContent)" }}
+{{- end }}
+{{- $content := .Values.k8sPitcher.profileContent | default $preset.profile }}
 {{- /* The trust-bundle volume is always remounted. The `profile` volume is
        only remounted from the out-of-band ConfigMap when inlineProfile is
        false; when true, the kustomize OCI's own profile ConfigMap + volume
@@ -29,7 +44,8 @@
        kubelet updates a mounted ConfigMap in place. Changing profileContent
        therefore reaches the container's filesystem but not its behaviour --
        the running process keeps the profile it booted with, and the change
-       looks applied while nothing happened. Stamping the content hash onto
+       looks applied while nothing happened. A preset's rendered profile
+       counts as content, too. Stamping the content hash onto
        the pod template makes the Deployment roll instead.
 
        Only possible when the chart knows the content. With profileContent
@@ -37,9 +53,9 @@
        this render, and a restart after editing it stays manual. Same for
        inlineProfile, where the profile ships inside the kustomize OCI and is
        already pinned by the image tag a version bump rolls anyway. */}}
-{{- if and (not .Values.k8sPitcher.inlineProfile) .Values.k8sPitcher.profileContent }}
+{{- if and (not .Values.k8sPitcher.inlineProfile) $content }}
 {{- $_ := set $podTemplate "metadata" (dict "annotations" (dict
-      "homerun2.stuttgart-things.com/profile-checksum" (.Values.k8sPitcher.profileContent | sha256sum)
+      "homerun2.stuttgart-things.com/profile-checksum" ($content | sha256sum)
     ))
 }}
 {{- end }}
@@ -94,8 +110,22 @@ spec:
           patch: |
 {{ toYaml $trustPatch | indent 12 }}
 {{- /* The base's ClusterRole covers its own profile (pods, nodes, events,
-       deployments, replicasets; get on secrets for the token). A profile
-       informing on anything else adds its rules here. */}}
+       deployments, replicasets; get on secrets for the token). A preset
+       replaces those rules with exactly what its profile reads (helper
+       homerun2.k8sPitcherPreset). A profile informing on anything else adds
+       its rules here. */}}
+{{- with $preset.rules }}
+        - target:
+            group: rbac.authorization.k8s.io
+            version: v1
+            kind: ClusterRole
+            name: {{ $name }}
+          patch: |-
+            - op: replace
+              path: /rules
+              value:
+                {{- toYaml . | nindent 16 }}
+{{- end }}
 {{- with .Values.k8sPitcher.extraRbacRules }}
         - target:
             group: rbac.authorization.k8s.io

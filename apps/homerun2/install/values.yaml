@@ -241,7 +241,7 @@ scout:
 k8sPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
-  version: v1.2.2
+  version: v1.3.0
   namespace: homerun2
   # When true, keep the K8sPitcherProfile ConfigMap shipped inside the
   # k8s-pitcher kustomize OCI instead of deleting it and remounting an
@@ -281,6 +281,46 @@ k8sPitcher:
   #       resources: [jobs, cronjobs]
   #       verbs: [get, list, watch]
   extraRbacRules: []
+  # A profile the chart renders itself, instead of profileContent / the
+  # out-of-band ConfigMap. Empty (the default) keeps everything above as is.
+  #
+  #   important-events  homerun2-k8s-pitcher's profiles/important-events.yaml:
+  #                     node Ready flips, Warning Events with reason BackOff,
+  #                     OOMKilling, Evicted, FailedMount, FailedAttachVolume,
+  #                     BackoffLimitExceeded, ProvisioningFailed or
+  #                     NodeNotReady; cooldown 1h, at most 20 messages per
+  #                     10m, no collectors, no inventory on restart.
+  #
+  # The preset also replaces the base's ClusterRole rules with exactly what
+  # it reads (get/list/watch on the watched resources, get on the token
+  # Secret only); extraRbacRules is still appended. Mutually exclusive with
+  # profileContent and inlineProfile. Needs k8s-pitcher v1.3.0 or later
+  # (homerun2-k8s-pitcher#88: cooldown, rateLimit, Event filters).
+  preset: ""
+  # spec.cluster of the preset's profile: names the cluster in the messages
+  # (system k8s-<cluster>). Empty, k8s-pitcher says "in-cluster".
+  cluster: ""
+  # Adds the reference profile's Flux informers to the preset (Ready flips of
+  # Kustomizations and HelmReleases) and their RBAC. Off by default: on a
+  # cluster without Flux CRDs such an informer never syncs and retries its
+  # list forever, logging an error each time.
+  fluxInformers: false
+  # Where the preset pitches. Empty url = this chart's in-cluster omni-pitcher
+  # (http://homerun2-omni-pitcher.<destination.namespace>.svc.cluster.local/pitch).
+  # Set it to a central omni-pitcher's /pitch URL, e.g.
+  # https://omni-pitcher.homerun2.example.com/pitch, and omniPitcher,
+  # redisStack, coreCatcher and scout can all be disabled: only k8s-pitcher
+  # runs. An https endpoint with a private CA is verified against
+  # trustBundleConfigMap (mounted into k8s-pitcher, SSL_CERT_DIR=/etc/ssl/custom).
+  central:
+    url: ""
+    # Existing Secret in k8sPitcher.namespace holding the bearer token for
+    # url (or the local omni-pitcher). The default is the Secret
+    # secrets.enabled materializes from Vault property authToken (into
+    # destination.namespace, which is k8sPitcher.namespace by default).
+    tokenSecret:
+      name: homerun2-k8s-pitcher-token
+      key: auth-token
 
 # light-catcher (Redis Streams consumer → WLED HTTP).
 lightCatcher:

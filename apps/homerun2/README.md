@@ -223,6 +223,37 @@ In-cluster, point `pitcher.addr` at `http://homerun2-omni-pitcher.<namespace>.sv
 
 **RBAC.** The kustomize base ships the ClusterRole `homerun2-k8s-pitcher` (get/list/watch on pods, nodes, events, deployments, replicasets; get on secrets — the token) and its binding; kustomize rewrites the binding's subject to `k8sPitcher.namespace`. That covers the shape above. A profile that informs on anything else (a CRD, jobs, …) adds its rules through `k8sPitcher.extraRbacRules`, which the chart appends to that ClusterRole.
 
+## k8s-pitcher only, pitching to a central omni-pitcher
+
+`k8sPitcher.preset: important-events` has the chart render the profile itself: homerun2-k8s-pitcher's [`profiles/important-events.yaml`](https://github.com/stuttgart-things/homerun2-k8s-pitcher/blob/main/profiles/important-events.yaml) — node `Ready` flips, `Warning` Events with reason `BackOff`, `OOMKilling`, `Evicted`, `FailedMount`, `FailedAttachVolume`, `BackoffLimitExceeded`, `ProvisioningFailed` or `NodeNotReady`, a 1h cooldown per object/reason, at most 20 messages per 10m, no collectors and no inventory on restart. It is materialized like `profileContent` (same ConfigMap, same Pod roll on change); the two are mutually exclusive, and `inlineProfile` must stay `false`. Without a preset nothing changes.
+
+`k8sPitcher.central.url` points the preset at a remote omni-pitcher's `/pitch` instead of this chart's in-cluster one, so a cluster can run k8s-pitcher and nothing else:
+
+```yaml
+redisStack:  { enabled: false }
+omniPitcher: { enabled: false }
+coreCatcher: { enabled: false }
+scout:       { enabled: false }
+httpRoute:   { enabled: false }
+k8sPitcher:
+  enabled: true
+  preset: important-events
+  cluster: my-cluster                    # spec.cluster, names the cluster in messages
+  central:
+    url: https://omni-pitcher.homerun2.example.com/pitch
+    tokenSecret:                         # existing Secret in k8sPitcher.namespace
+      name: homerun2-k8s-pitcher-token   # default; secrets.enabled materializes it from authToken
+      key: auth-token
+```
+
+- **Token.** `central.tokenSecret` names a Secret in `k8sPitcher.namespace` holding the central omni-pitcher's bearer token. The default is the Secret `secrets.enabled` materializes from the Vault property `authToken` (in `destination.namespace`, the same namespace by default); anything else is provisioned out-of-band.
+- **TLS.** A central endpoint with a private CA is verified against the [trust bundle](#trust-bundle-k8s-pitcher-tls) the chart always mounts into k8s-pitcher: trust-manager's `cluster-trust-bundle` has to carry the CA and reach `k8sPitcher.namespace`.
+- **Flux.** The reference profile also watches Flux Kustomizations and HelmReleases. Argo CD clusters usually have no Flux CRDs, and an informer on a resource the API server does not serve never syncs: its reflector retries the list forever and logs an error each time. So these informers (and their RBAC) are opt-in: `k8sPitcher.fluxInformers: true`.
+- **RBAC.** A preset replaces the rules of the base's ClusterRole with exactly what it reads: get/list/watch on `nodes` and `events` (plus the two Flux resources with `fluxInformers`), get on the token Secret only (`resourceNames`). `extraRbacRules` is still appended.
+- **Version.** The preset's fields (`cooldown`, `rateLimit`, Event `types`/`reasons`) need k8s-pitcher v1.3.0 or later (homerun2-k8s-pitcher#88, the chart default); an older `k8sPitcher.version` ignores them and pitches every Warning Event.
+
+`central.url`, `cluster` and `fluxInformers` only configure the preset; set without one, the render fails instead of ignoring them.
+
 ## Schedule-pitcher, ai-pitcher and scout's digest
 
 The three belong together; each one works alone, too.
@@ -450,6 +481,7 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `portal.enabled` / `version` / `hostname` / `services` | `false` / `v0.4.0` / `portal.example.com` / `[]` (derived from the basePaths) | homerun2-portal, see [Portal](#portal) |
 | `scout.profile.content` / `scout.retentionTTL` | `""` / `""` | ScoutProfile spec as a YAML string (replaces `spec`, renders on its own); `SCOUT_RETENTION_TTL` (360h with the ai-pitcher's weekly mode) |
 | `k8sPitcher.profileContent` / `extraRbacRules` | `""` / `[]` | K8sPitcherProfile document (chart creates the ConfigMap); extra rules for the base's ClusterRole |
+| `k8sPitcher.preset` / `cluster` / `fluxInformers` / `central.url` / `central.tokenSecret.{name,key}` | `""` / `""` / `false` / `""` (in-cluster omni-pitcher) / `homerun2-k8s-pitcher-token`, `auth-token` | Chart-rendered profile (`important-events`), its `spec.cluster`, opt-in Flux informers and pitch target; see [k8s-pitcher only](#k8s-pitcher-only-pitching-to-a-central-omni-pitcher) |
 | `smokeTest.enabled` / `external.*` / `extraProbes` / `events` | `false` / verify TLS via `cluster-trust-bundle`, dial the gateway Service / one fixture event | Opt-in Job asserting `/health`, an unauthenticated `POST /pitch` → 401, and an authenticated pitch — in-cluster and through the HTTPRoute — plus a `/health` probe per enabled core-catcher/scout. Needs the auth-token Secret (inline `authToken` or `secrets.enabled`). See [`smoke-test/`](./smoke-test/) |
 | `syncPolicy` | automated + retry | Applied to all rendered Applications |
 
