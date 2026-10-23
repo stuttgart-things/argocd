@@ -241,7 +241,7 @@ scout:
 k8sPitcher:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
-  version: v1.2.2
+  version: v1.3.0
   namespace: homerun2
   # When true, keep the K8sPitcherProfile ConfigMap shipped inside the
   # k8s-pitcher kustomize OCI instead of deleting it and remounting an
@@ -294,8 +294,8 @@ k8sPitcher:
   # The preset also replaces the base's ClusterRole rules with exactly what
   # it reads (get/list/watch on the watched resources, get on the token
   # Secret only); extraRbacRules is still appended. Mutually exclusive with
-  # profileContent and inlineProfile. Needs a k8s-pitcher release with
-  # homerun2-k8s-pitcher#88 (cooldown, rateLimit, Event filters).
+  # profileContent and inlineProfile. Needs k8s-pitcher v1.3.0 or later
+  # (homerun2-k8s-pitcher#88: cooldown, rateLimit, Event filters).
   preset: ""
   # spec.cluster of the preset's profile: names the cluster in the messages
   # (system k8s-<cluster>). Empty, k8s-pitcher says "in-cluster".

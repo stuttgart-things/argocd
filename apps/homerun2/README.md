@@ -250,7 +250,7 @@ k8sPitcher:
 - **TLS.** A central endpoint with a private CA is verified against the [trust bundle](#trust-bundle-k8s-pitcher-tls) the chart always mounts into k8s-pitcher: trust-manager's `cluster-trust-bundle` has to carry the CA and reach `k8sPitcher.namespace`.
 - **Flux.** The reference profile also watches Flux Kustomizations and HelmReleases. Argo CD clusters usually have no Flux CRDs, and an informer on a resource the API server does not serve never syncs: its reflector retries the list forever and logs an error each time. So these informers (and their RBAC) are opt-in: `k8sPitcher.fluxInformers: true`.
 - **RBAC.** A preset replaces the rules of the base's ClusterRole with exactly what it reads: get/list/watch on `nodes` and `events` (plus the two Flux resources with `fluxInformers`), get on the token Secret only (`resourceNames`). `extraRbacRules` is still appended.
-- **Version.** The preset's fields (`cooldown`, `rateLimit`, Event `types`/`reasons`) need a k8s-pitcher release with homerun2-k8s-pitcher#88; an older one ignores them and pitches every Warning Event.
+- **Version.** The preset's fields (`cooldown`, `rateLimit`, Event `types`/`reasons`) need k8s-pitcher v1.3.0 or later (homerun2-k8s-pitcher#88, the chart default); an older `k8sPitcher.version` ignores them and pitches every Warning Event.
 
 `central.url`, `cluster` and `fluxInformers` only configure the preset; set without one, the render fails instead of ignoring them.
 
