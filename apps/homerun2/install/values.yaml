@@ -426,7 +426,7 @@ ledCatcher:
 portal:
   enabled: false
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-portal
-  version: v0.6.0
+  version: v0.8.0
   hostname: portal.example.com
   # PORTAL_SERVICES as a list of `key=url` (or `key|Title=url`), in navigation
   # order. Empty: every enabled led-/core-/light-catcher and demo-pitcher with
