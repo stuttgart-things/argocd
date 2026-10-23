@@ -29,7 +29,7 @@ configurations:
 # on the FIRST install only -- after a bump, apply the matching CRDs by hand
 # (see cicd/github-arc/README.md).
 # renovate: datasource=docker depName=ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller
-arcVersion: "0.15.0"
+arcVersion: "0.15.1"
 
 controller:
   namespace: arc-systems
