@@ -74,7 +74,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.99.0
+        targetRevision: v0.103.0
         path: apps/clusterscope/install
         helm:
           # Fixed, not derived: Helm caps release names at 53 characters, and
@@ -93,7 +93,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.99.0
+              targetRevision: v0.103.0
             destination:
               server: '{{ .server }}'
               namespace: clusterscope
