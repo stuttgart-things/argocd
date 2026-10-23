@@ -327,6 +327,11 @@ chart patches parentRef + hostname, or deletes it with `httpRoute.enabled: false
 setup as flux `apps/homerun2/profiles/portal` (`HOMERUN2_PORTAL_SERVICES`,
 `HOMERUN2_<COMPONENT>_BASE_PATH`).
 
+From v0.8.0 the portal also has a kiosk mode for office displays:
+`https://<portal.hostname>/kiosk` shows the services full screen, one after another,
+skipping those that are down (`?services=overview,core,led&seconds=30&pause=60&reset=300`,
+see the portal's README).
+
 ## Sound-catcher
 
 `soundCatcher` runs the catcher with the browser sink only — a Pod has no speaker. Open
@@ -478,7 +483,7 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `schedulePitcher.enabled` / `version` / `hostname` / `inlineHttpRoute` / `profileConfigMap` / `profileContent` / `secretAccess` | `false` / `v1.10.0` / `schedule-pitcher.example.com` / `false` / `homerun2-schedule-pitcher-profile` / `""` (minimal profile) / `[]` | Central schedule-pitcher, see above |
 | `soundCatcher.enabled` / `version` / `hostname` / `redisStreams` | `false` / `v0.6.1` / `sound-catcher.example.com` / `messages` | Browser-only sound-catcher |
 | `ledCatcher.basePath` / `coreCatcher.basePath` / `lightCatcher.basePath` / `demoPitcher.basePath` / `notificationCatcher.ui.basePath` | `""` | `BASE_PATH`, one segment such as `/led`, for serving behind the portal; see [Portal](#portal) |
-| `portal.enabled` / `version` / `hostname` / `services` | `false` / `v0.4.0` / `portal.example.com` / `[]` (derived from the basePaths) | homerun2-portal, see [Portal](#portal) |
+| `portal.enabled` / `version` / `hostname` / `services` | `false` / `v0.8.0` / `portal.example.com` / `[]` (derived from the basePaths) | homerun2-portal, see [Portal](#portal) |
 | `scout.profile.content` / `scout.retentionTTL` | `""` / `""` | ScoutProfile spec as a YAML string (replaces `spec`, renders on its own); `SCOUT_RETENTION_TTL` (360h with the ai-pitcher's weekly mode) |
 | `k8sPitcher.profileContent` / `extraRbacRules` | `""` / `[]` | K8sPitcherProfile document (chart creates the ConfigMap); extra rules for the base's ClusterRole |
 | `k8sPitcher.preset` / `cluster` / `fluxInformers` / `central.url` / `central.tokenSecret.{name,key}` | `""` / `""` / `false` / `""` (in-cluster omni-pitcher) / `homerun2-k8s-pitcher-token`, `auth-token` | Chart-rendered profile (`important-events`), its `spec.cluster`, opt-in Flux informers and pitch target; see [k8s-pitcher only](#k8s-pitcher-only-pitching-to-a-central-omni-pitcher) |
