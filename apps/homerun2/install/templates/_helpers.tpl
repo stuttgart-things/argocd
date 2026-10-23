@@ -292,3 +292,56 @@ deriving one from the other keeps them from drifting apart.
 {{- join "," $services }}
 {{- end }}
 {{- end -}}
+
+{{/*
+homerun2.k8sPitcherPreset -- the K8sPitcherProfile and the ClusterRole rules
+of `k8sPitcher.preset`, as YAML `{profile: string, rules: list}`. Empty when
+no preset is set, so a cluster without one keeps today's contract
+(profileContent or the out-of-band ConfigMap, the base's ClusterRole).
+
+important-events is homerun2-k8s-pitcher's profiles/important-events.yaml
+(homerun2-k8s-pitcher#88): Ready flips of nodes, Warning Events with a reason
+worth a message, a cooldown and a rate limit, no collectors, no inventory on
+restart. The Flux informers of the reference profile are opt-in
+(`k8sPitcher.fluxInformers`): an informer on a resource the API server does not
+serve never syncs and its reflector retries the list forever, logging an
+error each time, so on a cluster without Flux CRDs they would be noise.
+
+`rules` is exactly what the profile reads: get/list/watch on what the
+informers watch, get on the token Secret only. templates/k8s-pitcher.yaml
+replaces the base's rules with it.
+Usage: include "homerun2.k8sPitcherPreset" . | fromYaml
+*/}}
+{{- define "homerun2.k8sPitcherPreset" -}}
+{{- $k := .Values.k8sPitcher -}}
+{{- if eq $k.preset "important-events" -}}
+{{- $addr := printf "http://homerun2-omni-pitcher.%s.svc.cluster.local/pitch" .Values.destination.namespace -}}
+{{- if $k.central.url }}{{ $addr = $k.central.url }}{{ end -}}
+{{- $watch := list (dict "group" "" "version" "v1" "resource" "nodes" "events" (list "update") "updates" "conditions") -}}
+{{- if $k.fluxInformers -}}
+{{- $watch = append $watch (dict "group" "kustomize.toolkit.fluxcd.io" "version" "v1" "resource" "kustomizations" "events" (list "update") "updates" "conditions") -}}
+{{- $watch = append $watch (dict "group" "helm.toolkit.fluxcd.io" "version" "v2" "resource" "helmreleases" "events" (list "update") "updates" "conditions") -}}
+{{- end -}}
+{{- $watch = append $watch (dict "group" "" "version" "v1" "resource" "events" "events" (list "add") "types" (list "Warning") "reasons" (list "BackOff" "OOMKilling" "Evicted" "FailedMount" "FailedAttachVolume" "BackoffLimitExceeded" "ProvisioningFailed" "NodeNotReady")) -}}
+{{- $spec := dict
+      "pitcher" (dict "addr" $addr)
+      "auth" (dict "tokenFrom" (dict "secretKeyRef" (dict "name" $k.central.tokenSecret.name "namespace" $k.namespace "key" $k.central.tokenSecret.key)))
+      "cooldown" "1h"
+      "rateLimit" (dict "max" 20 "per" "10m")
+      "informers" $watch
+-}}
+{{- with $k.cluster }}{{ $_ := set $spec "cluster" . }}{{ end -}}
+{{- $profile := dict
+      "apiVersion" "homerun2.sthings.io/v1alpha1"
+      "kind" "K8sPitcherProfile"
+      "metadata" (dict "name" "important-events")
+      "spec" $spec
+-}}
+{{- $rules := list -}}
+{{- range $watch -}}
+{{- $rules = append $rules (dict "apiGroups" (list .group) "resources" (list .resource) "verbs" (list "get" "list" "watch")) -}}
+{{- end -}}
+{{- $rules = append $rules (dict "apiGroups" (list "") "resources" (list "secrets") "resourceNames" (list $k.central.tokenSecret.name) "verbs" (list "get")) -}}
+{{- dict "profile" (toYaml $profile) "rules" $rules | toYaml -}}
+{{- end -}}
+{{- end -}}

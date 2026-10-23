@@ -384,6 +384,53 @@
             },
             "additionalProperties": false
           }
+        },
+        "preset": {
+          "type": "string",
+          "enum": [
+            "",
+            "important-events"
+          ],
+          "description": "Profile the chart renders itself (homerun2-k8s-pitcher profiles/important-events.yaml); also replaces the base ClusterRole rules with exactly what it reads. Empty keeps profileContent / the out-of-band ConfigMap. Excludes profileContent and inlineProfile."
+        },
+        "cluster": {
+          "type": "string",
+          "description": "spec.cluster of the preset's profile, names the cluster in messages. Needs preset."
+        },
+        "fluxInformers": {
+          "type": "boolean",
+          "description": "Add Ready-flip informers (and RBAC) for Flux Kustomizations and HelmReleases to the preset. Only on clusters with Flux CRDs. Needs preset."
+        },
+        "central": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Pitch target of the preset. Empty url = the in-cluster omni-pitcher; set, a central omni-pitcher and the rest of the stack can stay disabled.",
+          "properties": {
+            "url": {
+              "type": "string",
+              "pattern": "^(|https?://.+)$",
+              "description": "Central omni-pitcher /pitch URL. Needs preset."
+            },
+            "tokenSecret": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "key"
+              ],
+              "description": "Existing Secret in k8sPitcher.namespace with the bearer token.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
         }
       },
       "required": [
