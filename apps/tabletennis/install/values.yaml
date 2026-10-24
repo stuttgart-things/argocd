@@ -100,7 +100,7 @@ schmetterpause:
   namespace: schmetterpause
   hostname: ""                       # empty = schmetterpause.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-  version: v0.17.0
+  version: v0.18.0
   # Display name of the player who gets the admin flag at every start
   # (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing, which is
   # the normal state after the first pass: the person has to have joined
@@ -151,7 +151,7 @@ zaehlwerk:
   namespace: zaehlwerk
   hostname: ""                       # empty = zaehlwerk.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
-  version: v0.30.0
+  version: v0.31.0
   # The handover to schmetterpause: a won match goes to its POST /api/results and
   # the scoring page offers its real players (zaehlwerk ADR-0004,
   # schmetterpause ADR-0015).
