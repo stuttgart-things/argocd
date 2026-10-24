@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "schmetterpause-seed chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "image",
+    "fixture",
+    "databaseSecret"
+  ],
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "fixture": {
+      "type": "string",
+      "enum": [
+        "pong",
+        "demo"
+      ],
+      "description": "SP_SEED_FIXTURE. pong needs schmetterpause v0.18.0."
+    },
+    "databaseSecret": {
+      "type": "string",
+      "minLength": 1
+    },
+    "backoffLimit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "resources": {
+      "type": "object"
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    }
+  }
+}

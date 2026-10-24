@@ -177,6 +177,9 @@ spec:
               {{- with .Values.zaehlwerkURL }}
               SP_ZAEHLWERK_URL: {{ trimSuffix "/" . | quote }}
               {{- end }}
+              {{- with .Values.scoreboard.settle }}
+              SP_SCOREBOARD_SETTLE: {{ . | quote }}
+              {{- end }}
   destination:
     {{- if .Values.destination.name }}
     name: {{ .Values.destination.name | quote }}

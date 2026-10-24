@@ -13,9 +13,32 @@ apps/schmetterpause/
 │                     Application "schmetterpause-db"  (sync-wave -10) → apps/schmetterpause/database
 │                     Application "schmetterpause-policy" (sync-wave -5, opt-in) → policy/ of stuttgart-things/schmetterpause at `version`
 │                     Application "schmetterpause-monitoring" (sync-wave 5, opt-in) → apps/schmetterpause/monitoring
+│                     Application "schmetterpause-seed" (sync-wave 1, opt-in) → apps/schmetterpause/seed
 ├── database/       CloudNativePG Cluster
-└── monitoring/     PodMonitors (app, database), a ServiceMonitor on Kyverno (with policy), and alert rules
+├── monitoring/     PodMonitors (app, database), a ServiceMonitor on Kyverno (with policy), and alert rules
+└── seed/           a Job running `schmetterpause seed` (SP_SEED_FIXTURE) — the Pong sandbox's bots
 ```
+
+## For the Pong sandbox: `scoreboard.settle` and `seed`
+
+Two switches that exist for the Pong sandbox (schmetterpause ADR-0027, **v0.18.0+**), a second
+schmetterpause where zaehlwerk-pong plays a league by itself. Neither belongs on the office's
+instance.
+
+- **`scoreboard.settle: immediate`** sets `SP_SCOREBOARD_SETTLE`: a result through
+  `POST /api/results` counts at once instead of waiting for a player to confirm it. Nobody
+  confirms in a sandbox, so without it every league result stays pending and TTR never moves.
+  Empty (the default) sets nothing — the app's `pending`. The app logs a warning at start with
+  `immediate`, so a value copied from the sandbox shows up.
+- **`seed.enabled`** renders `apps/schmetterpause/seed` as its own Application (wave 1): a Job
+  running `schmetterpause seed` with `SP_SEED_FIXTURE=pong` (eight bots, Ada … Hanna, and the
+  observer `Pong`) at the image tag `version`. The binary refuses a database that already has
+  players and exits 0, so every later run is a no-op. The Job carries
+  `argocd.argoproj.io/sync-options: Force=true,Replace=true`, because a Job's pod template is
+  immutable and a new `version` would otherwise be a rejected patch. It is a plain resource,
+  not upstream's PostSync hook: in an Application of its own, a hook alone leaves nothing to be
+  OutOfSync and automated sync would never run it. The chart refuses `fixture: pong` below
+  v0.18.0, and `seed` without `database.enabled`.
 
 ## Why the database is a separate chart
 

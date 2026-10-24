@@ -376,6 +376,15 @@
         "vaultProperty": {
           "type": "string",
           "minLength": 1
+        },
+        "settle": {
+          "type": "string",
+          "enum": [
+            "",
+            "pending",
+            "immediate"
+          ],
+          "description": "SP_SCOREBOARD_SETTLE (v0.18.0+). Empty = the app's default, pending. immediate is for the Pong sandbox only: results count without confirmation."
         }
       },
       "if": {
@@ -400,6 +409,23 @@
           "vaultProperty": {
             "minLength": 1
           }
+        }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A Job running `schmetterpause seed` with SP_SEED_FIXTURE, as its own Application (apps/schmetterpause/seed). For the Pong sandbox. Refuses a database with players, so re-runs are no-ops. Needs database.enabled and, for pong, version >= v0.18.0.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "fixture": {
+          "type": "string",
+          "enum": [
+            "pong",
+            "demo"
+          ]
         }
       }
     },
