@@ -21,7 +21,11 @@ apps/tabletennis/
                       Application "…-light-catcher"          (wave  0) → homerun2-light-catcher OCI, opt-in
                       Application "…-light-catcher-secrets"  (wave -10) → apps/homerun2/secrets, opt-in
                       Application "…-piezo-sim"              (wave  1) → apps/zaehlwerk/piezo-sim, opt-in
+                      Application "…-pong"                   (wave  1) → apps/zaehlwerk/pong, opt-in
 ```
+
+With `schmetterpause.seed`, schmetterpause's sub-chart renders one more leaf, `…-seed`
+(wave 1) → `apps/schmetterpause/seed`.
 
 The two applications are delegated rather than re-implemented: their charts
 ([`apps/schmetterpause`](../schmetterpause/), [`apps/zaehlwerk`](../zaehlwerk/)) stay usable on
@@ -157,6 +161,94 @@ from **v0.8.0** on, and the chart refuses an older version rather than leave a p
 ImagePullBackOff. `piezoSim.board` sets best of, pace, the noise shares and the seed. The PR
 previews run the same chart (`platforms/zaehlwerk-pr-preview`, label `preview-sim`).
 
+## zaehlwerk-pong (`pong`)
+
+`pong.enabled` renders [`apps/zaehlwerk/pong`](../zaehlwerk/pong/) into zaehlwerk's namespace:
+the game at `pong.hostname` (default `zaehlwerk-pong.<domain>`, on `gateway`), and zaehlwerk's
+`PONG_URL` pointed at it for the watch screen's screensaver (zaehlwerk ADR-0013). The image tag
+is `zaehlwerk.version` unless `pong.version` is set; the chart refuses anything below v0.16.0.
+`pong.attractAfter` turns attract mode on. **Without `pong.league` every Pong match is a demo**
+and is reported nowhere (zaehlwerk ADR-0008). This is the counterpart of flux's
+`zaehlwerk-pong-on` / `-attract`.
+
+## The Pong sandbox
+
+A second schmetterpause and zaehlwerk, in namespaces of their own, where zaehlwerk-pong plays a
+league by itself: one real match after another between eight bot players, every result
+reported and rated at once (zaehlwerk ADR-0015/0016, schmetterpause ADR-0027). The counterpart
+of flux's `profiles/sandbox`, selected there as `tabletennis-sandbox`.
+
+**Here it is a second Application of this same chart**, next to the office's, with the values
+below. The chart can host two instances on one cluster because everything it names is derived
+from `applicationName` (Applications, Helm release names) or set per component (namespaces,
+hostnames). The one cluster-scoped object it can render, schmetterpause's Kyverno policy, stays
+with the office (`schmetterpause.policy.enabled` off here), and so do the light-catcher, its
+secrets and the piezo board.
+
+| value | what it adds | flux component |
+|---|---|---|
+| `schmetterpause.scoreboard.enabled` | `/api` on the sandbox's schmetterpause, and — with `zaehlwerk.handover` — the handover | `schmetterpause-scoreboard-sops`, `zaehlwerk-handover-sops` |
+| `zaehlwerk.schmetterpauseURL` | the handover over the in-cluster Service, so the league depends on no certificate | `ZAEHLWERK_SCHMETTERPAUSE_URL` |
+| `zaehlwerk.matches` | `MATCHES_TOKEN`: `POST /matches` takes player ids (zaehlwerk **v0.31.0+**). Adds the container's env entry too, because the v0.31.0 base does not list the key | `zaehlwerk-matches-sops` |
+| `schmetterpause.scoreboard.settle: immediate` | `SP_SCOREBOARD_SETTLE` (schmetterpause **v0.18.0+**): nobody confirms in a sandbox | `schmetterpause-settle-immediate` |
+| `schmetterpause.seed` | a Job running `schmetterpause seed` with `SP_SEED_FIXTURE=pong`: Ada … Hanna and the observer `Pong`. Refuses a database with players, so every later run is a no-op | `schmetterpause-seed-pong` |
+| `pong` + `pong.league` | the game in league mode: `ZAEHLWERK_TOKEN` (the matches token), `PONG_OPERATOR` (`Pong`), `PONG_PLAYER_SKILL` (a spread over the seed's names), `PONG_LEAGUE_PAUSE` (`30s`) | `zaehlwerk-pong-league` |
+| `zaehlwerk.panel: redis` + `panelStream` | optional: the score into homerun2's Redis on `tabletennis-sandbox`, no catcher switch | `zaehlwerk-panel-redis` |
+
+```yaml
+    helm:
+      values: |
+        applicationName: tabletennis-<cluster>-sandbox   # MUST differ from the office's
+        project: <cluster>
+        destination: { name: <cluster> }
+        domain: <cluster>.sthings.lab
+        gateway:     { name: <cluster>-gateway, namespace: default }
+        secretStore: { kind: ClusterSecretStore, name: vault-<cluster> }
+        secretSources:
+          schmetterpause:
+            entry: schmetterpause-sandbox    # + schmetterpause-sandbox-scoreboard
+        homerun2: { namespace: homerun2 }
+        schmetterpause:
+          namespace: schmetterpause-sandbox
+          hostname: schmetterpause-sandbox.<cluster>.sthings.lab
+          scoreboard: { enabled: true, settle: immediate }
+          seed: { enabled: true, fixture: pong }
+          values:
+            database: { storage: { size: 1Gi } }
+        zaehlwerk:
+          namespace: zaehlwerk-sandbox
+          hostname: zaehlwerk-sandbox.<cluster>.sthings.lab
+          schmetterpauseURL: http://schmetterpause.schmetterpause-sandbox.svc.cluster.local
+          matches: { enabled: true, vaultPath: zaehlwerk-sandbox-matches, vaultProperty: token }
+          panel: redis                       # or false
+          panelStream: tabletennis-sandbox
+        pong:
+          enabled: true
+          hostname: zaehlwerk-pong-sandbox.<cluster>.sthings.lab
+          league: { enabled: true }
+        cascadingDelete: false
+```
+
+**The Vault entries come first.** ESO fails a whole ExternalSecret over one missing property,
+so before this syncs the store needs `schmetterpause-sandbox` (`session-key`, `username`,
+`password`), `schmetterpause-sandbox-scoreboard` (`token`, read by both sides) and
+`zaehlwerk-sandbox-matches` (`token`, `openssl rand -hex 32`, read by zaehlwerk as
+`MATCHES_TOKEN` and by the game as `ZAEHLWERK_TOKEN`). zaehlwerk's panel properties keep
+coming from `zaehlwerk` (or homerun2's entry through `secretSources.homerun2`); with
+`panel: redis` its `redis-password` has to be homerun2's.
+
+**On the office's panel.** With the sandbox's panel at `redis`, its matches go to
+`tabletennis-sandbox`. The office shows them between its own matches when that stream is in its
+zaehlwerk's idle streams — `zaehlwerk.catcherIdleStreams: messages,tabletennis-sandbox` in the
+office's values — and in homerun2's led-catcher streams on the homerun2 side. A real match
+switches the catcher to `tabletennis` alone and the sandbox is off the panel until it ends
+(zaehlwerk ADR-0003, ADR-0016).
+
+**Never on the office's pair.** Every sandbox-only value is off by default, and the guard is a
+secret: an office zaehlwerk has no `MATCHES_TOKEN`, so Pong in league mode is refused with 503
+there and creates nothing. The chart also refuses `pong.league` without `zaehlwerk.matches`,
+`zaehlwerk.matches` without the handover, and either below zaehlwerk v0.31.0.
+
 ## Per-cluster secrets
 
 `secretSources` addresses secrets by the app that owns them, as a ClusterStack publishes them
@@ -252,6 +344,11 @@ Hostnames come out as `schmetterpause.tabletennis.sthings.lab` and
 | The image-signature policy | a component pair (`schmetterpause-policy-off` / `-on`) reading the schmetterpause repo through a `GitRepository` | `schmetterpause.policy.enabled`, a git Application at the same tag |
 | The bootstrap admin | `TABLETENNIS_SCHMETTERPAUSE_BOOTSTRAP_ADMIN` — a plain substitution, since empty means "none" to the app | `schmetterpause.bootstrapAdmin` |
 | omni-pitcher routing | a default `routes.yaml` in the homerun2 base | set on homerun2's `routesContent` — see above |
+| The panel modes | `TABLETENNIS_ZAEHLWERK_PANEL`: `off`, `homerun2`, `redis` (components) | `zaehlwerk.panel`: `false`/`off`, `true`/`homerun2`, `redis`, plus `panelStream` |
+| Catcher idle streams | `ZAEHLWERK_CATCHER_IDLE_STREAMS`, always set (`messages`) | `zaehlwerk.catcherIdleStreams`, left out when empty (zaehlwerk's default is `messages`) |
+| zaehlwerk-pong | `zaehlwerk-pong-off` / `-on` / `-attract` / `-league` | `pong.enabled`, `pong.attractAfter`, `pong.league` |
+| The Pong sandbox | `profiles/sandbox`, a bundle entry of its own (`tabletennis-sandbox`) with `TABLETENNIS_SANDBOX_*` variables and a sops Secret | a second Application of this chart with its own `applicationName` and values — see above; credentials through ESO like the office's |
+| The seed Job | `kustomize.toolkit.fluxcd.io/force: Enabled` | `argocd.argoproj.io/sync-options: Force=true,Replace=true`, in an Application of its own |
 
 Both paths reach the same end state: schmetterpause at the pinned tag with its database,
 zaehlwerk beside it, the handover between them, and homerun2 carrying the panel. What

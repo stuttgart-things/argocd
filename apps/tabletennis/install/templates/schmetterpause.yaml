@@ -39,6 +39,15 @@
 {{- if $spSrc.entry }}
 {{- $_ := set $computed "vaultEntry" $spSrc.entry }}
 {{- end }}
+{{- /* The Pong sandbox's two (schmetterpause ADR-0027): set only when asked
+       for, so an office's values stay exactly as they were. */}}
+{{- with .Values.schmetterpause.scoreboard.settle }}
+{{- $_ := set (index $computed "scoreboard") "settle" . }}
+{{- end }}
+{{- $seed := .Values.schmetterpause.seed | default dict }}
+{{- if eq (toString ($seed.enabled | default false)) "true" }}
+{{- $_ := set $computed "seed" (dict "enabled" true "fixture" ($seed.fixture | default "pong")) }}
+{{- end }}
 {{- /* The running score from zaehlwerk (schmetterpause#188); zaehlwerk.yaml
        allows this origin under the same condition. */}}
 {{- if and .Values.zaehlwerk.enabled .Values.zaehlwerk.liveScore }}

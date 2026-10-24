@@ -1,0 +1,85 @@
+{{- if include "tabletennis.pongEnabled" . }}
+{{- if not .Values.zaehlwerk.enabled }}
+{{- fail "pong.enabled needs zaehlwerk.enabled: the game plays its matches against zaehlwerk." }}
+{{- end }}
+{{- $version := .Values.pong.version | default .Values.zaehlwerk.version }}
+{{- $league := include "tabletennis.pongLeague" . }}
+{{- /* zaehlwerk-pong is built with zaehlwerk from v0.16.0 on, league mode from
+       v0.31.0. Below that the pod sits in ImagePullBackOff, or the game ignores
+       the league and plays demos that are reported nowhere -- refuse it here.
+       Non-semver tags (main, pr-<n>-<sha>) are taken as they are. */}}
+{{- if regexMatch "^v?[0-9]+\\.[0-9]+\\.[0-9]+$" $version }}
+{{- if not (semverCompare ">=0.16.0" $version) }}
+{{- fail (printf "pong needs zaehlwerk-pong, which exists from v0.16.0 on; the version is %s. Set pong.version or raise zaehlwerk.version." $version) }}
+{{- end }}
+{{- if and $league (not (semverCompare ">=0.31.0" $version)) }}
+{{- fail (printf "pong.league needs zaehlwerk v0.31.0 or later (MATCHES_TOKEN, league mode); the version is %s." $version) }}
+{{- end }}
+{{- end }}
+{{- /* League mode reads zaehlwerk's MATCHES_TOKEN as its ZAEHLWERK_TOKEN. Without
+       it every league start is a 503 and the pod waits on a Secret key that never
+       comes, so the two switches are required together. */}}
+{{- if and $league (ne (toString ((.Values.zaehlwerk.matches | default dict).enabled | default false)) "true") }}
+{{- fail "pong.league.enabled needs zaehlwerk.matches.enabled: the game starts its league matches through zaehlwerk's MATCHES_TOKEN door." }}
+{{- end }}
+{{- $appName := include "tabletennis.appName" . }}
+{{- $ns := .Values.zaehlwerk.namespace }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-pong" $appName | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # After zaehlwerk (wave 0): the game calls zaehlwerk's Service and reads
+    # its ConfigMap and Secret, all optional, so ordering is a hint only.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/zaehlwerk/pong
+    helm:
+      releaseName: {{ include "tabletennis.releaseName" (printf "%s-pong" $appName) | quote }}
+      valuesObject:
+        image:
+          tag: {{ $version | quote }}
+        # Same namespace as zaehlwerk, so its Service answers by its short name.
+        zaehlwerkURL: http://zaehlwerk
+        bestOf: {{ .Values.pong.bestOf | default 1 }}
+        botSkill: {{ .Values.pong.botSkill | default "mittel" | quote }}
+        attractAfter: {{ .Values.pong.attractAfter | default "" | quote }}
+        league:
+          enabled: {{ if $league }}true{{ else }}false{{ end }}
+          {{- with .Values.pong.league }}
+          operator: {{ .operator | default "Pong" | quote }}
+          playerSkill: {{ .playerSkill | quote }}
+          pause: {{ .pause | default "30s" | quote }}
+          {{- end }}
+        httpRoute:
+          enabled: true
+          hostname: {{ include "tabletennis.pongHostname" . | quote }}
+          gateway:
+            name: {{ .Values.gateway.name | quote }}
+            namespace: {{ .Values.gateway.namespace | quote }}
+            sectionName: {{ .Values.gateway.sectionNameHTTPS | quote }}
+  destination:
+    {{- include "tabletennis.destination" (dict "root" . "namespace" $ns) | nindent 4 }}
+  {{- /* Same trade as apps/zaehlwerk/install: the API server defaults
+         group/kind/weight into backendRefs, which the manifest leaves out. */}}
+  ignoreDifferences:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zaehlwerk-pong
+      jqPathExpressions:
+        - .spec.rules[].backendRefs[].group
+        - .spec.rules[].backendRefs[].kind
+        - .spec.rules[].backendRefs[].weight
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
