@@ -1,0 +1,89 @@
+---
+# zaehlwerk-pong next to a zaehlwerk (stuttgart-things/zaehlwerk cmd/zaehlwerk-pong,
+# zaehlwerk ADR-0006). Rendered by apps/tabletennis/install (`pong`) into
+# zaehlwerk's namespace. The shapes follow upstream's kcl/pong.k, as the flux
+# components zaehlwerk-pong-on / -league do -- zaehlwerk's published base
+# leaves pong off, and kustomize cannot switch on a resource that was never
+# rendered.
+#
+# EVERY PONG MATCH IS A DEMO, except in league mode (below): it starts with
+# demo: true and no player ids, so nothing is reported (zaehlwerk ADR-0008), and
+# a real match started at the table ends the demo at once.
+
+# Deployment, Service and HTTPRoute name; also the Pod's app label.
+name: zaehlwerk-pong
+
+image:
+  repository: ghcr.io/stuttgart-things/zaehlwerk-pong
+  # The same tag as zaehlwerk: one release run builds both. Exists from v0.16.0
+  # on; league mode needs v0.31.0.
+  tag: v0.31.0
+
+# zaehlwerk in the same namespace: Service `zaehlwerk`, port 80. The game talks
+# to it server-side, so it needs no ALLOWED_ORIGINS entry.
+zaehlwerkURL: http://zaehlwerk
+
+# PONG_BEST_OF: sets per match the game starts on its own (demo, attract,
+# league). One, the length of a demo and of the screensaver; the lobby also
+# offers 3 and 5.
+bestOf: 1
+
+# PONG_BOT_SKILL: leicht, mittel or schwer -- or two of them, comma-separated,
+# one per bot.
+botSkill: mittel
+
+# PONG_ATTRACT_AFTER: two bots play a demo by themselves once the table has been
+# free this long (e.g. 10m). Empty leaves the variable out, which is how the
+# game switches attract mode off -- it refuses an empty or zero duration. Not
+# together with league mode: the game refuses to start with both.
+attractAfter: ""
+
+# League mode (zaehlwerk ADR-0015, v0.31.0+): one REAL match after another
+# between two of schmetterpause's players, each at the strength `playerSkill`
+# gives its display name, reported by zaehlwerk.
+#
+# SANDBOX ONLY. A league match is no demo: it ends running demos, and its result
+# lands in schmetterpause's TTR and ranking. It needs zaehlwerk's MATCHES_TOKEN
+# (apps/zaehlwerk/install `matches`) -- read here from the same Secret as
+# ZAEHLWERK_TOKEN -- and the handover (SCHMETTERPAUSE_URL / _TOKEN, passed on
+# below): the players come from /api/players, the operator from /api/operators.
+# On a zaehlwerk without the token every league start is refused with 503.
+league:
+  enabled: false
+  # PONG_OPERATOR: who counts. The observer schmetterpause's pong seed creates.
+  operator: Pong
+  # PONG_PLAYER_SKILL: the seed's eight bots (SP_SEED_FIXTURE=pong), spread from
+  # strong to weak so the ranking has something to sort. The names are a
+  # contract with that fixture: a renamed bot plays at botSkill, and the game
+  # logs it.
+  playerSkill: Ada=schwer,Bert=schwer,Cleo=0.1,Dino=mittel,Emil=mittel,Frida=0.2,Gero=leicht,Hanna=leicht
+  # PONG_LEAGUE_PAUSE: longer than zaehlwerk's SCHMETTERPAUSE_REPORT_DELAY
+  # (15s), so a result is out before the next match starts.
+  pause: 30s
+
+# The HTTPRoute, for playing in a browser (attract and league mode need none --
+# the panel and zaehlwerk's pages show the match). Like zaehlwerk's own route
+# it is the access control: the game has no login, so it belongs on the same
+# INTERNAL gateway and listener.
+httpRoute:
+  enabled: true
+  hostname: zaehlwerk-pong.cluster.example.com
+  gateway:
+    name: gateway
+    namespace: default
+    sectionName: https
+
+# trust-manager's bundle, mounted optionally, so an https SCHMETTERPAUSE_URL
+# behind the cluster's own CA verifies. A cluster without it starts the pod
+# with an empty mount.
+caBundle:
+  configMap: cluster-trust-bundle
+  key: trust-bundle.pem
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 200m
+    memory: 64Mi

@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: zaehlwerk-pong
+description: zaehlwerk-pong (zaehlwerk cmd/zaehlwerk-pong, image zaehlwerk-pong) next to a zaehlwerk — a table tennis game that plays whole matches through the ingest contract, in the browser, in attract mode, or in league mode as the Pong sandbox's player. Deployment, Service and HTTPRoute.
+type: application
+version: 0.1.0
