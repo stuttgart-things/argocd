@@ -26,6 +26,10 @@ apps/zaehlwerk/
                     (piezoSim) and by the PR previews (platforms/zaehlwerk-pr-preview,
                     label preview-sim). A won match is handed over like any other — demo
                     and test clusters only.
+└── pong/           zaehlwerk-pong (image zaehlwerk-pong, zaehlwerk ≥ v0.16.0; league mode
+                    ≥ v0.31.0): Deployment, Service and HTTPRoute next to zaehlwerk.
+                    Rendered by apps/tabletennis/install (`pong`) — the Pong sandbox's
+                    league player.
 ```
 
 No sub-charts. Unlike schmetterpause, zaehlwerk owns no database: the running match lives in
@@ -168,6 +172,47 @@ Move the pin with the switch.
 **The token is appended, not rendered in the published base.** The base is shared, and ESO fails a whole `ExternalSecret` over one missing property: rendered there, every environment would lose its panel token over a Vault key it never asked for.
 
 **The same value as schmetterpause's scoreboard token**, which is the only thing the two sides share. Its own Vault entry, for the reason schmetterpause keeps its own separate: an entry written with `data_json` is rewritten whole.
+
+## Straight into Redis (`panel.redisAddr`, `panel.stream`)
+
+The second way onto a panel (zaehlwerk ADR-0016): `REDIS_ADDR` / `REDIS_PORT` into a Redis
+and `PANEL_STREAM` as the stream, no omni-pitcher and no catcher switch. It exists for the Pong
+sandbox next to the office's zaehlwerk:
+
+```yaml
+panel:
+  redisAddr: redis-stack.homerun2.svc.cluster.local
+  stream: tabletennis-sandbox
+```
+
+Over omni-pitcher the stream is the pitcher's routing decision, by system, which two instances
+share; straight into Redis, `stream` *is* the stream. Leave `omniPitcherURL`, `catcherURL` and
+`homerun2Namespace` empty with it: omni-pitcher wins where both are set (upstream `main.go`),
+and two zaehlwerks switching one catcher take the panel from each other. The office shows the
+sandbox between its own matches when the same stream is in its `panel.idleStreams`
+(`messages,tabletennis-sandbox`) and in the led-catcher's streams on the homerun2 side. The
+password is the Secret's `REDIS_PASSWORD`, exactly as for the omni-pitcher path.
+
+## Reported matches from outside the page (`matches`)
+
+`matches.enabled` puts `MATCHES_TOKEN` into the Secret and the container (zaehlwerk ADR-0015,
+**v0.31.0+**): `POST /matches` then takes `home_id`, `away_id` and `operator_id` behind that
+bearer, so a caller other than the scoring page can start a match that is reported. The Pong
+sandbox's league plays through it, and its `zaehlwerk-pong` reads the same key as
+`ZAEHLWERK_TOKEN` ([`pong/`](pong/)).
+
+- **Off is the guard.** Without the token a body with an id answers 503, so an office zaehlwerk
+  cannot be made to start a reported match. Never turn it on next to a real table.
+- **Two patches, not one.** The published base passes its Secret to the container one key at a
+  time from a fixed list, and v0.31.0's list has no `MATCHES_TOKEN` — the key would be fetched
+  and read by nobody. So the chart also adds the env entry (strategic merge on container
+  `zaehlwerk`). Drop that patch once the base lists the key.
+- **Needs `schmetterpause.url`**; the chart refuses to render without it. The Vault property
+  (`matches.vaultPath` / `vaultProperty`, default `zaehlwerk-matches` / `token`) has to exist
+  before this goes on — ESO fails the whole `zaehlwerk-panel` over one missing property.
+
+`pongURL` sets `PONG_URL`, the browser address of the game, for the watch screen's screensaver
+(ADR-0013).
 
 ## Application name
 

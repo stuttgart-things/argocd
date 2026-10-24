@@ -61,7 +61,15 @@ the empty string forever.
 {{- with $p.matchStreams }}{{ $_ := set $data "CATCHER_MATCH_STREAMS" . }}{{ end -}}
 {{- with $p.idleStreams }}{{ $_ := set $data "CATCHER_IDLE_STREAMS" . }}{{ end -}}
 {{- with $p.idleTimeout }}{{ $_ := set $data "CATCHER_IDLE_TIMEOUT" . }}{{ end -}}
+{{- /* Straight into a Redis rather than through omni-pitcher (upstream
+       ADR-0016): PANEL_STREAM is then the stream, where over omni-pitcher it is
+       the pitcher's routing decision. The base always carries PANEL_STREAM
+       (`tabletennis`), so setting it here replaces it. REDIS_PORT only with an
+       address, as the base renders it. */ -}}
+{{- with $p.redisAddr }}{{ $_ := set $data "REDIS_ADDR" . }}{{ $_ := set $data "REDIS_PORT" (toString ($p.redisPort | default "6379")) }}{{ end -}}
+{{- with $p.stream }}{{ $_ := set $data "PANEL_STREAM" . }}{{ end -}}
 {{- with .Values.allowedOrigins }}{{ $_ := set $data "ALLOWED_ORIGINS" . }}{{ end -}}
+{{- with .Values.pongURL }}{{ $_ := set $data "PONG_URL" . }}{{ end -}}
 {{- with (.Values.schmetterpause | default dict).url }}{{ $_ := set $data "SCHMETTERPAUSE_URL" . }}{{ end -}}
 {{- /* Empty renders as nothing rather than `{}`, so the caller can skip the
        patch entirely instead of emitting one that changes no key. */ -}}

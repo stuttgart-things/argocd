@@ -131,6 +131,61 @@ spec:
                 {{- end }}
                 {{- end }}
         {{- end }}
+        {{- $matches := .Values.matches | default dict }}
+        {{- if $matches.enabled }}
+        {{- if not $sp.url }}
+        {{- fail "matches.enabled needs schmetterpause.url: zaehlwerk opens POST /matches with player ids only when it has a schmetterpause to report to, and answers 503 otherwise" }}
+        {{- end }}
+        {{- /* MATCHES_TOKEN (zaehlwerk ADR-0015, v0.31.0+): POST /matches takes a
+               handover -- home_id, away_id, operator_id -- behind this bearer.
+               The Pong sandbox's door: every match the game starts that way is
+               reported. Without the key a body with an id answers 503, which is
+               what a zaehlwerk at a real table runs with, so this is the guard
+               that keeps the league mode off the office's pair.
+
+               Two patches, because the published base hands its Secret to the
+               container ONE KEY AT A TIME from a fixed list (kcl/deploy.k), and
+               v0.31.0's list has no MATCHES_TOKEN: in the Secret alone it would
+               be fetched from Vault and read by nobody -- the v0.4.0 trap with
+               SCHMETTERPAUSE_TOKEN. The env entry is a strategic merge on the
+               container `zaehlwerk` (env merges by name, the base's entries
+               stay). Drop it once the base lists the key, or the container gets
+               it twice. */}}
+        - target:
+            group: external-secrets.io
+            kind: ExternalSecret
+            name: zaehlwerk-panel
+          patch: |-
+            - op: add
+              path: /spec/data/-
+              value:
+                secretKey: MATCHES_TOKEN
+                remoteRef:
+                  key: {{ required "matches.vaultPath is required when matches.enabled" $matches.vaultPath | quote }}
+                  property: {{ required "matches.vaultProperty is required when matches.enabled" $matches.vaultProperty | quote }}
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: zaehlwerk
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: zaehlwerk
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: zaehlwerk
+                      env:
+                        - name: MATCHES_TOKEN
+                          valueFrom:
+                            secretKeyRef:
+                              name: zaehlwerk-panel
+                              key: MATCHES_TOKEN
+                              optional: true
+        {{- end }}
         {{- if not $omniPitcherURL }}
         {{- /* NO PANEL. The key is REMOVED, not blanked: zaehlwerk asks whether
                OMNI_PITCHER_URL is set, so an empty string is a URL it dials
