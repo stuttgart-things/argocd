@@ -79,6 +79,9 @@ spec:
               value: {{ required "league.playerSkill is required with league.enabled" .Values.league.playerSkill | quote }}
             - name: PONG_LEAGUE_PAUSE
               value: {{ .Values.league.pause | default "30s" | quote }}
+            # on/off, the game's own words; anything else stops it at startup.
+            - name: PONG_TOURNAMENTS
+              value: {{ if .Values.league.tournaments }}"on"{{ else }}"off"{{ end }}
             {{- end }}
             - name: SSL_CERT_DIR
               value: /etc/ssl/cluster-trust

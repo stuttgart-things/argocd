@@ -368,6 +368,10 @@ pong:
     # PONG_LEAGUE_PAUSE: longer than zaehlwerk's SCHMETTERPAUSE_REPORT_DELAY
     # (15s), so a result is out before the next match starts.
     pause: 30s
+    # PONG_TOURNAMENTS: open tournament places first, final included, before
+    # random pairs (zaehlwerk v0.32.0+ against schmetterpause v0.19.0+).
+    # Boolean, or the string "true"/"false".
+    tournaments: false
 
 # The light-catcher's Redis credential, as an ExternalSecret in its namespace.
 # Renders apps/homerun2/secrets (a generic ExternalSecret renderer) at

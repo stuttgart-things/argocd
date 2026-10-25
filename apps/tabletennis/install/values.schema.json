@@ -567,6 +567,13 @@
             "pause": {
               "type": "string",
               "pattern": "^[0-9]+(ms|s|m|h)$"
+            },
+            "tournaments": {
+              "type": [
+                "boolean",
+                "string"
+              ],
+              "description": "PONG_TOURNAMENTS: open tournament places first. zaehlwerk v0.32.0+, against schmetterpause v0.19.0+."
             }
           }
         }
