@@ -72,6 +72,10 @@
         "pause": {
           "type": "string",
           "pattern": "^[0-9]+(ms|s|m|h)$"
+        },
+        "tournaments": {
+          "type": "boolean",
+          "description": "PONG_TOURNAMENTS (zaehlwerk v0.32.0+): open tournament places first, before random pairs. Needs schmetterpause v0.19.0+."
         }
       }
     },
