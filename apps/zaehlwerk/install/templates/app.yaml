@@ -143,14 +143,15 @@ spec:
                what a zaehlwerk at a real table runs with, so this is the guard
                that keeps the league mode off the office's pair.
 
-               Two patches, because the published base hands its Secret to the
-               container ONE KEY AT A TIME from a fixed list (kcl/deploy.k), and
-               v0.31.0's list has no MATCHES_TOKEN: in the Secret alone it would
-               be fetched from Vault and read by nobody -- the v0.4.0 trap with
-               SCHMETTERPAUSE_TOKEN. The env entry is a strategic merge on the
-               container `zaehlwerk` (env merges by name, the base's entries
-               stay). Drop it once the base lists the key, or the container gets
-               it twice. */}}
+               The ExternalSecret entry always. The env entry only below v0.32.0:
+               the published base hands its Secret to the container ONE KEY AT A
+               TIME from a fixed list (kcl/deploy.k), and v0.31.0's list has no
+               MATCHES_TOKEN -- in the Secret alone it would be fetched from
+               Vault and read by nobody, the v0.4.0 trap with
+               SCHMETTERPAUSE_TOKEN. From v0.32.0 the base lists it
+               (zaehlwerk#178), so the entry is left to the base. A tag that is
+               not semver (main, pr-<n>-<sha>) is taken as current. */}}
+        {{- $matchesEnv := and (regexMatch "^v?[0-9]+\\.[0-9]+\\.[0-9]+$" .Values.version) (not (semverCompare ">=0.32.0" .Values.version)) }}
         - target:
             group: external-secrets.io
             kind: ExternalSecret
@@ -163,6 +164,7 @@ spec:
                 remoteRef:
                   key: {{ required "matches.vaultPath is required when matches.enabled" $matches.vaultPath | quote }}
                   property: {{ required "matches.vaultProperty is required when matches.enabled" $matches.vaultProperty | quote }}
+        {{- if $matchesEnv }}
         - target:
             group: apps
             version: v1
@@ -185,6 +187,7 @@ spec:
                               name: zaehlwerk-panel
                               key: MATCHES_TOKEN
                               optional: true
+        {{- end }}
         {{- end }}
         {{- if not $omniPitcherURL }}
         {{- /* NO PANEL. The key is REMOVED, not blanked: zaehlwerk asks whether
