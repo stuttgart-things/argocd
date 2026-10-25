@@ -12,7 +12,7 @@ applicationName: ""
 cascadingDelete: false
 
 # renovate: datasource=helm depName=argo-workflows registryUrl=https://argoproj.github.io/argo-helm
-chartVersion: 2.0.13
+chartVersion: 2.0.14
 
 # Public hostname of the server UI, e.g. workflows.<cluster>.<zone>.
 # Empty renders nothing.
