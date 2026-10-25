@@ -1,0 +1,53 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: schmetterpause-seed
+  labels:
+    app.kubernetes.io/name: schmetterpause
+    app.kubernetes.io/component: seed
+  annotations:
+    # A Job's pod template is immutable, so a new image tag would be a rejected
+    # patch. Force + Replace makes Argo CD delete and recreate it instead, and
+    # the seed's own guard makes the new run a no-op -- what flux's
+    # kustomize.toolkit.fluxcd.io/force does for the same Job.
+    #
+    # A plain resource rather than upstream's PostSync hook: this Job is the
+    # only thing in its Application, and an Application of hooks alone has
+    # nothing to be OutOfSync about, so automated sync would never run it.
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+spec:
+  backoffLimit: {{ .Values.backoffLimit }}
+  {{- /* No ttlSecondsAfterFinished: a Job the cluster deletes is one Argo CD
+         recreates, and the seed would run again on every sync. */}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: schmetterpause
+        app.kubernetes.io/component: seed
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: seed
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          args: ["seed"]
+          env:
+            - name: SP_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.databaseSecret }}
+                  key: SP_DATABASE_URL
+            - name: SP_SEED_FIXTURE
+              value: {{ .Values.fixture | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

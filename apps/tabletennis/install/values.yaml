@@ -100,7 +100,7 @@ schmetterpause:
   namespace: schmetterpause
   hostname: ""                       # empty = schmetterpause.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-  version: v0.17.0
+  version: v0.18.0
   # Display name of the player who gets the admin flag at every start
   # (SP_BOOTSTRAP_ADMIN, schmetterpause ADR-0008). Empty sets nothing, which is
   # the normal state after the first pass: the person has to have joined
@@ -123,6 +123,11 @@ schmetterpause:
     enabled: false
     vaultPath: schmetterpause-scoreboard
     vaultProperty: token
+    # SP_SCOREBOARD_SETTLE (schmetterpause v0.18.0+). Empty = the app's
+    # `pending`: a handed-over result waits for a player to confirm it.
+    # `immediate` counts it at once -- THE PONG SANDBOX ONLY, where nobody
+    # confirms and TTR would otherwise never move. Never at the office.
+    settle: ""
   # Kyverno admission policy: the app image must carry a keyless signature from
   # schmetterpause's CI (ADR-0020/0021), read from the schmetterpause repository
   # at the same tag as `version`. Deny from v0.16.0 — an unsigned image is
@@ -133,6 +138,15 @@ schmetterpause:
   # Applications fight over the same object.
   policy:
     enabled: false
+  # A Job that fills an EMPTY database with a fixture (apps/schmetterpause/seed,
+  # its own Application at wave 1). `pong`: the Pong sandbox's eight bots
+  # (Ada ... Hanna) and the observer `Pong` that pong.league.operator names
+  # (schmetterpause ADR-0027, v0.18.0+). The binary refuses a database that
+  # already has players, so a re-run is a no-op -- but only the sandbox turns
+  # this on. Boolean, or the string "true"/"false" from a platform AppSet.
+  seed:
+    enabled: false
+    fixture: pong
   # Anything else from apps/schmetterpause/install's values, merged on top of
   # what this chart computes (and winning over it). Its own schema validates the
   # result, so the knobs are documented there rather than repeated here.
@@ -151,7 +165,7 @@ zaehlwerk:
   namespace: zaehlwerk
   hostname: ""                       # empty = zaehlwerk.<domain>
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
-  version: v0.30.0
+  version: v0.31.0
   # The handover to schmetterpause: a won match goes to its POST /api/results and
   # the scoring page offers its real players (zaehlwerk ADR-0004,
   # schmetterpause ADR-0015).
@@ -195,7 +209,47 @@ zaehlwerk:
   # chart then removes OMNI_PITCHER_URL from the base's ConfigMap rather than
   # blanking it, because zaehlwerk asks whether the variable is SET and would
   # dial an empty string forever.
+  #
+  # Or spell the mode out, as flux's TABLETENNIS_ZAEHLWERK_PANEL does:
+  #   homerun2  (= true)  OMNI_PITCHER_URL + CATCHER_URL, the catcher switched
+  #                       to the table's stream during a match
+  #   off       (= false) no panel
+  #   redis               REDIS_ADDR into homerun2's Redis (redis-stack.<ns>),
+  #                       the score on `panelStream`, and NO catcher switch
+  #                       (zaehlwerk ADR-0016) -- the Pong sandbox's way onto
+  #                       the office's panel. Needs homerun2.namespace.
   panel: true
+  # PANEL_STREAM with `panel: redis`. Empty keeps the base's `tabletennis` --
+  # which is the office's stream, so a sandbox sets its own
+  # (`tabletennis-sandbox`).
+  panelStream: ""
+  # CATCHER_IDLE_STREAMS with `panel: homerun2`: what the led-catcher goes back
+  # to when a match ends. Empty leaves the key out and zaehlwerk returns it to
+  # `messages`. The office next to a Pong sandbox sets
+  # `messages,tabletennis-sandbox`, so the sandbox's matches show while the
+  # table is free, and a real match takes the panel back by the existing rule
+  # (ADR-0003). homerun2's led-catcher has to read that stream too.
+  catcherIdleStreams: ""
+  # Where the handover posts to. Empty = schmetterpause's route
+  # (https://<schmetterpause hostname>). The sandbox uses the in-cluster
+  # Service of its own namespace
+  # (http://schmetterpause.<namespace>.svc.cluster.local), so its league
+  # depends on no certificate.
+  schmetterpauseURL: ""
+  # MATCHES_TOKEN: POST /matches with player ids (zaehlwerk ADR-0015,
+  # v0.31.0+), the door the Pong sandbox's league plays through -- every
+  # match started that way is reported. NEVER ON THE OFFICE'S PAIR: without the
+  # token a body with an id answers 503, and that is the guard.
+  #
+  # Needs the handover (schmetterpause.scoreboard.enabled + `handover`); the
+  # chart refuses it otherwise. Read through zaehlwerk's store (the panel's),
+  # and the property has to exist in Vault BEFORE this goes on -- ESO fails the
+  # whole zaehlwerk-panel Secret over one missing property.
+  # `openssl rand -hex 32`. pong.league reads the same key.
+  matches:
+    enabled: false
+    vaultPath: zaehlwerk-matches
+    vaultProperty: token
   # Same pass-through as schmetterpause.values, against apps/zaehlwerk/install.
   values: {}
 
@@ -275,6 +329,45 @@ piezoSim:
     resend: "0.1"
     undo: "0.05"
     seed: "1"
+
+# zaehlwerk-pong next to zaehlwerk (apps/zaehlwerk/pong, its own Application at
+# wave 1, in zaehlwerk's namespace): the game in the browser at `hostname`, and
+# with `league` the Pong sandbox's player. Also sets zaehlwerk's PONG_URL, so
+# the watch screen can frame its screensaver (zaehlwerk ADR-0013).
+#
+# Without `league`, EVERY PONG MATCH IS A DEMO (zaehlwerk ADR-0008): it is
+# reported nowhere and a real match at the table ends it at once. Like
+# zaehlwerk's own, its route is the access control -- it rides on `gateway`.
+pong:
+  # Boolean, or the string "true"/"false" from a platform AppSet label.
+  enabled: false
+  hostname: ""                       # empty = zaehlwerk-pong.<domain>
+  # zaehlwerk-pong image tag. Empty = zaehlwerk.version (one release run builds
+  # both). From v0.16.0 on; league mode needs v0.31.0. The chart refuses older.
+  version: ""
+  bestOf: 1
+  # leicht, mittel or schwer -- or two, comma-separated, one per bot.
+  botSkill: mittel
+  # Attract mode: two bots play a demo once the table has been free this long
+  # (e.g. 10m). Empty = off. Not together with league -- the game refuses both.
+  attractAfter: ""
+  # League mode (zaehlwerk ADR-0015, v0.31.0+): one REAL match after another
+  # between two of schmetterpause's players, reported and rated. SANDBOX ONLY.
+  # Needs zaehlwerk.matches (its token is the game's ZAEHLWERK_TOKEN) and the
+  # handover; the players come from /api/players, the operator from
+  # /api/operators -- schmetterpause.seed creates both.
+  league:
+    # Boolean, or the string "true"/"false".
+    enabled: false
+    # PONG_OPERATOR: the observer the pong seed creates.
+    operator: Pong
+    # PONG_PLAYER_SKILL: the seed's eight bots, strong to weak, so the ranking
+    # has something to sort. A contract with SP_SEED_FIXTURE=pong: a renamed
+    # bot plays at botSkill.
+    playerSkill: Ada=schwer,Bert=schwer,Cleo=0.1,Dino=mittel,Emil=mittel,Frida=0.2,Gero=leicht,Hanna=leicht
+    # PONG_LEAGUE_PAUSE: longer than zaehlwerk's SCHMETTERPAUSE_REPORT_DELAY
+    # (15s), so a result is out before the next match starts.
+    pause: 30s
 
 # The light-catcher's Redis credential, as an ExternalSecret in its namespace.
 # Renders apps/homerun2/secrets (a generic ExternalSecret renderer) at

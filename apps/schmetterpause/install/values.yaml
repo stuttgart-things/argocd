@@ -54,7 +54,7 @@ syncPolicy:
 # off auto-merge for exactly that reason; do not fold them back in.
 #
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/schmetterpause-kustomize
-version: v0.17.0
+version: v0.18.0
 
 # FQDN the app is served on. Patched into both HTTPRoutes and into
 # SP_PUBLIC_BASE_URL, which the app uses to build absolute links — the base
@@ -244,6 +244,16 @@ scoreboard:
   # the consumer that forgot it.
   vaultPath: ""
   vaultProperty: token
+  # How a result through POST /api/results settles (SP_SCOREBOARD_SETTLE,
+  # schmetterpause ADR-0027, v0.18.0+). Empty sets nothing, which is the app's
+  # `pending`: the result waits for a player to confirm it.
+  #
+  # `immediate` counts it at once -- FOR THE PONG SANDBOX ONLY, where nobody
+  # confirms anything and every league result would otherwise stay pending with
+  # TTR never moving. At the office it would rate the Zählwerk's matches without
+  # anybody agreeing to them; schmetterpause logs a warning at start with it on,
+  # so a value copied from the sandbox shows up.
+  settle: ""
 
 # The kiosk: one browser at the table that may enter results for anyone and
 # issue a recovery code for somebody STANDING NEXT TO IT (schmetterpause
@@ -293,6 +303,20 @@ monitoring:
 # and the alert tells whoever is not watching the rollout.
 policy:
   enabled: false
+
+# A Job that fills an EMPTY database with a fixture (`schmetterpause seed`,
+# apps/schmetterpause/seed), as its own Application at sync-wave 1. `pong` is
+# the Pong sandbox's field: eight bot players (Ada ... Hanna) and the observer
+# `Pong` zaehlwerk-pong's league mode counts as (ADR-0027, v0.18.0+).
+#
+# Off by default. The binary refuses a database that already has players and
+# exits 0, so a re-run -- every new `version` recreates the Job -- is a no-op;
+# but that is not a guard against the office's league: only the sandbox turns
+# this on. Needs `database.enabled` (it reads the Secret the base's
+# schmetterpause-db ExternalSecret writes).
+seed:
+  enabled: false
+  fixture: pong
 
 # Whether deleting the parent Application also prunes what it deployed.
 #

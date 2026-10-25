@@ -215,8 +215,70 @@
         },
         "idleTimeout": {
           "type": "string"
+        },
+        "redisAddr": {
+          "type": "string",
+          "description": "REDIS_ADDR: publish straight into this Redis instead of through omni-pitcher (zaehlwerk ADR-0016). Empty sets neither REDIS_ADDR nor REDIS_PORT."
+        },
+        "redisPort": {
+          "type": [
+            "string",
+            "integer"
+          ],
+          "pattern": "^([0-9]{1,5})?$",
+          "description": "REDIS_PORT, with redisAddr only. Empty = 6379."
+        },
+        "stream": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9._:-]+)?$",
+          "description": "PANEL_STREAM, the stream the score goes to. Empty keeps the base's `tabletennis`."
         }
       }
+    },
+    "matches": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "MATCHES_TOKEN for POST /matches with player ids (zaehlwerk v0.31.0+), the Pong sandbox's door. Appended to the ExternalSecret and named in the container's env. Needs schmetterpause.url.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "vaultPath": {
+          "type": "string"
+        },
+        "vaultProperty": {
+          "type": "string"
+        }
+      },
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
+      "then": {
+        "required": [
+          "vaultPath",
+          "vaultProperty"
+        ],
+        "properties": {
+          "vaultPath": {
+            "minLength": 1
+          },
+          "vaultProperty": {
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "pongURL": {
+      "type": "string",
+      "pattern": "^(https?://.+)?$",
+      "description": "PONG_URL: the browser address of zaehlwerk-pong, for the watch screen's screensaver. Empty sets nothing."
     },
     "reloader": {
       "type": "boolean",

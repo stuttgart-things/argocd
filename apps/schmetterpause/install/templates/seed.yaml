@@ -1,0 +1,48 @@
+{{- if (.Values.seed | default dict).enabled }}
+{{- if not .Values.database.enabled }}
+{{- fail "seed.enabled needs database.enabled: the Job reads the database Secret and writes into that database" }}
+{{- end }}
+{{- /* The pong fixture exists from v0.18.0 on; an older binary fails the Job
+       with an unknown fixture while the Application looks merely Progressing.
+       Non-semver tags (preview, a SHA) are taken as they are. */}}
+{{- $v := trimPrefix "v" .Values.version }}
+{{- if and (eq (.Values.seed.fixture | default "pong") "pong") (regexMatch "^[0-9]+\\.[0-9]+\\.[0-9]+$" $v) (not (semverCompare ">=0.18.0" $v)) }}
+{{- fail (printf "seed.fixture pong needs schmetterpause v0.18.0 or later, got %q" .Values.version) }}
+{{- end }}
+{{- $name := include "schmetterpause.appName" . }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-seed" $name | quote }}
+  namespace: argocd
+  {{- if $.Values.cascadingDelete }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+  annotations:
+    # After the app (0) and its database (-10). Top-level ordering is a hint
+    # only; the Job's own retries cover a database or schema not there yet.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/schmetterpause/seed
+    helm:
+      releaseName: {{ include "schmetterpause.releaseName" (printf "%s-seed" $name) | quote }}
+      valuesObject:
+        image:
+          tag: {{ .Values.version | quote }}
+        fixture: {{ .Values.seed.fixture | default "pong" | quote }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

@@ -1,0 +1,40 @@
+---
+# `schmetterpause seed` as a Job, in the shape of upstream's kcl/seed.k and
+# flux's schmetterpause-seed-pong. Rendered by apps/schmetterpause/install
+# (`seed`) into the app's namespace.
+#
+# Why this catalog renders it: the published base carries its seed Job only in
+# pr-* artefacts, and kustomize cannot switch on a resource that was never
+# rendered.
+#
+# SAFE TO RUN AGAIN, and that is what makes it a plain Job. `seed` refuses a
+# database that already has players and exits 0 with "nothing seeded, the
+# database is in use". It is NOT a guard against pointing it at the office's
+# league -- that is the namespace, and only the sandbox turns this on.
+
+image:
+  repository: ghcr.io/stuttgart-things/schmetterpause
+  # apps/schmetterpause/install passes its `version`. `pong` needs v0.18.0.
+  tag: v0.18.0
+
+# SP_SEED_FIXTURE: `pong` (eight bots, Ada ... Hanna, and the observer Pong
+# that zaehlwerk-pong's league mode counts as) or `demo`, the binary's default.
+fixture: pong
+
+# The Secret holding SP_DATABASE_URL -- the one the base's `schmetterpause-db`
+# ExternalSecret assembles. `seed` needs that and nothing else: it does not
+# serve, so it never holds a session key.
+databaseSecret: schmetterpause-db
+
+# The database is created in the same sync and the schema by the app's migrate
+# init container, so the first attempts can find no database or no tables. Ten
+# retries with the Job's own backoff ride that out (a few minutes).
+backoffLimit: 10
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi

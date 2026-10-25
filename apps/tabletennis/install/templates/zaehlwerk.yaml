@@ -14,9 +14,35 @@
        go, and the led-catcher zaehlwerk takes over for the duration of a match.
        With homerun2.namespace empty the sub-chart gets no panel at all, which is
        a supported and silent mode rather than a degraded one. */}}
+{{- /* `panel` is true/false as before, or the mode spelled out: `homerun2`
+       (= true), `off` (= false), or `redis` -- straight into homerun2's Redis
+       onto `panelStream`, never switching the catcher (zaehlwerk ADR-0016),
+       the Pong sandbox's way onto the office's panel. Compared as a string, so
+       the "false" a platform AppSet hands over is off rather than truthy. */}}
+{{- $panelMode := toString .Values.zaehlwerk.panel }}
+{{- if eq $panelMode "true" }}{{ $panelMode = "homerun2" }}{{ end }}
 {{- $panel := dict }}
-{{- if and .Values.zaehlwerk.panel .Values.homerun2.namespace }}
+{{- if and (eq $panelMode "homerun2") .Values.homerun2.namespace }}
 {{- $panel = dict "homerun2Namespace" .Values.homerun2.namespace }}
+{{- /* What the catcher returns to after a match. The office next to a Pong
+       sandbox lists the sandbox's stream here (messages,tabletennis-sandbox),
+       so the sandbox's matches show while the table is free. */}}
+{{- with .Values.zaehlwerk.catcherIdleStreams }}
+{{- $_ := set $panel "idleStreams" . }}
+{{- end }}
+{{- else if eq $panelMode "redis" }}
+{{- if not .Values.homerun2.namespace }}
+{{- fail "zaehlwerk.panel redis needs homerun2.namespace: the stream goes into homerun2's Redis (redis-stack.<namespace>)" }}
+{{- end }}
+{{- /* REDIS_ADDR rather than omni-pitcher: over omni-pitcher the stream is the
+       pitcher's routing decision, by system, which both instances share;
+       straight into Redis, PANEL_STREAM is the stream. No catcher URL on
+       purpose: two zaehlwerks switching one catcher would take the panel from
+       each other. The password is the Secret's REDIS_PASSWORD, homerun2's. */}}
+{{- $panel = dict "redisAddr" (printf "redis-stack.%s.svc.cluster.local" .Values.homerun2.namespace) "redisPort" "6379" }}
+{{- with .Values.zaehlwerk.panelStream }}
+{{- $_ := set $panel "stream" . }}
+{{- end }}
 {{- end }}
 {{- /* The handover to schmetterpause (zaehlwerk ADR-0004, schmetterpause
        ADR-0015). Derived rather than configured, because this chart already
@@ -48,8 +74,11 @@
 {{- end }}
 {{- $handover := dict }}
 {{- if and .Values.zaehlwerk.handover .Values.schmetterpause.enabled $scoreboard.enabled }}
+{{- /* `zaehlwerk.schmetterpauseURL` replaces the route with another address
+       -- the sandbox's in-cluster Service, so its league depends on no
+       certificate. */}}
 {{- $handover = dict
-      "url"           (printf "https://%s" (include "tabletennis.hostname" (dict "root" . "name" "schmetterpause")))
+      "url"           (.Values.zaehlwerk.schmetterpauseURL | default (printf "https://%s" (include "tabletennis.hostname" (dict "root" . "name" "schmetterpause"))))
       "vaultPath"     $scoreboardPath
       "vaultProperty" $scoreboard.vaultProperty }}
 {{- if and $spSrc.store (ne $spSrc.store $panelStore) }}
@@ -89,6 +118,21 @@
 }}
 {{- if $hrSrc.entry }}
 {{- $_ := set $computed "homerun2Secrets" (dict "vaultEntry" $hrSrc.entry) }}
+{{- end }}
+{{- /* MATCHES_TOKEN, the Pong sandbox's door (zaehlwerk ADR-0015). Only
+       with the handover in place: zaehlwerk opens POST /matches with ids only
+       when it has a schmetterpause to report to. */}}
+{{- $matches := .Values.zaehlwerk.matches | default dict }}
+{{- if eq (toString ($matches.enabled | default false)) "true" }}
+{{- if not $handover }}
+{{- fail "zaehlwerk.matches.enabled needs the handover: schmetterpause.enabled, schmetterpause.scoreboard.enabled and zaehlwerk.handover" }}
+{{- end }}
+{{- $_ := set $computed "matches" (dict "enabled" true "vaultPath" $matches.vaultPath "vaultProperty" $matches.vaultProperty) }}
+{{- end }}
+{{- /* PONG_URL for the watch screen's screensaver: the game's route, the
+       address a browser at the table reaches it at. */}}
+{{- if include "tabletennis.pongEnabled" . }}
+{{- $_ := set $computed "pongURL" (printf "https://%s" (include "tabletennis.pongHostname" .)) }}
 {{- end }}
 {{- if .Values.destination.name }}
 {{- $_ := set (index $computed "destination") "name" .Values.destination.name }}

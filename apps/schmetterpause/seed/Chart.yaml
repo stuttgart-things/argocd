@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: schmetterpause-seed
+description: A Job that fills an EMPTY schmetterpause database with a fixture (`schmetterpause seed`, SP_SEED_FIXTURE) — the Pong sandbox's eight bot players and its observer `Pong` (schmetterpause ADR-0027, v0.18.0+). The binary refuses a database that already has players, so every later run is a no-op.
+type: application
+version: 0.1.0

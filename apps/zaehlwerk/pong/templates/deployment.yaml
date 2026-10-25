@@ -1,0 +1,122 @@
+{{- if and .Values.league.enabled .Values.attractAfter }}
+{{- fail "league.enabled and attractAfter together: the game refuses to start with both, since both start matches by themselves" }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.name }}
+    app.kubernetes.io/part-of: zaehlwerk
+spec:
+  # One: a game is in the memory of the pod playing it, and a browser game's
+  # token is known to that pod only. Two pods would be two games fighting over
+  # one table.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.name }}
+        app.kubernetes.io/part-of: zaehlwerk
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pong
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          env:
+            - name: ZAEHLWERK_URL
+              value: {{ .Values.zaehlwerkURL | quote }}
+            - name: HTTP_ADDR
+              value: ":8081"
+            - name: PONG_BEST_OF
+              value: {{ .Values.bestOf | quote }}
+            - name: PONG_BOT_SKILL
+              value: {{ .Values.botSkill | quote }}
+            {{- with .Values.attractAfter }}
+            - name: PONG_ATTRACT_AFTER
+              value: {{ . | quote }}
+            {{- end }}
+            # zaehlwerk's own schmetterpause and token, both optional: the
+            # names the lobby offers, and in league mode where the players and
+            # the operator come from.
+            - name: SCHMETTERPAUSE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: zaehlwerk-config
+                  key: SCHMETTERPAUSE_URL
+                  optional: true
+            - name: SCHMETTERPAUSE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: zaehlwerk-panel
+                  key: SCHMETTERPAUSE_TOKEN
+                  optional: true
+            {{- if .Values.league.enabled }}
+            # zaehlwerk's MATCHES_TOKEN, one credential read twice. NOT
+            # optional: a league player without it is refused on every start,
+            # and a pod that will not start says so sooner.
+            - name: ZAEHLWERK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: zaehlwerk-panel
+                  key: MATCHES_TOKEN
+            - name: PONG_OPERATOR
+              value: {{ required "league.operator is required with league.enabled" .Values.league.operator | quote }}
+            - name: PONG_PLAYER_SKILL
+              value: {{ required "league.playerSkill is required with league.enabled" .Values.league.playerSkill | quote }}
+            - name: PONG_LEAGUE_PAUSE
+              value: {{ .Values.league.pause | default "30s" | quote }}
+            {{- end }}
+            - name: SSL_CERT_DIR
+              value: /etc/ssl/cluster-trust
+          volumeMounts:
+            - name: cluster-trust
+              mountPath: /etc/ssl/cluster-trust
+              readOnly: true
+          ports:
+            - name: http
+              containerPort: 8081
+          # /healthz says the process is up and does not ask zaehlwerk: a
+          # zaehlwerk that is down is a game that cannot start, not a pod to
+          # restart.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: cluster-trust
+          configMap:
+            name: {{ .Values.caBundle.configMap }}
+            optional: true
+            items:
+              - key: {{ .Values.caBundle.key }}
+                path: ca.pem

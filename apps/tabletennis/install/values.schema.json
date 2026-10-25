@@ -209,6 +209,15 @@
             "vaultProperty": {
               "type": "string",
               "minLength": 1
+            },
+            "settle": {
+              "type": "string",
+              "enum": [
+                "",
+                "pending",
+                "immediate"
+              ],
+              "description": "SP_SCOREBOARD_SETTLE (schmetterpause v0.18.0+). Empty = the app's pending. immediate is for the Pong sandbox only."
             }
           }
         },
@@ -219,6 +228,27 @@
           "properties": {
             "enabled": {
               "type": "boolean"
+            }
+          }
+        },
+        "seed": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A Job running `schmetterpause seed` (apps/schmetterpause/seed) on an empty database. pong: the Pong sandbox's bots and observer (v0.18.0+). Sandbox only.",
+          "properties": {
+            "enabled": {
+              "type": [
+                "boolean",
+                "string"
+              ],
+              "description": "Accepts \"true\"/\"false\" as well as a boolean, for a platform AppSet."
+            },
+            "fixture": {
+              "type": "string",
+              "enum": [
+                "pong",
+                "demo"
+              ]
             }
           }
         },
@@ -261,12 +291,60 @@
           "description": "Wire schmetterpause's running score: its SP_ZAEHLWERK_URL to zaehlwerk's hostname and its origin into zaehlwerk's ALLOWED_ORIGINS, when both are on this cluster. Shows from schmetterpause >= v0.15.0."
         },
         "panel": {
-          "type": "boolean",
-          "description": "Wire the scoreboard panel from homerun2.namespace. False runs zaehlwerk without one even where homerun2 is present."
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "true",
+            "false",
+            "homerun2",
+            "redis",
+            "off"
+          ],
+          "description": "The scoreboard panel. true/homerun2: OMNI_PITCHER_URL + CATCHER_URL from homerun2.namespace. false/off: none. redis: REDIS_ADDR into homerun2's Redis onto panelStream, no catcher switch (zaehlwerk ADR-0016) -- the Pong sandbox's way onto the office's panel."
+        },
+        "panelStream": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9._:-]+)?$",
+          "description": "PANEL_STREAM with panel: redis. Empty keeps the base's `tabletennis`, the office's stream."
+        },
+        "catcherIdleStreams": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9._:-]+(,[a-zA-Z0-9._:-]+)*)?$",
+          "description": "CATCHER_IDLE_STREAMS with panel: homerun2. Empty = zaehlwerk's default (messages). The office next to a Pong sandbox: messages,tabletennis-sandbox."
         },
         "handover": {
           "type": "boolean",
           "description": "Wire zaehlwerk's SCHMETTERPAUSE_URL and token when schmetterpause.scoreboard.enabled is on. No effect on its own \u2014 the scoreboard switch is what makes the receiving surface exist. Needs zaehlwerk >= v0.5.0, which is the first tag that trusts the cluster CA over the HTTPRoute."
+        },
+        "schmetterpauseURL": {
+          "type": "string",
+          "pattern": "^(https?://.+)?$",
+          "description": "Where the handover posts to. Empty = https://<schmetterpause hostname>. The sandbox: its in-cluster Service."
+        },
+        "matches": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "MATCHES_TOKEN for POST /matches with player ids (zaehlwerk v0.31.0+), the Pong sandbox's door. Needs the handover. Never on the office's pair.",
+          "properties": {
+            "enabled": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "vaultPath": {
+              "type": "string",
+              "minLength": 1
+            },
+            "vaultProperty": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
         },
         "values": {
           "type": "object",
@@ -425,6 +503,70 @@
             "seed": {
               "type": "string",
               "pattern": "^-?[0-9]+$"
+            }
+          }
+        }
+      }
+    },
+    "pong": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "zaehlwerk-pong next to zaehlwerk (apps/zaehlwerk/pong). Without league every match is a demo, reported nowhere. With league: the Pong sandbox's player -- real, reported matches between schmetterpause's players. Sandbox only.",
+      "properties": {
+        "enabled": {
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "description": "Accepts \"true\"/\"false\" as well as a boolean, for a platform AppSet."
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Empty = zaehlwerk-pong.<domain>."
+        },
+        "version": {
+          "type": "string",
+          "description": "zaehlwerk-pong image tag. Empty = zaehlwerk.version. Needs v0.16.0, league v0.31.0."
+        },
+        "bestOf": {
+          "type": "integer",
+          "enum": [
+            1,
+            3,
+            5,
+            7
+          ]
+        },
+        "botSkill": {
+          "type": "string",
+          "pattern": "^(leicht|mittel|schwer)(,(leicht|mittel|schwer))?$"
+        },
+        "attractAfter": {
+          "type": "string",
+          "pattern": "^([0-9]+(ms|s|m|h))?$",
+          "description": "PONG_ATTRACT_AFTER. Empty = attract mode off. Not with league."
+        },
+        "league": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "operator": {
+              "type": "string",
+              "minLength": 1
+            },
+            "playerSkill": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pause": {
+              "type": "string",
+              "pattern": "^[0-9]+(ms|s|m|h)$"
             }
           }
         }

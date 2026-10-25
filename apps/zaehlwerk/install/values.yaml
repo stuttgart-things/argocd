@@ -52,7 +52,7 @@ syncPolicy:
 # shared images group and off auto-merge for exactly that reason.
 #
 # renovate: datasource=docker depName=ghcr.io/stuttgart-things/zaehlwerk-kustomize
-version: v0.30.0
+version: v0.31.0
 
 # FQDN the scoreboard is served on, patched into the HTTPRoute. The base ships
 # zaehlwerk.cluster.example.com.
@@ -190,6 +190,53 @@ panel:
   matchStreams: ""
   idleStreams: ""
   idleTimeout: ""
+
+  # The other way onto a panel: straight into a Redis (REDIS_ADDR, REDIS_PORT),
+  # onto `stream` (PANEL_STREAM), with no omni-pitcher and no catcher switch
+  # (zaehlwerk ADR-0016). Made for the Pong sandbox next to the office: its
+  # matches go to a stream of their own, the office's zaehlwerk lists that
+  # stream in its `idleStreams`, and the catcher shows the sandbox while the
+  # real table is free. Leave omniPitcherURL, catcherURL and homerun2Namespace
+  # empty with it -- omni-pitcher wins where both are set (upstream main.go),
+  # and two zaehlwerks switching one catcher take the panel from each other.
+  #
+  # The password is the Secret's REDIS_PASSWORD, as for the omni-pitcher path:
+  # the base's `zaehlwerk:redis-password`, or homerun2's own entry with
+  # homerun2Secrets.vaultEntry.
+  #
+  # Empty redisAddr sets neither key; empty stream keeps the base's
+  # PANEL_STREAM (`tabletennis`).
+  redisAddr: ""
+  redisPort: ""                      # empty = 6379
+  stream: ""
+
+# POST /matches with player ids (zaehlwerk ADR-0015, v0.31.0+): a caller other
+# than the scoring page starts a REPORTED match by handing over home_id,
+# away_id and operator_id, behind the bearer MATCHES_TOKEN. The Pong sandbox's
+# league plays through it. Off by default, and off is the guard: without the
+# token a body with an id answers 503, so nothing can start a reported match
+# on a zaehlwerk at a real table.
+#
+# On appends MATCHES_TOKEN to the `zaehlwerk-panel` ExternalSecret AND names it
+# in the container's env -- the v0.31.0 base passes Secret keys one at a time
+# and does not list this one. Needs `schmetterpause.url` (zaehlwerk opens the
+# door only with a schmetterpause to report to; the chart refuses to render
+# without it). Read through `secretStore`. The property has to exist in Vault
+# BEFORE this goes on: ESO fails the whole ExternalSecret over one missing
+# property, the panel token included. `openssl rand -hex 32`.
+#
+# The same value is zaehlwerk-pong's ZAEHLWERK_TOKEN in league mode
+# (apps/zaehlwerk/pong reads it from this Secret).
+matches:
+  enabled: false
+  vaultPath: zaehlwerk-matches
+  vaultProperty: token
+
+# The address a BROWSER at the table reaches zaehlwerk-pong at (PONG_URL): the
+# watch screen frames its /screensaver once the side select has been idle
+# (zaehlwerk ADR-0013, v0.21.0). The game's HTTPRoute host, never its Service
+# -- zaehlwerk itself never calls it. Empty sets nothing.
+pongURL: ""
 
 # Stakater Reloader annotation on the Deployment: roll zaehlwerk when
 # zaehlwerk-config or the panel Secret changes. zaehlwerk reads both only at

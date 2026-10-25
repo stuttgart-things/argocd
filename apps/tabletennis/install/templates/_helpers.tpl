@@ -95,7 +95,7 @@ Returns JSON; callers fromJson it.
        explicitly rather than "every .enabled found": a rename upstream should
        fail the render here, not silently stop converting and hand a string to
        a schema that wants a boolean. */ -}}
-{{- range $block := list "monitoring" "policy" "scoreboard" "kiosk" -}}
+{{- range $block := list "monitoring" "policy" "scoreboard" "kiosk" "seed" -}}
 {{- $b := get $v $block -}}
 {{- if and (kindIs "map" $b) (hasKey $b "enabled") -}}
 {{- $_ := set $b "enabled" (eq (toString (get $b "enabled")) "true") -}}
@@ -150,4 +150,25 @@ platform AppSet may template them from a label or annotation.
 {{- $r := .Values.lightCatcher.reloader -}}
 {{- if kindIs "invalid" $r }}{{ $r = true }}{{ end -}}
 {{- if eq (toString $r) "true" }}true{{ end -}}
+{{- end -}}
+
+{{/*
+tabletennis.pongEnabled / tabletennis.pongLeague -- "true" or empty,
+string-compared like lightCatcherEnabled, so a platform AppSet may template
+them from a label.
+*/}}
+{{- define "tabletennis.pongEnabled" -}}
+{{- if eq ((.Values.pong | default dict).enabled | default false | toString) "true" }}true{{ end -}}
+{{- end -}}
+
+{{- define "tabletennis.pongLeague" -}}
+{{- if eq (((.Values.pong | default dict).league | default dict).enabled | default false | toString) "true" }}true{{ end -}}
+{{- end -}}
+
+{{/*
+tabletennis.pongHostname -- the game's FQDN: `pong.hostname`, else
+`zaehlwerk-pong.<domain>` (flux: ZAEHLWERK_PONG_HOSTNAME's default).
+*/}}
+{{- define "tabletennis.pongHostname" -}}
+{{- (.Values.pong | default dict).hostname | default (printf "zaehlwerk-pong.%s" .Values.domain) -}}
 {{- end -}}
