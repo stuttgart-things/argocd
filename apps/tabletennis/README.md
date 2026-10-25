@@ -189,7 +189,7 @@ secrets and the piezo board.
 |---|---|---|
 | `schmetterpause.scoreboard.enabled` | `/api` on the sandbox's schmetterpause, and — with `zaehlwerk.handover` — the handover | `schmetterpause-scoreboard-sops`, `zaehlwerk-handover-sops` |
 | `zaehlwerk.schmetterpauseURL` | the handover over the in-cluster Service, so the league depends on no certificate | `ZAEHLWERK_SCHMETTERPAUSE_URL` |
-| `zaehlwerk.matches` | `MATCHES_TOKEN`: `POST /matches` takes player ids (zaehlwerk **v0.31.0+**). Adds the container's env entry too, because the v0.31.0 base does not list the key | `zaehlwerk-matches-sops` |
+| `zaehlwerk.matches` | `MATCHES_TOKEN`: `POST /matches` takes player ids (zaehlwerk **v0.31.0+**). Below v0.32.0 it adds the container's env entry too, because the v0.31.0 base does not list the key; from v0.32.0 the base does | `zaehlwerk-matches-sops` |
 | `schmetterpause.scoreboard.settle: immediate` | `SP_SCOREBOARD_SETTLE` (schmetterpause **v0.18.0+**): nobody confirms in a sandbox | `schmetterpause-settle-immediate` |
 | `schmetterpause.seed` | a Job running `schmetterpause seed` with `SP_SEED_FIXTURE=pong`: Ada … Hanna and the observer `Pong`. Refuses a database with players, so every later run is a no-op | `schmetterpause-seed-pong` |
 | `pong` + `pong.league` | the game in league mode: `ZAEHLWERK_TOKEN` (the matches token), `PONG_OPERATOR` (`Pong`), `PONG_PLAYER_SKILL` (a spread over the seed's names), `PONG_LEAGUE_PAUSE` (`30s`) | `zaehlwerk-pong-league` |

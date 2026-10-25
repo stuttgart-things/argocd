@@ -217,9 +217,10 @@ panel:
 # token a body with an id answers 503, so nothing can start a reported match
 # on a zaehlwerk at a real table.
 #
-# On appends MATCHES_TOKEN to the `zaehlwerk-panel` ExternalSecret AND names it
-# in the container's env -- the v0.31.0 base passes Secret keys one at a time
-# and does not list this one. Needs `schmetterpause.url` (zaehlwerk opens the
+# On appends MATCHES_TOKEN to the `zaehlwerk-panel` ExternalSecret. Below
+# v0.32.0 it also names it in the container's env -- the v0.31.0 base passes
+# Secret keys one at a time and does not list this one; from v0.32.0 the base
+# does. Needs `schmetterpause.url` (zaehlwerk opens the
 # door only with a schmetterpause to report to; the chart refuses to render
 # without it). Read through `secretStore`. The property has to exist in Vault
 # BEFORE this goes on: ESO fails the whole ExternalSecret over one missing
