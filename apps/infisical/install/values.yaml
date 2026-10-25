@@ -15,7 +15,7 @@ destination:
 
 # Upstream Infisical chart (infisical-standalone).
 # renovate: datasource=helm depName=infisical-standalone registryUrl=https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
-chartVersion: 1.11.0
+chartVersion: 1.11.1
 
 # Infisical server.
 replicas: 2
