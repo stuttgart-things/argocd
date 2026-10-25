@@ -4,6 +4,9 @@
 {{- end }}
 {{- $version := .Values.pong.version | default .Values.zaehlwerk.version }}
 {{- $league := include "tabletennis.pongLeague" . }}
+{{- /* Tournaments ride on the league: without it there is nothing that plays
+       them. A string "true" counts as true, like league.enabled. */}}
+{{- $tournaments := and $league (eq (toString ((.Values.pong.league | default dict).tournaments | default false)) "true") }}
 {{- /* zaehlwerk-pong is built with zaehlwerk from v0.16.0 on, league mode from
        v0.31.0. Below that the pod sits in ImagePullBackOff, or the game ignores
        the league and plays demos that are reported nowhere -- refuse it here.
@@ -14,6 +17,9 @@
 {{- end }}
 {{- if and $league (not (semverCompare ">=0.31.0" $version)) }}
 {{- fail (printf "pong.league needs zaehlwerk v0.31.0 or later (MATCHES_TOKEN, league mode); the version is %s." $version) }}
+{{- end }}
+{{- if and $tournaments (not (semverCompare ">=0.32.0" $version)) }}
+{{- fail (printf "pong.league.tournaments needs zaehlwerk v0.32.0 or later (ADR-0017); the version is %s." $version) }}
 {{- end }}
 {{- end }}
 {{- /* League mode reads zaehlwerk's MATCHES_TOKEN as its ZAEHLWERK_TOKEN. Without
@@ -61,6 +67,7 @@ spec:
           playerSkill: {{ .playerSkill | quote }}
           pause: {{ .pause | default "30s" | quote }}
           {{- end }}
+          tournaments: {{ if $tournaments }}true{{ else }}false{{ end }}
         httpRoute:
           enabled: true
           hostname: {{ include "tabletennis.pongHostname" . | quote }}
