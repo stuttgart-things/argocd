@@ -51,7 +51,7 @@ runners:
     # Keep current: GitHub deprecates runner versions server-side, and a
     # deprecated runner exits 7 on every start (ARC phase Outdated, forever).
     # renovate: datasource=docker depName=ghcr.io/actions/actions-runner
-    tag: "2.338.1"
+    tag: "2.338.2"
   containerMode:
     type: kubernetes
     # false: jobs without `container:` run inside the runner pod itself.
