@@ -65,7 +65,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.105.1
+        targetRevision: v0.105.4
         path: infra/velero/install
         helm:
           releaseName: 'velero-{{ .name }}'
@@ -79,7 +79,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.105.1
+              targetRevision: v0.105.4
             destination:
               server: '{{ .server }}'
               namespace: velero
