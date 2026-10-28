@@ -189,6 +189,12 @@ zaehlwerk:
   # Set it to false to keep zaehlwerk scoring and reporting nowhere on a cluster
   # whose schmetterpause serves other tables — ADR-0004 keeps that a first-class
   # way to run.
+  #
+  # The same URL also brings each player's figure to zaehlwerk's spectator
+  # view, with the face the match gives it, and the faces to the running score
+  # on schmetterpause's start page (zaehlwerk ADR-0018, schmetterpause
+  # ADR-0029). Needs zaehlwerk >= v0.38.0 and schmetterpause >= v0.20.0; older
+  # tags show the mascot and no faces, nothing breaks.
   handover: true
   # The running score on schmetterpause's start page (schmetterpause#188): its
   # SP_ZAEHLWERK_URL set to zaehlwerk's hostname, and schmetterpause's origin
