@@ -16,7 +16,7 @@ destination:
 # Upstream openbao-helm chart (https://openbao.github.io/openbao-helm).
 # Held at the version stuttgart-things/flux runs in apps/openbao.
 # renovate: datasource=helm depName=openbao registryUrl=https://openbao.github.io/openbao-helm
-chartVersion: 0.30.5
+chartVersion: 0.30.6
 
 # Server image. NO tag, deliberately. The chart renders
 #   {{ .Values.server.image.tag | default (trimPrefix "v" .Chart.AppVersion) }}
