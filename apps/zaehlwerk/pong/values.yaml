@@ -17,7 +17,7 @@ image:
   repository: ghcr.io/stuttgart-things/zaehlwerk-pong
   # The same tag as zaehlwerk: one release run builds both. Exists from v0.16.0
   # on; league mode needs v0.31.0.
-  tag: v0.40.0
+  tag: v0.47.0
 
 # zaehlwerk in the same namespace: Service `zaehlwerk`, port 80. The game talks
 # to it server-side, so it needs no ALLOWED_ORIGINS entry.
