@@ -4,7 +4,7 @@
 namespace: monitoring
 image:
   repository: prompve/prometheus-pve-exporter
-  tag: 3.10.2
+  tag: 3.11.0
 target: set-pve-exporter-target.invalid
 verifySSL: false
 secretName: prometheus-pve-exporter
