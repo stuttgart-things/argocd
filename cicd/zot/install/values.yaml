@@ -15,7 +15,7 @@ applicationName: ""
 cascadingDelete: false
 
 # renovate: datasource=helm depName=zot registryUrl=https://zotregistry.dev/helm-charts
-chartVersion: 0.1.128
+chartVersion: 0.1.130
 
 # Public hostname, e.g. zot.<cluster>.<zone>. Empty renders nothing.
 hostname: ""
