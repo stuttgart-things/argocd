@@ -87,7 +87,7 @@ capabilities:
   ansibleRun:
     enabled: false
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/ansible
-    chartVersion: 0.9.33
+    chartVersion: 0.9.39
     # environments.<key> of the chart: labda | labul.
     environment: labda
     # environmentConfig.storageClass (the PipelineRun workspace PVC).
