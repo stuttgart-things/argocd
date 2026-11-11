@@ -263,6 +263,8 @@ spec:
     # cicd-platform.stuttgart-things.com/cluster-build-watch-discovery: 'false'  # 'true' = discover ClusterStacks on machinery (ONE cluster per fleet)
     # cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-exclude: ''          # <ns>/<name> globs, comma-separated
     # cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-argo-server: ''      # machinery on the Argo CD cluster; '' = no Argo checkpoint
+    # cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-server: ''          # machinery gRPC host:port; '' = LabDA machinery (machinery-grpc.machinery.4sthings.tiab.ssc.sva.de:443)
+    # cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-gitops: ''          # Flux Kustomization of the gitops phase; '' = flux-system/machinery-xrs
     # cicd-platform.stuttgart-things.com/backstage-url: https://backstage.sthings-platform.4sthings.tiab.ssc.sva.de
     # cicd-platform.stuttgart-things.com/backstage-runs-path: ''                 # e.g. clusters/labda/vsphere/<cluster>-backstage-runs; '' = none
     # cicd-platform.stuttgart-things.com/storage-class: openebs-hostpath           # redis / harbor / zot PVCs
