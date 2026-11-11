@@ -28,6 +28,13 @@
 #                                     cluster per fleet, or cards come twice
 #   cluster-build-watch-discovery-exclude      <ns>/<name> globs, comma-separated
 #   cluster-build-watch-discovery-argo-server  machinery on the Argo CD cluster
+#   cluster-build-watch-discovery-server       machinery gRPC host:port holding the
+#                                     ClusterStacks; default LabDA machinery. LabUL:
+#                                     machinery-grpc.machinery-labul.<domain>:443
+#                                     (stuttgart-things#4273)
+#   cluster-build-watch-discovery-gitops       Flux Kustomization of the gitops
+#                                     phase; default flux-system/machinery-xrs,
+#                                     LabUL flux-system/machinery-labul-xrs
 #   backstage-url                     Backstage the template worker drives
 #   backstage-runs-path               directory of BackstageTemplateRun files
 #                                     (request-vm) in stuttgart-things, applied
@@ -121,6 +128,9 @@ spec:
                 enabled: {{ ne (default "" (index $a "cicd-platform.stuttgart-things.com/shared-machinery-grpc-secret-key")) "" }}
               discovery:
                 enabled: {{ eq (default "" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery")) "true" }}
+                # Defaults = the chart's (LabDA), so existing clusters render as before.
+                server: '{{ default "machinery-grpc.machinery.4sthings.tiab.ssc.sva.de:443" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-server") }}'
+                gitops: '{{ default "flux-system/machinery-xrs" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-gitops") }}'
                 exclude: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-exclude") }}'
                 argoServer: '{{ default "" (index $a "cicd-platform.stuttgart-things.com/cluster-build-watch-discovery-argo-server") }}'
       syncPolicy:
