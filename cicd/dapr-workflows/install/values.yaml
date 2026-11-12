@@ -120,11 +120,11 @@ clusterBuildWatch:
   kustomize:
     repoURL: ghcr.io/stuttgart-things/dapr-cluster-build-watch-kustomize
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-cluster-build-watch-kustomize
-    targetRevision: 70dec02eb15c
+    targetRevision: e173e1194e7a
   image:
     repository: ghcr.io/stuttgart-things/dapr-cluster-build-watch
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/dapr-cluster-build-watch
-    tag: 70dec02eb15c
+    tag: e173e1194e7a
   # homerun2 omni-pitcher /pitch endpoint. Empty: no homerun sink.
   homerunPitchURL: ""
   # Bearer token for a machinery gRPC server with auth on (machinery-auth).
@@ -149,4 +149,4 @@ clusterBuildWatch:
   # kro RGD `cluster-build-watch` (kind ClusterBuildWatch). Needs kro.
   trigger:
     enabled: true
-    targetRevision: 70dec02eb15c-trigger
+    targetRevision: e173e1194e7a-trigger
