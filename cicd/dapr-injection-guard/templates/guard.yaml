@@ -1,0 +1,135 @@
+{{- /* Why: a pod is mutated (or not) once, at admission. A Deployment synced
+       in the same minutes as Dapr can be admitted while the injector does not
+       serve yet (failurePolicy Ignore) and then crash-loops for good: a
+       container restart never adds the sidecar, only a new pod does. The
+       injector labels every pod it mutated dapr.io/sidecar-injected=true; a
+       pod with dapr.io/enabled=true but without that label missed it.
+       Only pods with an owner are deleted, so their controller recreates
+       them -- a bare pod is left alone. */}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dapr-injection-guard
+  namespace: {{ .Values.namespace | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dapr-injection-guard-injector-status
+  namespace: {{ .Values.daprNamespace | quote }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["dapr-sidecar-injector"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dapr-injection-guard-injector-status
+  namespace: {{ .Values.daprNamespace | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dapr-injection-guard-injector-status
+subjects:
+  - kind: ServiceAccount
+    name: dapr-injection-guard
+    namespace: {{ .Values.namespace | quote }}
+{{- range $ns := .Values.watchNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dapr-injection-guard
+  namespace: {{ $ns | quote }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dapr-injection-guard
+  namespace: {{ $ns | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dapr-injection-guard
+subjects:
+  - kind: ServiceAccount
+    name: dapr-injection-guard
+    namespace: {{ $.Values.namespace | quote }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dapr-injection-guard
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 120
+      ttlSecondsAfterFinished: 600
+      template:
+        spec:
+          serviceAccountName: dapr-injection-guard
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          volumes:
+            - name: tmp
+              emptyDir: {}
+          containers:
+            - name: guard
+              image: {{ .Values.image | quote }}
+              command: ["/bin/sh", "-c"]
+              env:
+                - name: WATCH_NAMESPACES
+                  value: {{ join " " .Values.watchNamespaces | quote }}
+                - name: DAPR_NAMESPACE
+                  value: {{ .Values.daprNamespace | quote }}
+                # kubectl writes its discovery cache under $HOME; the root
+                # filesystem is read-only.
+                - name: HOME
+                  value: /tmp
+              args:
+                - |
+                  set -eu
+                  avail=$(kubectl -n "$DAPR_NAMESPACE" get deploy dapr-sidecar-injector \
+                    -o jsonpath='{.status.availableReplicas}' 2>/dev/null || true)
+                  if [ "${avail:-0}" -lt 1 ]; then
+                    echo "dapr-sidecar-injector not available -- nothing to do"; exit 0
+                  fi
+                  tpl='{{"{{"}}range $p := .items{{"}}"}}{{"{{"}}if $p.metadata.ownerReferences{{"}}"}}{{"{{"}}with $p.metadata.annotations{{"}}"}}{{"{{"}}if eq (or (index . "dapr.io/enabled") "") "true"{{"}}"}}{{"{{"}}$p.metadata.name{{"}}"}}{{"{{"}}"\n"{{"}}"}}{{"{{"}}end{{"}}"}}{{"{{"}}end{{"}}"}}{{"{{"}}end{{"}}"}}{{"{{"}}end{{"}}"}}'
+                  for ns in $WATCH_NAMESPACES; do
+                    for pod in $(kubectl -n "$ns" get pods -l '!dapr.io/sidecar-injected' -o go-template="$tpl"); do
+                      echo "$ns/$pod: dapr.io/enabled=true but no sidecar -- deleting, its controller recreates it"
+                      kubectl -n "$ns" delete pod "$pod" --wait=false
+                    done
+                  done
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi

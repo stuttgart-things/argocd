@@ -150,3 +150,13 @@ clusterBuildWatch:
   trigger:
     enabled: true
     targetRevision: e173e1194e7a-trigger
+
+# Recreates worker pods that were admitted without their daprd sidecar
+# because the Dapr injector was not ready yet (fresh cluster; #4486). A
+# CronJob in its own namespace watches the namespaces of the enabled workers.
+injectionGuard:
+  enabled: true
+  namespace: dapr-injection-guard
+  daprNamespace: dapr-system
+  schedule: "*/2 * * * *"
+  image: cgr.dev/chainguard/kubectl:latest-dev

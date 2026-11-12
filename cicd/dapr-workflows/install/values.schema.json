@@ -470,6 +470,35 @@
           }
         }
       }
+    },
+    "injectionGuard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
+      "description": "Recreates worker pods admitted without a daprd sidecar (#4486): child Application from cicd/dapr-injection-guard.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "daprNamespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "schedule": {
+          "type": "string",
+          "minLength": 9
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   }
 }

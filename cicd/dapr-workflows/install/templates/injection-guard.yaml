@@ -1,0 +1,36 @@
+{{- $appName := include "daprWorkflows.appName" . }}
+{{- $g := .Values.injectionGuard }}
+{{- $watch := list }}
+{{- if .Values.templateExecution.enabled }}{{ $watch = append $watch .Values.templateExecution.namespace }}{{ end }}
+{{- if .Values.clusterBuildWatch.enabled }}{{ $watch = append $watch .Values.clusterBuildWatch.namespace }}{{ end }}
+{{- if and $g.enabled $watch }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-injection-guard" $appName | quote }}
+  namespace: argocd
+  {{- include "daprWorkflows.leafFinalizer" . | nindent 0 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: cicd/dapr-injection-guard
+    helm:
+      releaseName: dapr-injection-guard
+      valuesObject:
+        namespace: {{ $g.namespace | default "dapr-injection-guard" | quote }}
+        watchNamespaces:
+          {{- toYaml (uniq $watch) | nindent 10 }}
+        daprNamespace: {{ $g.daprNamespace | default "dapr-system" | quote }}
+        schedule: {{ $g.schedule | default "*/2 * * * *" | quote }}
+        image: {{ $g.image | default "cgr.dev/chainguard/kubectl:latest-dev" | quote }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $g.namespace | default "dapr-injection-guard" | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}
