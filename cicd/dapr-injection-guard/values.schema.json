@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dapr-injection-guard values",
+  "type": "object",
+  "required": ["namespace", "watchNamespaces", "daprNamespace", "schedule", "image"],
+  "additionalProperties": false,
+  "properties": {
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through so verify-catalog's probe values validate; not consumed."
+    },
+    "namespace": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+    "watchNamespaces": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+      "uniqueItems": true
+    },
+    "daprNamespace": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+    "schedule": {"type": "string", "minLength": 9},
+    "image": {"type": "string", "minLength": 1}
+  }
+}

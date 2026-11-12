@@ -1,0 +1,10 @@
+---
+apiVersion: v2
+name: dapr-injection-guard
+description: >-
+  CronJob that recreates pods which asked for a Dapr sidecar (annotation
+  dapr.io/enabled=true) but were admitted without one, because the Dapr
+  sidecar injector was not ready yet. The guard sub-Application of the
+  dapr-workflows app-of-apps chart (stuttgart-things/stuttgart-things#4486).
+type: application
+version: 0.1.0

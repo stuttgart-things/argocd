@@ -1,0 +1,13 @@
+---
+# Namespace the CronJob, its ServiceAccount and Role live in.
+namespace: dapr-injection-guard
+# Namespaces whose pods are checked. Each gets a Role (pods get/list/delete)
+# bound to the guard's ServiceAccount -- nothing cluster-wide.
+watchNamespaces: []
+# Where the Dapr control plane runs: the guard only acts once the
+# dapr-sidecar-injector Deployment there has an available replica.
+daprNamespace: dapr-system
+schedule: "*/2 * * * *"
+# Needs sh and kubectl. chainguard's -dev variant has busybox; the same image
+# apps/machinery/httproute's nudge hook uses.
+image: cgr.dev/chainguard/kubectl:latest-dev
