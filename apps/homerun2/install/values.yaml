@@ -446,8 +446,10 @@ notificationCatcher:
   # UI a Dead letter tab and the pending gauge (catcher#70). v3.15.0: opt-in
   # throttle per output (catcher#79). v3.16.0: the Teams preview line goes in
   # the message summary too (catcher#45).
+  # v3.17.0: `card.layout: rich` (catcher#82). v3.18.0: card `text` template
+  # (catcher#84).
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-  version: v3.16.0
+  version: v3.18.0
   # Stream to consume. `messages` is where omni-pitcher's default_stream puts
   # everything; a cluster that routes alerts onto their own stream (the flux
   # side sends /pitch/grafana to `alerts`) sets that here instead.
@@ -504,7 +506,7 @@ notificationCatcher:
     # Tag of the sink base; it pins the catcher image to the same tag. Every
     # catcher release from v3.5.0 on publishes one, so this follows `version`.
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-notification-catcher
-    version: v3.16.0
+    version: v3.18.0
     # Route to the UI (rendered by the homerun2-httproute Application when
     # httpRoute.enabled).
     hostname: notification-sink.example.com
