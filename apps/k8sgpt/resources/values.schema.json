@@ -3,39 +3,106 @@
   "title": "k8sgpt resources chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespace", "k8sgpt", "reporterSecret"],
+  "required": [
+    "namespace",
+    "k8sgpt",
+    "reporterSecret"
+  ],
   "properties": {
-    "namespace": {"type": "string", "minLength": 1},
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
     "k8sgpt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version", "interval", "filters"],
+      "required": [
+        "name",
+        "version",
+        "interval",
+        "filters"
+      ],
       "properties": {
-        "name": {"type": "string", "minLength": 1},
-        "version": {"type": "string", "minLength": 1, "description": "k8sgpt server image tag (ghcr.io/k8sgpt-ai/k8sgpt)."},
-        "interval": {"type": "string", "pattern": "^[0-9]+[smh]$"},
-        "filters": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "Analyzers; empty = all defaults."}
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "k8sgpt server image tag (ghcr.io/k8sgpt-ai/k8sgpt)."
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+[smh]$"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Analyzers; empty = all defaults."
+        }
       }
     },
     "reporterSecret": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "name", "secretStore", "remoteKey", "property", "refreshInterval"],
+      "required": [
+        "enabled",
+        "name",
+        "secretStore",
+        "remoteKey",
+        "property",
+        "refreshInterval"
+      ],
       "properties": {
-        "enabled": {"type": "boolean"},
-        "name": {"type": "string", "minLength": 1},
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
         "secretStore": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "name"],
+          "required": [
+            "kind",
+            "name"
+          ],
           "properties": {
-            "kind": {"type": "string", "enum": ["ClusterSecretStore", "SecretStore"]},
-            "name": {"type": "string", "minLength": 1}
+            "kind": {
+              "type": "string",
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
-        "remoteKey": {"type": "string", "minLength": 1},
-        "property": {"type": "string", "minLength": 1},
-        "refreshInterval": {"type": "string", "minLength": 1}
+        "remoteKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refreshInterval": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }
