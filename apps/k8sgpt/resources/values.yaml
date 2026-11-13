@@ -1,0 +1,40 @@
+---
+# Namespace of the K8sGPT CR, its Results and the reporter.
+namespace: k8sgpt-operator-system
+
+# The K8sGPT CR. ai.enabled is false: no LLM, no API key. Every finding is a
+# Result CR with spec.error[]; the operator deletes it once the problem is
+# gone.
+k8sgpt:
+  name: k8sgpt
+  # renovate: datasource=docker depName=ghcr.io/k8sgpt-ai/k8sgpt
+  version: v0.4.41
+  # Pattern ^[0-9]+[smh]$.
+  interval: 5m
+  # k8sgpt's default analyzers without ConfigMap: on platform-sthings the
+  # ConfigMap analyzer produced 138 of 139 findings (empty or unused
+  # ConfigMaps). Empty list = every default analyzer.
+  filters:
+    - Pod
+    - Deployment
+    - ReplicaSet
+    - StatefulSet
+    - CronJob
+    - Service
+    - Ingress
+    - PersistentVolumeClaim
+    - Node
+    - ValidatingWebhookConfiguration
+    - MutatingWebhookConfiguration
+
+# The bearer token of the central omni-pitcher for the reporter, from a
+# ClusterSecretStore. Rendered only with the reporter.
+reporterSecret:
+  enabled: false
+  name: homerun2-k8s-pitcher-token-k8sgpt
+  secretStore:
+    kind: ClusterSecretStore
+    name: vault
+  remoteKey: _omni-pitcher
+  property: alertmanager-webhook-token
+  refreshInterval: 1h

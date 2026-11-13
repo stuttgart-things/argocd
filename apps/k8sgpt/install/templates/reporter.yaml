@@ -1,0 +1,108 @@
+{{- if .Values.reporter.enabled }}
+{{- $r := .Values.reporter }}
+{{- if not $r.centralUrl }}{{ fail "reporter.enabled needs reporter.centralUrl (the central omni-pitcher's /pitch)" }}{{ end }}
+{{- if not $r.cluster }}{{ fail "reporter.enabled needs reporter.cluster (names the cluster: system k8sgpt-<cluster>)" }}{{ end }}
+{{- $appName := include "k8sgpt.appName" . }}
+{{- $ns := .Values.destination.namespace }}
+{{- $name := "homerun2-k8s-pitcher" }}
+{{- $token := "homerun2-k8s-pitcher-token-k8sgpt" }}
+{{- $results := dict "group" "core.k8sgpt.ai" "version" "v1alpha1" "resource" "results" "namespace" $ns }}
+{{- $profile := dict
+      "apiVersion" "homerun2.sthings.io/v1alpha1"
+      "kind" "K8sPitcherProfile"
+      "metadata" (dict "name" "k8sgpt-reporter")
+      "spec" (dict
+        "cluster" $r.cluster
+        "system" (printf "k8sgpt-%s" $r.cluster)
+        "pitcher" (dict "addr" $r.centralUrl "insecure" false)
+        "auth" (dict "tokenFrom" (dict "secretKeyRef" (dict "name" $token "namespace" $ns "key" "auth-token")))
+        "informers" (list (merge (dict "events" (list "add" "update" "delete") "updates" "generation" "includeObject" true "throttle" false) $results))
+        "collectors" (list (merge (dict "interval" $r.snapshotInterval "mode" "snapshot" "throttle" false) $results))
+      )
+}}
+---
+# The reporter: homerun2-k8s-pitcher, every object suffixed -k8sgpt (Argo's
+# kustomize nameSuffix; references follow), so it runs next to a homerun2
+# k8s-pitcher on the same cluster. Its profile watches only the Results:
+# events (add/update/delete) and an hourly snapshot, system k8sgpt-<cluster>,
+# to the central omni-pitcher, which routes system k8sgpt to the archive
+# stream. The patches name the objects as the artifact does: kustomize applies
+# them before the suffix.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-reporter" $appName | quote }}
+  namespace: argocd
+  annotations:
+    # After the resources: its token Secret comes from there.
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: oci://ghcr.io/stuttgart-things/homerun2-k8s-pitcher-kustomize
+    targetRevision: {{ $r.version | quote }}
+    path: .
+    kustomize:
+      namespace: {{ $ns | quote }}
+      nameSuffix: -k8sgpt
+      patches:
+        - target:
+            kind: Deployment
+            name: {{ $name }}
+          patch: |
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: {{ $name }}
+              annotations:
+                # The pitcher reads profile and token at start only.
+                reloader.stakater.com/auto: "true"
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: {{ $name }}
+                      image: ghcr.io/stuttgart-things/homerun2-k8s-pitcher:{{ $r.version }}
+        - target:
+            kind: ConfigMap
+            name: {{ printf "%s-profile" $name }}
+          patch: |
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ printf "%s-profile" $name }}
+            data:
+              profile.yaml: |
+{{ toYaml $profile | indent 16 }}
+        # Exactly what the profile reads: the Results, and its token Secret.
+        - target:
+            group: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: {{ $name }}
+          patch: |
+            - op: replace
+              path: /rules
+              value:
+                - apiGroups: [core.k8sgpt.ai]
+                  resources: [results]
+                  verbs: [get, list, watch]
+                - apiGroups: [""]
+                  resources: [secrets]
+                  resourceNames: [{{ $token }}]
+                  verbs: [get]
+        # The artifact's placeholder token; the ExternalSecret owns the real one.
+        - target:
+            kind: Secret
+            name: {{ printf "%s-token" $name }}
+          patch: |
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: {{ printf "%s-token" $name }}
+            $patch: delete
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

@@ -1,0 +1,24 @@
+---
+# The K8sGPT CR: the operator starts a k8sgpt server from it and runs the
+# analyzers every interval. Its kind comes with the operator's chart, which is
+# why this is its own Application, after the operator.
+apiVersion: core.k8sgpt.ai/v1alpha1
+kind: K8sGPT
+metadata:
+  name: {{ .Values.k8sgpt.name | quote }}
+  namespace: {{ .Values.namespace | quote }}
+spec:
+  ai:
+    enabled: false
+    # Required by the CRD, unused while ai is disabled.
+    backend: openai
+  analysis:
+    interval: {{ .Values.k8sgpt.interval | quote }}
+  {{- with .Values.k8sgpt.filters }}
+  filters:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  # The cache only holds AI answers.
+  noCache: true
+  repository: ghcr.io/k8sgpt-ai/k8sgpt
+  version: {{ .Values.k8sgpt.version | quote }}

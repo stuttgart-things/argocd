@@ -177,6 +177,10 @@ spec:
     observability-platform/clusterscope-blackbox-probes: 'false'  # ScrapeConfig over /api/targets; needs clusterscope-live + blackbox exporter
     # Proxmox VE exporter -- opt-IN.
     observability-platform/prometheus-pve-exporter: 'false'  # → appset-prometheus-pve-exporter [ann: pve-exporter-target]
+    # K8sGPT without AI -- opt-IN; the reporter pitches its findings to the
+    # central archive (system k8sgpt-<cluster>, stream k8sgpt).
+    observability-platform/k8sgpt: 'false'                # → appset-k8sgpt
+    observability-platform/k8sgpt-reporter: 'false'       # → appset-k8sgpt reporter [ann: secret-store, k8sgpt-central-url or alert-webhook-url]
 
     # ---- profile: homerun2-platform ----
     # The homerun2 event bus. Core components (on unless 'false'):
@@ -376,6 +380,10 @@ spec:
     # observability-platform.stuttgart-things.com/storage-class: openebs-hostpath    # default = cluster default SC
     # observability-platform.stuttgart-things.com/storage-size: 10Gi                 # default 10Gi
     # observability-platform.stuttgart-things.com/retention: 15d                     # default 15d
+
+    # ---- [user] observability: k8sgpt reporter (only with observability-platform/k8sgpt-reporter: 'true') ----
+    # observability-platform.stuttgart-things.com/k8sgpt-central-url: https://omni.platform.sthings-vsphere.labul.sva.de/pitch  # default = alert-webhook-url without /grafana
+    # observability-platform.stuttgart-things.com/k8sgpt-reporter-secret-key: _omni-pitcher   # entry with property alertmanager-webhook-token; default _omni-pitcher
 
     # ---- [user] observability: clusterscope (only with observability-platform/clusterscope: 'true') ----
     # observability-platform.stuttgart-things.com/clusterscope-git-repo: https://github.com/stuttgart-things/stuttgart-things  # [req] no ".git"

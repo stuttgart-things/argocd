@@ -1,0 +1,97 @@
+---
+# K8sGPT without AI on every opted-in cluster (stuttgart-things/argocd#828,
+# tracking stuttgart-things/stuttgart-things#4556): the k8sgpt-operator, a
+# K8sGPT CR scanning every 5m with k8sgpt's analyzers minus ConfigMap, and --
+# with the reporter label -- a k8s-pitcher (suffixed -k8sgpt) that pitches the
+# findings to the central omni-pitcher as system k8sgpt-<cluster>. The central
+# homerun2 routes that system to the stream `k8sgpt`, which only the archive
+# (homerun2-s3-catcher, bucket k8s-cluster-report) reads: no Teams, lights or
+# speakers. A periodic Claude Code run analyses all clusters' findings there.
+#
+# Fans out across clusters labelled `observability-platform: "true"` AND
+# `observability-platform/k8sgpt: "true"`. OPT-IN: a new scanner on every
+# observability cluster at the next sync is not something to switch on by
+# absence of a label.
+#
+# Reporter (`observability-platform/k8sgpt-reporter: "true"`):
+#   …/k8sgpt-central-url        the central omni-pitcher's /pitch; default =
+#                               …/alert-webhook-url without its /grafana
+#   …/secret-store              the ClusterSecretStore (as kube-prometheus-stack)
+#   …/k8sgpt-reporter-secret-key  entry with the central token; default
+#                               _omni-pitcher (shared, as the Alertmanager's)
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: k8sgpt-observability
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            observability-platform: "true"
+          matchExpressions:
+            - key: observability-platform/k8sgpt
+              operator: In
+              values: ["true"]
+  template:
+    metadata:
+      name: 'k8sgpt-observability-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+    spec:
+      project: '{{ .name }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.108.0
+        path: apps/k8sgpt/install
+        helm:
+          # Fixed, not derived: Helm caps release names at 53 characters (see
+          # appset-kube-prometheus-stack). The chart does not use it.
+          releaseName: k8sgpt
+          # A YAML string, not valuesObject: the label toggle needs a real
+          # bool and the annotations a variable -- templating inside a
+          # string, the same way appset-homerun2 does it. `default ""`
+          # because missingkey=error does not apply to `index`.
+          values: |
+            {{- $l := default (dict) .metadata.labels }}
+            {{- $a := default (dict) .metadata.annotations }}
+            # MUST differ from this template's own metadata.name (see
+            # appset-clusterscope): the children derive -operator, -resources
+            # and -reporter from it.
+            applicationName: 'k8sgpt-{{ .name }}'
+            project: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.108.0
+            destination:
+              server: '{{ .server }}'
+              namespace: k8sgpt-operator-system
+            reporter:
+              enabled: {{ eq (default "" (index $l "observability-platform/k8sgpt-reporter")) "true" }}
+              cluster: '{{ .name }}'
+              centralUrl: '{{ default (trimSuffix "/grafana" (default "" (index $a "observability-platform.stuttgart-things.com/alert-webhook-url"))) (index $a "observability-platform.stuttgart-things.com/k8sgpt-central-url") }}'
+              secret:
+                secretStore:
+                  kind: ClusterSecretStore
+                  name: '{{ default "vault" (index $a "observability-platform.stuttgart-things.com/secret-store") }}'
+                remoteKey: '{{ default "_omni-pitcher" (index $a "observability-platform.stuttgart-things.com/k8sgpt-reporter-secret-key") }}'
+                property: alertmanager-webhook-token
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
