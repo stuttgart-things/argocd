@@ -14,6 +14,7 @@ Catalog entries rendered:
 |---|---|---|---|---|
 | `kube-prometheus-stack-observability` | 5 | `infra/kube-prometheus-stack/install` | `monitoring` | The whole stack: Prometheus Operator + CRDs, Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics, default rules. Grafana behind the cluster's gateway, Grafana admin and webhook token from a ClusterSecretStore, warning/critical alerts to a webhook |
 | `clusterscope-observability` | 6 | `apps/clusterscope/install` | `clusterscope` (+ ScrapeConfig in `monitoring`) | **Opt-in** (`observability-platform/clusterscope: 'true'`). Lab visualizer over a git-synced cluster repo; live mode reads the lab's other clusters via kubeconfigs from Vault. UI behind the cluster's gateway. Optional ScrapeConfig blackbox-probing every endpoint it lists (label `…/clusterscope-blackbox-probes`, needs kube-prometheus-stack + `infra/blackbox-exporter`) |
+| `k8sgpt-observability` | 6 | `apps/k8sgpt/install` | `k8sgpt-operator-system` | **Opt-in** (`observability-platform/k8sgpt: 'true'`). K8sGPT **without AI**: operator (chart `k8sgpt-operator`), then a K8sGPT CR (every 5m, analyzers without ConfigMap) → one `Result` CR per finding. With `…/k8sgpt-reporter: 'true'` also a k8s-pitcher (suffixed `-k8sgpt`) pitching findings and an hourly snapshot as system `k8sgpt-<cluster>` to the central omni-pitcher, which routes them to the archive stream `k8sgpt` (#828) |
 | `prometheus-pve-exporter-observability` | 10 | `infra/prometheus-pve-exporter/install` | `monitoring` | Proxmox VE exporter + PodMonitor + Grafana dashboard. **Opt-in** (`observability-platform/prometheus-pve-exporter: 'true'`), shares kps's opt-out. Needs `…/pve-exporter-target`; PVE token from the store (`…/pve-exporter-secret-store`, default `…/secret-store`) or a hand-made Secret |
 
 `project: '{{ .name }}'` on every generated Application — the `AppProject` named after the cluster must exist first (see [`config/cluster-project`](../../config/cluster-project/), driven by the `cluster-projects` ApplicationSet on clusters labelled `auto-project=true`).
@@ -56,6 +57,10 @@ Like `security-platform`, and for the same reason, the umbrella label alone inst
 | `observability-platform.stuttgart-things.com/clusterscope-config` | annotation (user) | one-line JSON `-config`; set = ConfigMap |
 | `observability-platform.stuttgart-things.com/clusterscope-git-extra-repo` (+ `-git-extra-branch`) | annotation (user) | set = second repo at `/data-extra` |
 | `observability-platform.stuttgart-things.com/clusterscope-blackbox-module` | annotation (user) | def `http_2xx` |
+| `observability-platform/k8sgpt` | label | `'true'` opts in: operator + scan |
+| `observability-platform/k8sgpt-reporter` | label | `'true'` adds the reporter (needs `…/k8sgpt`, a ClusterSecretStore with the central token) |
+| `observability-platform.stuttgart-things.com/k8sgpt-central-url` | annotation (user) | the central omni-pitcher's `/pitch`; default = `…/alert-webhook-url` without `/grafana` |
+| `observability-platform.stuttgart-things.com/k8sgpt-reporter-secret-key` | annotation (user) | entry with the central token (property `alertmanager-webhook-token`); default `_omni-pitcher`. Store = `…/secret-store` |
 | `observability-platform/prometheus-pve-exporter` | label | `'true'` opts in |
 | `observability-platform.stuttgart-things.com/pve-exporter-target` | annotation **(user, req)** | PVE host the exporter scrapes |
 | `observability-platform.stuttgart-things.com/pve-exporter-secret-store` / `-secret-key` / `-verify-ssl` | annotation (user) | def `…/secret-store` / `pve-exporter` / `false` |

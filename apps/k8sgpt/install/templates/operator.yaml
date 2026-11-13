@@ -1,0 +1,34 @@
+{{- $appName := include "k8sgpt.appName" . }}
+---
+# The k8sgpt-operator chart (charts.k8sgpt.ai) with its CRDs (K8sGPT, Result,
+# Mutation). No AI backend and no Interplex cache: the operator only writes
+# Result CRs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-operator" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://charts.k8sgpt.ai
+    chart: k8sgpt-operator
+    targetRevision: {{ .Values.operator.chartVersion | quote }}
+    helm:
+      releaseName: k8sgpt-operator
+      valuesObject:
+        interplex:
+          enabled: false
+        {{- with .Values.operator.resources }}
+        controllerManager:
+          manager:
+            resources:
+              {{- toYaml . | nindent 14 }}
+        {{- end }}
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

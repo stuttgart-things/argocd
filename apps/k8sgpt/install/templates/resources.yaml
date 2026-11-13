@@ -1,0 +1,40 @@
+{{- $appName := include "k8sgpt.appName" . }}
+---
+# The K8sGPT CR (and the reporter's token ExternalSecret) from
+# apps/k8sgpt/resources. After the operator: the K8sGPT kind comes with its
+# chart, so the dry run skips the missing resource and the retries cover the
+# race on a first sync.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-resources" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: apps/k8sgpt/resources
+    helm:
+      releaseName: k8sgpt-resources
+      valuesObject:
+        namespace: {{ .Values.destination.namespace | quote }}
+        k8sgpt:
+          {{- toYaml .Values.k8sgpt | nindent 10 }}
+        reporterSecret:
+          enabled: {{ .Values.reporter.enabled }}
+          name: homerun2-k8s-pitcher-token-k8sgpt
+          secretStore:
+            {{- toYaml .Values.reporter.secret.secretStore | nindent 12 }}
+          remoteKey: {{ .Values.reporter.secret.remoteKey | quote }}
+          property: {{ .Values.reporter.secret.property | quote }}
+          refreshInterval: 1h
+  destination:
+    server: {{ .Values.destination.server | quote }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- $sp := deepCopy .Values.syncPolicy }}
+    {{- $_ := set $sp "syncOptions" (append ($sp.syncOptions | default list) "SkipDryRunOnMissingResource=true") }}
+    {{- toYaml $sp | nindent 4 }}

@@ -1,0 +1,94 @@
+---
+# Reference back to this catalog repo, for the resources Application
+# (apps/k8sgpt/resources).
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject of the rendered Applications.
+project: default
+
+# Name prefix of the rendered Applications (-operator, -resources,
+# -reporter). Empty derives one from destination.server.
+applicationName: ""
+
+# Where everything deploys: operator, K8sGPT CR, Results, reporter.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: k8sgpt-operator-system
+
+# Upstream k8sgpt-operator chart (charts.k8sgpt.ai). Its CRDs come with it.
+operator:
+  # renovate: datasource=helm depName=k8sgpt-operator registryUrl=https://charts.k8sgpt.ai
+  chartVersion: 0.2.29
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+# The K8sGPT CR, see apps/k8sgpt/resources/values.yaml.
+k8sgpt:
+  name: k8sgpt
+  # renovate: datasource=docker depName=ghcr.io/k8sgpt-ai/k8sgpt
+  version: v0.4.41
+  interval: 5m
+  # k8sgpt's defaults without ConfigMap (138 of 139 findings on
+  # platform-sthings were empty or unused ConfigMaps). Empty = all defaults.
+  filters:
+    - Pod
+    - Deployment
+    - ReplicaSet
+    - StatefulSet
+    - CronJob
+    - Service
+    - Ingress
+    - PersistentVolumeClaim
+    - Node
+    - ValidatingWebhookConfiguration
+    - MutatingWebhookConfiguration
+
+# The reporter: homerun2-k8s-pitcher (kustomize OCI, nameSuffix -k8sgpt, so
+# it never collides with a homerun2 k8s-pitcher on the same cluster) with a
+# profile that watches only the Results. New, changed and resolved findings
+# plus one snapshot of all open ones per hour go to a central omni-pitcher as
+# system k8sgpt-<cluster>; it routes them to the stream `k8sgpt`, which only
+# an archive (homerun2-s3-catcher) reads. Unthrottled: a dropped finding is
+# missing data.
+reporter:
+  enabled: false
+  # Needs v1.9.0 or later: throttle: false, the snapshot collector by
+  # resource, per-source system.
+  # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
+  version: v1.9.0
+  # The central omni-pitcher's /pitch endpoint. Required with enabled.
+  centralUrl: ""
+  # Names the cluster: spec.cluster and system k8sgpt-<cluster>. Required
+  # with enabled.
+  cluster: ""
+  snapshotInterval: 1h
+  # The bearer token, materialized by an ExternalSecret.
+  secret:
+    secretStore:
+      kind: ClusterSecretStore
+      name: vault
+    # The shared entry holding the central omni-pitcher's AUTH_TOKEN; the
+    # same one kube-prometheus-stack's Alertmanager reads.
+    remoteKey: _omni-pitcher
+    property: alertmanager-webhook-token
+
+# Sync policy shared by the rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

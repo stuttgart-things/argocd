@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: k8sgpt-install
+description: App-of-apps chart for K8sGPT without AI (operator + scan) and its optional reporter, a k8s-pitcher pitching the findings to a central homerun2
+type: application
+version: 0.1.0
+appVersion: "0.2.29"

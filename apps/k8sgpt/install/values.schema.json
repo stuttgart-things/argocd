@@ -1,0 +1,184 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "k8sgpt app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog",
+    "project",
+    "destination",
+    "operator",
+    "k8sgpt",
+    "reporter",
+    "syncPolicy"
+  ],
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ],
+      "properties": {
+        "repoURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "targetRevision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "applicationName": {
+      "type": "string",
+      "description": "Name prefix of the rendered Applications; empty derives one from destination.server."
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server",
+        "namespace"
+      ],
+      "properties": {
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chartVersion"
+      ],
+      "properties": {
+        "chartVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resources": {
+          "type": "object"
+        }
+      }
+    },
+    "k8sgpt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "interval",
+        "filters"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "k8sgpt server image tag (ghcr.io/k8sgpt-ai/k8sgpt)."
+        },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+[smh]$"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Analyzers; empty = all defaults."
+        }
+      }
+    },
+    "reporter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "version",
+        "centralUrl",
+        "cluster",
+        "snapshotInterval",
+        "secret"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "centralUrl": {
+          "type": "string"
+        },
+        "cluster": {
+          "type": "string"
+        },
+        "snapshotInterval": {
+          "type": "string",
+          "pattern": "^[0-9]+(s|m|h)$"
+        },
+        "secret": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "secretStore",
+            "remoteKey",
+            "property"
+          ],
+          "properties": {
+            "secretStore": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "name"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "ClusterSecretStore",
+                    "SecretStore"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "remoteKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "property": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "syncPolicy": {
+      "type": "object"
+    }
+  }
+}
