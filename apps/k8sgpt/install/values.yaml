@@ -61,7 +61,7 @@ reporter:
   # Needs v1.9.0 or later: throttle: false, the snapshot collector by
   # resource, per-source system.
   # renovate: datasource=docker depName=ghcr.io/stuttgart-things/homerun2-k8s-pitcher
-  version: v1.9.0
+  version: v1.12.1
   # The central omni-pitcher's /pitch endpoint. Required with enabled.
   centralUrl: ""
   # Names the cluster: spec.cluster and system k8sgpt-<cluster>. Required
