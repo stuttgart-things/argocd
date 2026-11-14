@@ -87,7 +87,7 @@ capabilities:
   ansibleRun:
     enabled: false
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/ansible
-    chartVersion: 0.9.33
+    chartVersion: 0.9.43
     # environments.<key> of the chart: labda | labul.
     environment: labda
     # environmentConfig.storageClass (the PipelineRun workspace PVC).
@@ -122,7 +122,7 @@ capabilities:
   packer:
     enabled: false
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/packer
-    chartVersion: 0.3.1
+    chartVersion: 0.3.2
     extraValues: {}
 
   # Proxmox VM capability: ClusterProviderConfig, ClusterSecretStore +
@@ -132,7 +132,7 @@ capabilities:
   proxmoxvm:
     enabled: false
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/proxmoxvm
-    chartVersion: 0.13.0
+    chartVersion: 0.13.1
     environment: labul
     extraValues: {}
 
@@ -144,7 +144,7 @@ capabilities:
   vspherevm:
     enabled: false
     # renovate: datasource=docker depName=ghcr.io/stuttgart-things/charts/vspherevm
-    chartVersion: 0.13.0
+    chartVersion: 0.17.0
     environment: labda
     extraValues: {}
 
