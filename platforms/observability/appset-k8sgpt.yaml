@@ -50,7 +50,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.109.0
+        targetRevision: v0.110.0
         path: apps/k8sgpt/install
         helm:
           # Fixed, not derived: Helm caps release names at 53 characters (see
@@ -71,7 +71,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.109.0
+              targetRevision: v0.110.0
             destination:
               server: '{{ .server }}'
               namespace: k8sgpt-operator-system
