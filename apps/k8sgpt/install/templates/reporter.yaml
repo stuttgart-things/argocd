@@ -63,6 +63,20 @@ spec:
                   containers:
                     - name: {{ $name }}
                       image: ghcr.io/stuttgart-things/homerun2-k8s-pitcher:{{ $r.version }}
+                      {{- with $r.trustBundle }}{{ if .configMap }}
+                      env:
+                        - name: SSL_CERT_FILE
+                          value: /etc/ssl/trust/{{ .key }}
+                      volumeMounts:
+                        - name: trust-bundle
+                          mountPath: /etc/ssl/trust
+                          readOnly: true
+                  volumes:
+                    - name: trust-bundle
+                      configMap:
+                        name: {{ .configMap }}
+                        optional: true
+                      {{- end }}{{ end }}
         - target:
             kind: ConfigMap
             name: {{ printf "%s-profile" $name }}

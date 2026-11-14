@@ -68,6 +68,13 @@ reporter:
   # with enabled.
   cluster: ""
   snapshotInterval: 1h
+  # CAs for the central omni-pitcher's certificate (a private PKI, e.g. the
+  # LabUL Vault PKI): trust-manager's bundle ConfigMap as SSL_CERT_FILE.
+  # Optional volume: without the ConfigMap the pod still starts (system
+  # roots only). Empty configMap: none.
+  trustBundle:
+    configMap: cluster-trust-bundle
+    key: trust-bundle.pem
   # The bearer token, materialized by an ExternalSecret.
   secret:
     secretStore:
