@@ -14,6 +14,9 @@ k8sgpt:
   # k8sgpt's default analyzers without ConfigMap: on platform-sthings the
   # ConfigMap analyzer produced 138 of 139 findings (empty or unused
   # ConfigMaps). Empty list = every default analyzer.
+  # GatewayClass, Gateway and HTTPRoute (#830) check acceptance and references,
+  # not reachability; without the Gateway API CRDs k8sgpt only records an
+  # analyzer error and still returns the other results.
   filters:
     - Pod
     - Deployment
@@ -26,6 +29,9 @@ k8sgpt:
     - Node
     - ValidatingWebhookConfiguration
     - MutatingWebhookConfiguration
+    - GatewayClass
+    - Gateway
+    - HTTPRoute
 
 # The bearer token of the central omni-pitcher for the reporter, from a
 # ClusterSecretStore. Rendered only with the reporter.

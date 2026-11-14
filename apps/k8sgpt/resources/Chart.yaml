@@ -3,4 +3,4 @@ apiVersion: v2
 name: k8sgpt-resources
 description: The K8sGPT CR (scan without AI) and the reporter's token ExternalSecret, rendered onto the target cluster by apps/k8sgpt/install
 type: application
-version: 0.1.0
+version: 0.1.1
