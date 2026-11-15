@@ -19,6 +19,9 @@
 #   …/secret-store              the ClusterSecretStore (as kube-prometheus-stack)
 #   …/k8sgpt-reporter-secret-key  entry with the central token; default
 #                               _omni-pitcher (shared, as the Alertmanager's)
+#   …/k8sgpt-central-ca         PEM of the central gateway's CA when the
+#                               cluster's trust bundle lacks it (a LabDA
+#                               cluster reporting to LabUL); default none
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -50,7 +53,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.110.2
+        targetRevision: v0.110.4
         path: apps/k8sgpt/install
         helm:
           # Fixed, not derived: Helm caps release names at 53 characters (see
@@ -71,7 +74,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.110.2
+              targetRevision: v0.110.4
             destination:
               server: '{{ .server }}'
               namespace: k8sgpt-operator-system
@@ -85,6 +88,8 @@ spec:
                   name: '{{ default "vault" (index $a "observability-platform.stuttgart-things.com/secret-store") }}'
                 remoteKey: '{{ default "_omni-pitcher" (index $a "observability-platform.stuttgart-things.com/k8sgpt-reporter-secret-key") }}'
                 property: alertmanager-webhook-token
+              # toJson: a multi-line PEM as one quoted YAML scalar.
+              centralCa: {{ toJson (default "" (index $a "observability-platform.stuttgart-things.com/k8sgpt-central-ca")) }}
       syncPolicy:
         automated:
           prune: true
