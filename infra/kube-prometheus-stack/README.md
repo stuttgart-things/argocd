@@ -24,7 +24,7 @@ infra/kube-prometheus-stack/
 Installs `kube-prometheus-stack` `.Values.chartVersion` into `.Values.destination.namespace`, release name `kube-prometheus-stack`. Computed `valuesObject`:
 
 - **CRDs and default rules on.** The curated rules are what Alertmanager fires on — `KubePodCrashLooping`, `KubePersistentVolumeFillingUp`, `TargetDown` and the rest
-- **Prometheus:** one replica, `prometheus.scrapeInterval` as scrape and evaluation interval, `prometheus.retention`, a PVC of `prometheus.storageSize` (on `prometheus.storageClass`, or the cluster default when empty). Discovers `ServiceMonitor`, `PodMonitor`, `PrometheusRule` and `Probe` objects **in every namespace**, not only those carrying the release label — so an application ships its own monitor next to its Deployment
+- **Prometheus:** one replica, `prometheus.scrapeInterval` as scrape and evaluation interval, `prometheus.retention` and `prometheus.retentionSize` (80% of the PVC unless set), a PVC of `prometheus.storageSize` (on `prometheus.storageClass`, or the cluster default when empty). Discovers `ServiceMonitor`, `PodMonitor`, `PrometheusRule` and `Probe` objects **in every namespace**, not only those carrying the release label — so an application ships its own monitor next to its Deployment
 - **`clusterName`** set → every series and alert carries `cluster: <name>`
 - **Control-plane scrape jobs off** (`controlPlane.*`). On k3s and RKE2 the controller manager, scheduler and etcd are not reachable as separate targets, and Cilium's kube-proxy replacement leaves no kube-proxy. Their default ServiceMonitors would only raise permanent `TargetDown` alerts. kubelet, cAdvisor and kube-apiserver are scraped regardless
 - **Alertmanager:** one replica, no PVC (silences do not survive a restart). With `alertmanager.webhook.enabled`, `warning` and `critical` alerts go to the webhook with `send_resolved: true`; `info` and the always-firing `Watchdog` go to a `null` receiver. Critical inhibits warning/info, warning inhibits info, per namespace and alert name
@@ -117,6 +117,7 @@ On clusters registered through clusterbook, use the `observability-platform` lab
 | `clusterName` | `""` | `cluster` external label; empty = none |
 | `prometheus.storageClass` / `storageSize` | `""` / `10Gi` | Prometheus PVC; empty class = cluster default |
 | `prometheus.retention` | `15d` | TSDB retention |
+| `prometheus.retentionSize` | `""` | TSDB size cap (WAL included), e.g. `8GB`; empty = 80% of `storageSize` |
 | `prometheus.scrapeInterval` | `60s` | Scrape and rule evaluation interval |
 | `controlPlane.{kubeControllerManager,kubeScheduler,kubeEtcd,kubeProxy}` | `false` | Control-plane scrape jobs |
 | `grafana.enabled` | `true` | Grafana subchart |

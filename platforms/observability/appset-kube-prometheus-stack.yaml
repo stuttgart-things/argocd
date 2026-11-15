@@ -80,6 +80,8 @@ spec:
               storageClass: '{{ index .metadata.annotations "observability-platform.stuttgart-things.com/storage-class" }}'
               storageSize: '{{ default "10Gi" (index .metadata.annotations "observability-platform.stuttgart-things.com/storage-size") }}'
               retention: '{{ default "15d" (index .metadata.annotations "observability-platform.stuttgart-things.com/retention") }}'
+              # Empty = 80% of storageSize (argocd#841).
+              retentionSize: '{{ default "" (index .metadata.annotations "observability-platform.stuttgart-things.com/retention-size") }}'
               scrapeInterval: 60s
             grafana:
               enabled: true
