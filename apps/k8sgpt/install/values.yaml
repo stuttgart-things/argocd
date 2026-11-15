@@ -75,6 +75,12 @@ reporter:
   trustBundle:
     configMap: cluster-trust-bundle
     key: trust-bundle.pem
+  # PEM of the CA behind the central omni-pitcher, for clusters whose bundle
+  # does not hold it (a LabDA cluster reporting to LabUL: its bundle has the
+  # LabDA Vault PKI, the central gateway is signed by the LabUL one). Rendered
+  # as a ConfigMap on the target and added via SSL_CERT_DIR, on top of the
+  # bundle. Public certificate only. Empty: none.
+  centralCa: ""
   # The bearer token, materialized by an ExternalSecret.
   secret:
     secretStore:

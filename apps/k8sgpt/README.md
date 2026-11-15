@@ -34,8 +34,10 @@ the cache stores AI answers, not reports.
 | `k8sgpt.filters` | defaults without ConfigMap | empty = every default analyzer |
 | `reporter.enabled` | `false` | |
 | `reporter.centralUrl` / `reporter.cluster` | — | required with the reporter |
-| `reporter.version` | `v1.9.0` | k8s-pitcher; ≥ v1.9.0 (throttle, snapshot, per-source system) |
+| `reporter.version` | `v1.12.1` | k8s-pitcher; ≥ v1.12.1 behind a gateway that routes only `/pitch` |
 | `reporter.snapshotInterval` | `1h` | |
+| `reporter.trustBundle` | `cluster-trust-bundle` / `trust-bundle.pem` | trust-manager bundle as `SSL_CERT_FILE` (optional volume) |
+| `reporter.centralCa` | `""` | PEM of the central gateway's CA when the bundle lacks it (LabDA cluster → LabUL omni): ConfigMap `homerun2-k8s-pitcher-central-ca-k8sgpt` via `-resources`, added as `SSL_CERT_DIR`. AppSet annotation `…/k8sgpt-central-ca` |
 | `reporter.secret` | store `vault`, entry `_omni-pitcher`, property `alertmanager-webhook-token` | the central omni-pitcher's token |
 
 ## Verify

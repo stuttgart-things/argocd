@@ -44,3 +44,7 @@ reporterSecret:
   remoteKey: _omni-pitcher
   property: alertmanager-webhook-token
   refreshInterval: 1h
+
+# PEM of the CA behind the central omni-pitcher (install's reporter.centralCa):
+# a ConfigMap the reporter mounts as SSL_CERT_DIR. Empty: not rendered.
+reporterCentralCa: ""

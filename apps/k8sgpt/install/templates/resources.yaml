@@ -31,6 +31,7 @@ spec:
           remoteKey: {{ .Values.reporter.secret.remoteKey | quote }}
           property: {{ .Values.reporter.secret.property | quote }}
           refreshInterval: 1h
+        reporterCentralCa: {{ ternary .Values.reporter.centralCa "" .Values.reporter.enabled | quote }}
   destination:
     server: {{ .Values.destination.server | quote }}
     namespace: {{ .Values.destination.namespace | quote }}
