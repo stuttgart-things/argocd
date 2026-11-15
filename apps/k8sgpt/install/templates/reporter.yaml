@@ -55,8 +55,15 @@ spec:
             metadata:
               name: {{ $name }}
               annotations:
-                # The pitcher reads profile and token at start only.
+                # The pitcher reads profile and token at start only. `auto`
+                # covers the mounted profile ConfigMap, but not the token: the
+                # pitcher reads that Secret through the API (tokenFrom), so it
+                # is not in the Pod spec and `auto` never matches it -- a
+                # rotated token kept the reporter at 401 until a manual
+                # restart (argocd#840). Named explicitly; the value is the
+                # final name, the suffix does not rewrite annotations.
                 reloader.stakater.com/auto: "true"
+                secret.reloader.stakater.com/reload: {{ $token | quote }}
             spec:
               template:
                 spec:
