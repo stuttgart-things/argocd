@@ -104,6 +104,10 @@
           "minLength": 1
         }
       }
+    },
+    "reporterCentralCa": {
+      "type": "string",
+      "description": "PEM rendered as ConfigMap homerun2-k8s-pitcher-central-ca-k8sgpt. Empty: not rendered."
     }
   }
 }

@@ -63,20 +63,44 @@ spec:
                   containers:
                     - name: {{ $name }}
                       image: ghcr.io/stuttgart-things/homerun2-k8s-pitcher:{{ $r.version }}
-                      {{- with $r.trustBundle }}{{ if .configMap }}
+                      {{- $tb := and $r.trustBundle $r.trustBundle.configMap }}
+                      {{- if or $tb $r.centralCa }}
                       env:
+                        {{- if $tb }}
                         - name: SSL_CERT_FILE
-                          value: /etc/ssl/trust/{{ .key }}
+                          value: /etc/ssl/trust/{{ $r.trustBundle.key }}
+                        {{- end }}
+                        {{- if $r.centralCa }}
+                        # Go adds every file in SSL_CERT_DIR to the roots from
+                        # SSL_CERT_FILE: the cluster bundle plus the central CA.
+                        - name: SSL_CERT_DIR
+                          value: /etc/ssl/central
+                        {{- end }}
                       volumeMounts:
+                        {{- if $tb }}
                         - name: trust-bundle
                           mountPath: /etc/ssl/trust
                           readOnly: true
+                        {{- end }}
+                        {{- if $r.centralCa }}
+                        - name: central-ca
+                          mountPath: /etc/ssl/central
+                          readOnly: true
+                        {{- end }}
                   volumes:
+                    {{- if $tb }}
                     - name: trust-bundle
                       configMap:
-                        name: {{ .configMap }}
+                        name: {{ $r.trustBundle.configMap }}
                         optional: true
-                      {{- end }}{{ end }}
+                    {{- end }}
+                    {{- if $r.centralCa }}
+                    # From apps/k8sgpt/resources (the -resources Application).
+                    - name: central-ca
+                      configMap:
+                        name: homerun2-k8s-pitcher-central-ca-k8sgpt
+                    {{- end }}
+                      {{- end }}
         - target:
             kind: ConfigMap
             name: {{ printf "%s-profile" $name }}

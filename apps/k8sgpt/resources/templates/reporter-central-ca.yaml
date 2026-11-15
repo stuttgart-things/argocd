@@ -1,0 +1,14 @@
+{{- with .Values.reporterCentralCa }}
+---
+# The CA behind the central omni-pitcher, for a reporter whose cluster trust
+# bundle does not hold it (apps/k8sgpt/install reporter.centralCa). Public
+# certificate, no key. Mounted as the reporter's SSL_CERT_DIR.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homerun2-k8s-pitcher-central-ca-k8sgpt
+  namespace: {{ $.Values.namespace | quote }}
+data:
+  ca.crt: |
+{{ . | trim | indent 4 }}
+{{- end }}

@@ -192,6 +192,10 @@
               "minLength": 1
             }
           }
+        },
+        "centralCa": {
+          "type": "string",
+          "description": "PEM of the CA behind the central omni-pitcher, added to the reporter trust via SSL_CERT_DIR. Empty: none."
         }
       }
     },
