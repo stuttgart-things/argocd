@@ -9,6 +9,20 @@
 {{- if .Values.prometheus.storageClass }}
 {{- $_ := set $pvc "storageClassName" .Values.prometheus.storageClass }}
 {{- end }}
+{{- /* Size retention: explicit, or 80% of the PVC so WAL and compaction keep
+     headroom (prometheus docs). Time retention alone fills the volume on a
+     cluster with more series than the size was planned for (argocd#841).
+     Prometheus units are binary: 1GB = 1GiB. */}}
+{{- $retentionSize := .Values.prometheus.retentionSize }}
+{{- if not $retentionSize }}
+{{- $mib := dict "Mi" 1 "Gi" 1024 "Ti" 1048576 "Pi" 1073741824 }}
+{{- $size := .Values.prometheus.storageSize }}
+{{- $num := regexFind "^[0-9]+" $size }}
+{{- $unit := trimPrefix $num $size }}
+{{- if hasKey $mib $unit }}
+{{- $retentionSize = printf "%dMB" (div (mul (atoi $num) (get $mib $unit) 8) 10) }}
+{{- end }}
+{{- end }}
 {{- $promSpec := dict
       "replicas" 1
       "scrapeInterval" .Values.prometheus.scrapeInterval
@@ -21,6 +35,9 @@
       "resources" (dict "requests" (dict "cpu" "100m" "memory" "512Mi") "limits" (dict "memory" "1536Mi"))
       "storageSpec" (dict "volumeClaimTemplate" (dict "spec" $pvc))
 }}
+{{- if $retentionSize }}
+{{- $_ := set $promSpec "retentionSize" $retentionSize }}
+{{- end }}
 {{- if .Values.clusterName }}
 {{- $_ := set $promSpec "externalLabels" (dict "cluster" .Values.clusterName) }}
 {{- end }}

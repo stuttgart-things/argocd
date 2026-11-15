@@ -27,6 +27,10 @@ prometheus:
   storageClass: ""
   storageSize: 10Gi
   retention: 15d
+  # Size cap on the TSDB (WAL included), in Prometheus units (MB, GB: binary).
+  # "" = 80% of storageSize, so the volume never fills when more series come
+  # in than the size was planned for (argocd#841).
+  retentionSize: ""
   # 60s (vs the chart default 30s) roughly halves scrape CPU and TSDB write
   # volume. Also used as the rule evaluation interval.
   scrapeInterval: 60s

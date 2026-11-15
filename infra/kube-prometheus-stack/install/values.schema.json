@@ -41,6 +41,7 @@
         "storageClass":   { "type": "string", "description": "Empty = the cluster's default StorageClass." },
         "storageSize":    { "type": "string", "minLength": 1, "pattern": "^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$" },
         "retention":      { "type": "string", "minLength": 1 },
+        "retentionSize":  { "type": "string", "pattern": "^([0-9]+(B|KB|MB|GB|TB|PB|EB))?$", "description": "Empty = 80% of storageSize." },
         "scrapeInterval": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" }
       },
       "required": ["storageSize", "retention", "scrapeInterval"]
