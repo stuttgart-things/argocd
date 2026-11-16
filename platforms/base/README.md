@@ -10,6 +10,7 @@ kubectl apply -f platforms/base/application.yaml   # once, on the mgmt cluster
 | AppSet | Component | Label |
 |---|---|---|
 | `appset-reloader` | Stakater Reloader, in `reloader` on the workload cluster | `base-platform/reloader` (opt-out) |
+| `appset-kured` | kured, in `kube-system` on the workload cluster | `base-platform/kured` (**opt-in**) |
 
 The umbrella label is `base-platform: 'true'`; components are opt-**out**, the
 convention the [repo README](../README.md) describes — a component is deselected
@@ -83,3 +84,11 @@ stops meaning anything.
 
 - [`infra/reloader`](../../infra/reloader/) — the chart this bundle renders.
 - [`platforms/tabletennis`](../tabletennis/) — the bundle that wanted it first.
+
+## Why kured is opt-in
+
+kured reboots nodes: after an OS update writes `/var/run/reboot-required`, it
+cordons, drains and reboots one node at a time, weekdays 04:00–06:00 UTC
+([`infra/kured/install`](../../infra/kured/install/)). Something that reboots
+machines must not arrive on a cluster just because it carries the umbrella
+label, so `appset-kured` selects only clusters with `base-platform/kured: 'true'`.

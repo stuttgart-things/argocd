@@ -75,6 +75,10 @@ spec:
     # `reloader.stakater.com/auto: "true"` -- it makes the annotation mean
     # something, it does not restart anything on its own.
     base-platform/reloader: 'true'      # → appset-reloader
+    # kured: reboots nodes after OS updates (/var/run/reboot-required), one at
+    # a time with drain, weekdays 04:00-06:00 UTC. OPT-IN -- absent or 'false'
+    # means off, unlike every other component here.
+    base-platform/kured: 'false'        # → appset-kured
 
     # ---- profile: cicd-platform (vSphere CI/CD stack) ----
     cicd-platform: 'true'               # umbrella

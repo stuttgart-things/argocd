@@ -3,3 +3,4 @@ kind: Kustomization
 namespace: argocd
 resources:
   - appset-reloader.yaml
+  - appset-kured.yaml

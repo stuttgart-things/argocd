@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "kured install app-of-apps chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project", "destination", "chartVersion"],
+  "properties": {
+    "applicationName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional explicit name for the rendered ArgoCD Application. Defaults to a per-cluster derived name to avoid collisions when deployed to multiple clusters."
+    },
+    "project": { "type": "string", "minLength": 1 },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Argo destination for the rendered Application. Provide `server` (cluster URL) or `name` (registered cluster name). Must resolve to the WORKLOAD cluster: kured reboots the nodes it runs on.",
+      "properties": {
+        "server":    { "type": "string", "format": "uri" },
+        "name":      { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 }
+      },
+      "required": ["namespace"],
+      "anyOf": [
+        { "required": ["server"] },
+        { "required": ["name"] }
+      ]
+    },
+    "chartVersion": { "type": "string", "minLength": 1 },
+    "period": { "type": "string", "description": "How often the sentinel is checked, Go duration (e.g. 1h)." },
+    "rebootDays": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["su", "mo", "tu", "we", "th", "fr", "sa"] },
+      "description": "Days a reboot may happen. Empty = every day."
+    },
+    "startTime": { "type": "string", "pattern": "^([0-9]|[01][0-9]|2[0-3]):[0-5][0-9]$" },
+    "endTime":   { "type": "string", "pattern": "^([0-9]|[01][0-9]|2[0-3]):[0-5][0-9]$" },
+    "timeZone":  { "type": "string" },
+    "concurrency": { "type": "integer", "minimum": 1, "description": "Nodes rebooting at the same time." },
+    "drainTimeout": { "type": "string", "description": "Go duration after which the drain is aborted; empty = wait forever." },
+    "forceReboot": { "type": "boolean", "description": "Reboot even when the drain failed or timed out." },
+    "drainGracePeriod": { "type": "integer", "description": "Seconds per pod to terminate; -1 = the pod's own terminationGracePeriod." },
+    "blockingPodSelector": { "type": "array", "items": { "type": "string" } },
+    "preferNoScheduleTaint": { "type": "string" },
+    "annotateNodes": { "type": "boolean" },
+    "prometheusUrl": { "type": "string" },
+    "alertFilterRegexp": { "type": "string" },
+    "notifyUrl": { "type": "string" },
+    "tolerations": { "type": "array", "items": { "type": "object" } },
+    "resources": { "type": "object" },
+    "extraValues": {
+      "type": "object",
+      "description": "Deep-merged on top of the computed values passed to the upstream chart."
+    },
+    "syncPolicy": { "type": "object" }
+  }
+}
