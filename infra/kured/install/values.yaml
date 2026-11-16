@@ -1,0 +1,100 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Where the rendered Application deploys.
+#
+# kured is a DaemonSet that has to run on the WORKLOAD cluster's nodes: it
+# reads the reboot sentinel on each node's filesystem and reboots that node.
+# Pointing this at the ArgoCD cluster reboots the wrong machines.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: kube-system
+
+# Upstream kured Helm chart (https://kubereboot.github.io/charts).
+# renovate: datasource=helm depName=kured registryUrl=https://kubereboot.github.io/charts
+chartVersion: 6.1.0
+
+# ---- When a node may reboot --------------------------------------------------
+#
+# kured checks every `period` whether /var/run/reboot-required exists (Ubuntu
+# writes it after a kernel/libc update, unattended-upgrades included). If so,
+# and only inside the window below, it takes the cluster-wide lock, cordons and
+# drains the node, reboots it, and uncordons it once it is back. One node at a
+# time (`concurrency`).
+#
+# Weekdays 04:00-06:00 UTC: before the fleet's VM health report (06:30 UTC,
+# stuttgart-things/stuttgart-things#4556), so the report sees the result, and
+# outside office hours.
+period: 1h
+rebootDays: [mo, tu, we, th, fr]
+startTime: "04:00"
+endTime: "06:00"
+timeZone: UTC
+concurrency: 1
+
+# ---- Drain -------------------------------------------------------------------
+#
+# A drain can block for good: a single-instance CloudNativePG cluster keeps a
+# PodDisruptionBudget on its primary, and on a single-node cluster nothing can
+# move at all. After `drainTimeout` kured gives up the drain; with
+# `forceReboot: true` it reboots anyway (the pods come back with the node),
+# with false the node stays cordoned until someone looks -- in a lab the
+# reboot is the lesser evil, the cordoned node the bigger one.
+drainTimeout: 15m
+forceReboot: true
+# Seconds per pod to terminate; -1 = the pod's own terminationGracePeriod.
+drainGracePeriod: -1
+
+# Pods whose presence blocks a reboot, e.g. a running CI job. Label selectors,
+# ANDed per entry by kured. Empty = nothing blocks.
+blockingPodSelector: []
+
+# Taint the node that waits for its reboot, so no new pods land on it from a
+# node rebooting before it. Empty = off.
+preferNoScheduleTaint: "weave.works/kured-node-reboot"
+
+# Node annotations kured-reboot-in-progress / -most-recent-reboot-needed:
+# visible in `kubectl describe node` and to the k8s-pitcher.
+annotateNodes: true
+
+# Optional: skip the reboot while Prometheus has firing alerts (all but those
+# matching alertFilterRegexp). Empty = not checked.
+prometheusUrl: ""
+alertFilterRegexp: ""
+
+# Optional: shoutrrr URL kured posts a message to before/after a reboot.
+notifyUrl: ""
+
+# Run on every node, control-plane nodes included -- they get kernel updates
+# too. RKE2/k3s servers are often tainted NoSchedule/NoExecute.
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+  - key: node-role.kubernetes.io/etcd
+    operator: Exists
+  - key: CriticalAddonsOnly
+    operator: Exists
+
+# Resource requests/limits for the kured container. Empty = upstream default.
+resources: {}
+
+# Deep-merged on top of the computed values passed to the upstream chart. Use
+# for anything not exposed above (image, nodeSelector, metrics, extraArgs, ...).
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

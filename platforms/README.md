@@ -32,12 +32,16 @@ component at `'false'` rather than omitting it.
 | Label | AppSet | Needs annotations |
 |---|---|---|
 | `base-platform/reloader` | `appset-reloader` → Stakater Reloader in `reloader` on the workload cluster | — |
+| `base-platform/kured` | `appset-kured` → kured in `kube-system` on the workload cluster — **opt-in** (`'true'` required) | — |
 
 Not owned by any one app platform, but depended on by several: ESO refreshes a
 Secret and the Pods holding the old value keep holding it. **Inert until a
 workload opts in** with `reloader.stakater.com/auto: "true"` — installing the
 bundle changes the behaviour of nothing already running. See
 [`platforms/base`](./base/).
+
+kured is the exception to opt-out: it reboots nodes (weekdays 04:00–06:00 UTC,
+one at a time), so it only arrives with an explicit `base-platform/kured: 'true'`.
 
 ### `cicd-platform` — vSphere CI/CD stack
 | Label | AppSet | Needs annotations |

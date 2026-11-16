@@ -1,0 +1,77 @@
+---
+# kured (Kubernetes Reboot Daemon), as part of the base platform.
+#
+# Reboots a node after an OS update asked for it (/var/run/reboot-required),
+# one node at a time, with cordon and drain, inside a weekday window
+# (infra/kured/install/values.yaml: mo-fr 04:00-06:00 UTC). Runs ON THE
+# WORKLOAD CLUSTER: it reboots the nodes it runs on.
+#
+# OPT-IN, unlike the other components of this platform and the convention in
+# platforms/README.md: a component that reboots nodes must never arrive on a
+# cluster because it carries the umbrella label. Both labels are required:
+#
+#   base-platform: "true"
+#   base-platform/kured: "true"
+#
+# Why: stuttgart-things/stuttgart-things#4590 -- nine VMs of the fleet waited
+# for a reboot after kernel/libc updates, some with two kernel generations.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kured-base
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # No `preserveResourcesOnDeletion`: this AppSet generates an app-of-apps
+  # parent, see appset-reloader.yaml (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            base-platform: "true"
+            base-platform/kured: "true"
+  template:
+    metadata:
+      name: 'kured-base-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      # The parent renders an Application CRD into argocd on the management
+      # cluster; the child targets the workload cluster via destination.server.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # The first tag with infra/kured/install.
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.113.0
+        path: infra/kured/install
+        helm:
+          releaseName: 'kured-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above (see
+            # appset-reloader.yaml).
+            applicationName: 'kured-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: kube-system
+            # Window, drain timeout and forceReboot stay at the chart's
+            # defaults; see infra/kured/install/values.yaml for why.
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

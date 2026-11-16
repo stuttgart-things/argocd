@@ -1,0 +1,61 @@
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $defaultName := printf "kured-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{/*
+The upstream chart takes kured's flags under `configuration:`. Only the knobs a
+cluster actually varies get a first-class value here; everything else goes
+through extraValues. Empty strings are left out so kured keeps its own default.
+*/}}
+{{- $conf := dict
+      "period"                .Values.period
+      "rebootDays"            .Values.rebootDays
+      "startTime"             .Values.startTime
+      "endTime"               .Values.endTime
+      "timeZone"              .Values.timeZone
+      "concurrency"           (int .Values.concurrency)
+      "drainTimeout"          .Values.drainTimeout
+      "forceReboot"           .Values.forceReboot
+      "drainGracePeriod"      (toString .Values.drainGracePeriod)
+      "blockingPodSelector"   .Values.blockingPodSelector
+      "preferNoScheduleTaint" .Values.preferNoScheduleTaint
+      "annotateNodes"         .Values.annotateNodes
+      "prometheusUrl"         .Values.prometheusUrl
+      "alertFilterRegexp"     .Values.alertFilterRegexp
+      "notifyUrl"             .Values.notifyUrl
+}}
+{{- $computed := dict
+      "configuration" $conf
+      "tolerations"   (.Values.tolerations | default list)
+      "resources"     (.Values.resources | default dict)
+}}
+{{- $extra := .Values.extraValues | default dict }}
+{{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # Nothing depends on kured at apply time; -10 only to keep it with the
+    # other infra components.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://kubereboot.github.io/charts
+    chart: kured
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: kured
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
