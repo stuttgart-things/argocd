@@ -131,6 +131,15 @@ spec:
         connectionLimit: -1
         passwordSecret:
           name: {{ .Values.bootstrap.secretName | quote }}
+    {{- if eq (int .Values.instances) 1 }}
+    # One instance means no replica, and <name>-ro selects replicas only: it
+    # never has an endpoint, and K8sGPT's Service analyzer reports it on
+    # every cluster with this database (stuttgart-things/stuttgart-things#4591).
+    # The app dials <name>-rw; -r (any instance) stays. With instances > 1
+    # the -ro Service comes back on its own.
+    services:
+      disabledDefaultServices: ["ro"]
+    {{- end }}
   {{- if $recovery.enabled }}
   # The server to replay from, through the read-only ObjectStore in
   # templates/backup.yaml. Reading only: nothing here can write to that path.

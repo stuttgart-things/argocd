@@ -24,6 +24,15 @@ metadata:
   {{- end }}
 spec:
   instances: {{ .Values.instances }}
+  {{- if eq (int .Values.instances) 1 }}
+  # One instance means no replica, and <name>-ro selects replicas only: it
+  # never has an endpoint, and K8sGPT's Service analyzer reports it
+  # (stuttgart-things/stuttgart-things#4591). -rw and -r stay; with
+  # instances > 1 the -ro Service comes back on its own.
+  managed:
+    services:
+      disabledDefaultServices: ["ro"]
+  {{- end }}
   # Custom operand image: CNPG standard images don't bundle pgvector. Built
   # from stuttgart-things/flux apps/backstage-rag-postgres/image/Dockerfile and
   # pulled by the kubelet, so the GHCR package must be public (or add an
