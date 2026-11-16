@@ -33,6 +33,7 @@ component at `'false'` rather than omitting it.
 |---|---|---|
 | `base-platform/reloader` | `appset-reloader` → Stakater Reloader in `reloader` on the workload cluster | — |
 | `base-platform/kured` | `appset-kured` → kured in `kube-system` on the workload cluster — **opt-in** (`'true'` required) | — |
+| `base-platform/kured-notify` | `appset-kured` → kured's reboot messages to the central homerun2 — opt-in | `observability-platform.stuttgart-things.com/k8sgpt-central-url`, `…/k8sgpt-central-ca`, `…/k8sgpt-reporter-secret-key`, `…/secret-store` (or the `base-platform.stuttgart-things.com/kured-notify-*` overrides) |
 
 Not owned by any one app platform, but depended on by several: ESO refreshes a
 Secret and the Pods holding the old value keep holding it. **Inert until a

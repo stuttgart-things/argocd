@@ -1,0 +1,41 @@
+---
+# Namespace kured runs in (infra/kured/install destination.namespace).
+namespace: kube-system
+
+# Cluster name: in the author (kured-<cluster>), the title and the tags of
+# every message, so a card says which cluster rebooted.
+cluster: ""
+
+# kured's notifications to the central homerun2 (omni-pitcher /pitch).
+#
+# kured sends three messages per node through shoutrrr: "Draining node X",
+# "Rebooting node X", "Node X rebooted & uncordoned successfully!". shoutrrr's
+# generic service posts them as JSON; the URL carries everything omni-pitcher
+# needs:
+#   generic+https://<omni>/pitch?@Authorization=Bearer+<token>&template=json
+#     &title=...&$system=kured&$author=kured-<cluster>&$severity=info&$tags=...
+# The token is the secret part, so the whole URL is built by an ExternalSecret
+# and reaches kured as KURED_NOTIFY_URL (kured reads every flag from
+# KURED_<FLAG>) -- it never sits in Git or in an Application spec.
+notify:
+  enabled: false
+  # omni-pitcher's /pitch, e.g. https://omni.platform.sthings-vsphere.labul.sva.de/pitch
+  url: ""
+  secretName: kured-notify
+  secretStore:
+    kind: ClusterSecretStore
+    name: vault
+  # The omni-pitcher bearer token, the same entry the k8sgpt reporter and
+  # Alertmanager use.
+  remoteKey: _omni-pitcher
+  property: alertmanager-webhook-token
+  refreshInterval: 1h
+  # homerun2 severity of all three messages (one URL for all of them).
+  severity: info
+
+# PEM of the CA behind the central omni-pitcher, when the cluster's own trust
+# does not hold it (a LabUL Vault PKI certificate seen from LabDA). Rendered as
+# a ConfigMap kured mounts as SSL_CERT_DIR. Public certificate, no key.
+# Empty: not rendered.
+centralCa: ""
+caConfigMapName: kured-central-ca

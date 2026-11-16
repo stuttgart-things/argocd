@@ -11,6 +11,7 @@ kubectl apply -f platforms/base/application.yaml   # once, on the mgmt cluster
 |---|---|---|
 | `appset-reloader` | Stakater Reloader, in `reloader` on the workload cluster | `base-platform/reloader` (opt-out) |
 | `appset-kured` | kured, in `kube-system` on the workload cluster | `base-platform/kured` (**opt-in**) |
+| `appset-kured` | kured's drain/reboot/uncordon messages to the central homerun2 | `base-platform/kured-notify` (opt-in) |
 
 The umbrella label is `base-platform: 'true'`; components are opt-**out**, the
 convention the [repo README](../README.md) describes — a component is deselected

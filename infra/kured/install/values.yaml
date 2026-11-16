@@ -1,6 +1,15 @@
 ---
-# ArgoCD AppProject the rendered Application belongs to.
+# Reference back to this catalog repo, for the notify Application
+# (infra/kured/resources).
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject the rendered Applications belong to.
 project: default
+
+# Cluster name, for the notifications (author kured-<cluster>, tags).
+cluster: ""
 
 # Where the rendered Application deploys.
 #
@@ -63,8 +72,35 @@ annotateNodes: true
 prometheusUrl: ""
 alertFilterRegexp: ""
 
-# Optional: shoutrrr URL kured posts a message to before/after a reboot.
+# Optional: a plain shoutrrr URL kured posts to (drain, reboot, uncordon).
+# Lands in the Application spec -- only for URLs without a secret. For the
+# central homerun2 use `notify` below instead.
 notifyUrl: ""
+
+# kured's messages to the central homerun2 (omni-pitcher /pitch) -- three per
+# node: "Draining node X", "Rebooting node X", "Node X rebooted & uncordoned
+# successfully!", as system `kured`, author `kured-<cluster>`.
+#
+# On: a second Application (<name>-notify, infra/kured/resources) puts an
+# ExternalSecret into the destination namespace that builds the shoutrrr URL
+# with the omni-pitcher token, and kured reads it as KURED_NOTIFY_URL. The
+# token never sits in Git or in an Application spec. Until the Secret exists
+# the kured pods wait (CreateContainerConfigError), then start on their own;
+# Reloader restarts them when the Secret changes (token rotation).
+notify:
+  enabled: false
+  # omni-pitcher's /pitch, e.g. https://omni.platform.sthings-vsphere.labul.sva.de/pitch
+  url: ""
+  secretStore:
+    kind: ClusterSecretStore
+    name: vault
+  remoteKey: _omni-pitcher
+  property: alertmanager-webhook-token
+  severity: info
+  # PEM of the CA behind omni-pitcher when the cluster's trust lacks it (LabUL
+  # Vault PKI seen from LabDA): a ConfigMap kured mounts as SSL_CERT_DIR, next
+  # to the image's own /etc/ssl/certs. Empty = system trust only.
+  centralCa: ""
 
 # Run on every node, control-plane nodes included -- they get kernel updates
 # too. RKE2/k3s servers are often tainted NoSchedule/NoExecute.

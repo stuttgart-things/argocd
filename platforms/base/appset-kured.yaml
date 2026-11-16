@@ -15,6 +15,16 @@
 #
 # Why: stuttgart-things/stuttgart-things#4590 -- nine VMs of the fleet waited
 # for a reboot after kernel/libc updates, some with two kernel generations.
+#
+# NOTIFICATIONS to the central homerun2 (drain / reboot / uncordon, system
+# `kured`), opt-in per cluster with `base-platform/kured-notify: "true"`.
+# Where to and with what, from the cluster secret's annotations -- the
+# kured-specific one first, else the K8sGPT reporter's, which already points
+# at the central omni-pitcher:
+#   base-platform.stuttgart-things.com/kured-notify-url  | observability-platform.stuttgart-things.com/k8sgpt-central-url
+#   base-platform.stuttgart-things.com/kured-notify-ca   | observability-platform.stuttgart-things.com/k8sgpt-central-ca
+#   base-platform.stuttgart-things.com/kured-notify-secret-key | observability-platform.stuttgart-things.com/k8sgpt-reporter-secret-key | _omni-pitcher
+#   base-platform.stuttgart-things.com/secret-store      | observability-platform.stuttgart-things.com/secret-store | vault
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -46,20 +56,39 @@ spec:
         namespace: argocd
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
-        # The first tag with infra/kured/install.
+        # The first tag with infra/kured/resources (notify).
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.113.0
+        targetRevision: v0.114.0
         path: infra/kured/install
         helm:
           releaseName: 'kured-{{ .name }}'
-          valuesObject:
+          # A YAML string, not valuesObject: the notify toggle needs a real
+          # bool and the CA a multi-line PEM (toJson) -- same as appset-k8sgpt.
+          values: |
+            {{- $l := .metadata.labels }}
+            {{- $a := .metadata.annotations }}
             # MUST differ from this template's own metadata.name above (see
             # appset-reloader.yaml).
             applicationName: 'kured-{{ .name }}'
             project: '{{ .name }}'
+            cluster: '{{ .name }}'
+            catalog:
+              repoURL: https://github.com/stuttgart-things/argocd.git
+              # renovate: datasource=github-tags depName=stuttgart-things/argocd
+              targetRevision: v0.114.0
             destination:
               server: '{{ .server }}'
               namespace: kube-system
+            notify:
+              enabled: {{ eq (default "" (index $l "base-platform/kured-notify")) "true" }}
+              url: '{{ default (default "" (index $a "observability-platform.stuttgart-things.com/k8sgpt-central-url")) (index $a "base-platform.stuttgart-things.com/kured-notify-url") }}'
+              secretStore:
+                kind: ClusterSecretStore
+                name: '{{ default (default "vault" (index $a "observability-platform.stuttgart-things.com/secret-store")) (index $a "base-platform.stuttgart-things.com/secret-store") }}'
+              remoteKey: '{{ default (default "_omni-pitcher" (index $a "observability-platform.stuttgart-things.com/k8sgpt-reporter-secret-key")) (index $a "base-platform.stuttgart-things.com/kured-notify-secret-key") }}'
+              property: alertmanager-webhook-token
+              # toJson: a multi-line PEM as one quoted YAML scalar.
+              centralCa: {{ toJson (default (default "" (index $a "observability-platform.stuttgart-things.com/k8sgpt-central-ca")) (index $a "base-platform.stuttgart-things.com/kured-notify-ca")) }}
             # Window, drain timeout and forceReboot stay at the chart's
             # defaults; see infra/kured/install/values.yaml for why.
       syncPolicy:
