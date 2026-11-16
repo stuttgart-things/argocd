@@ -52,6 +52,39 @@ Rolled out by `platforms/base/appset-kured.yaml`, opt-**in** per cluster with
 | `preferNoScheduleTaint` | `weave.works/kured-node-reboot` | taint while the node waits |
 | `annotateNodes` | `true` | reboot annotations on the node |
 | `prometheusUrl` / `alertFilterRegexp` | empty | skip while alerts fire |
-| `notifyUrl` | empty | shoutrrr URL for reboot messages |
+| `notifyUrl` | empty | plain shoutrrr URL (no secrets: it lands in the Application spec) |
+| `notify.*` | off | messages to the central homerun2, see below |
+| `cluster` / `catalog` | — | cluster name for the messages; this repo for the notify Application |
 | `tolerations` | control-plane, master, etcd, CriticalAddonsOnly | run on server nodes too |
 | `extraValues` | `{}` | deep-merged into the upstream values |
+
+## Messages to homerun2 (`notify`)
+
+With `notify.enabled` kured reports every node it handles to the central
+omni-pitcher (`/pitch`): "Draining node X", "Rebooting node X", "Node X rebooted
+& uncordoned successfully!" -- system `kured`, author `kured-<cluster>`, tags
+`kured,cluster=<cluster>`, severity `notify.severity` (info).
+
+```
+infra/kured/install  ──>  Application <name>-notify  (infra/kured/resources, wave -11)
+                            ├─ ExternalSecret kured-notify   token from notify.secretStore / remoteKey
+                            │    └─ Secret kured-notify: url = generic://<omni>/pitch?@Authorization=Bearer+<token>&template=json&$title=…&$system=kured…
+                            └─ ConfigMap kured-central-ca    notify.centralCa (optional)
+                     ──>  Application <name>             kured DaemonSet
+                            env KURED_NOTIFY_URL  <- Secret kured-notify/url   (kured reads every flag as KURED_<FLAG>)
+                            env SSL_CERT_DIR=/etc/kured-ca <- ConfigMap         (Go keeps the image's system bundle file)
+                            annotation secret.reloader.stakater.com/reload: kured-notify
+```
+
+- The token never sits in Git or an Application spec: the ExternalSecret
+  builds the whole URL.
+- The pods wait for the Secret (non-optional `secretKeyRef`) and start on their
+  own once it exists. Reloader restarts them when the Secret changes.
+- shoutrrr v0.8.0 (kured 1.23.0), tested: `generic://`, not `generic+https://`
+  -- with the custom scheme `template=json` is passed to the target and the body
+  is plain text. The title goes in as `$title`, because `title=` never reaches
+  the JSON, and omni-pitcher requires a title.
+
+In `platforms/base/appset-kured.yaml` the switch is `base-platform/kured-notify`,
+and URL, CA, token entry and store come from the cluster's annotations (the
+K8sGPT reporter's, unless kured-specific ones are set).

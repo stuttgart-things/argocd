@@ -1,0 +1,6 @@
+---
+apiVersion: v2
+name: kured-resources
+description: kured's notification wiring on the workload cluster -- the shoutrrr URL with the central omni-pitcher's token (ExternalSecret) and the CA behind it (ConfigMap)
+type: application
+version: 0.1.0

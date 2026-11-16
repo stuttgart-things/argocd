@@ -28,6 +28,23 @@ through extraValues. Empty strings are left out so kured keeps its own default.
       "tolerations"   (.Values.tolerations | default list)
       "resources"     (.Values.resources | default dict)
 }}
+{{- $n := .Values.notify | default dict }}
+{{- if $n.enabled }}
+{{/*
+Notify: KURED_NOTIFY_URL from the Secret infra/kured/resources builds (not
+optional -- the pod waits for it rather than starting without notifications),
+the CA as SSL_CERT_DIR (Go still loads the image's system bundle file), and
+Reloader's annotation so a rotated token restarts the pods.
+*/}}
+{{- $env := list (dict "name" "KURED_NOTIFY_URL" "valueFrom" (dict "secretKeyRef" (dict "name" "kured-notify" "key" "url"))) }}
+{{- if $n.centralCa }}
+{{- $env = append $env (dict "name" "SSL_CERT_DIR" "value" "/etc/kured-ca") }}
+{{- $_ := set $computed "volumes" (list (dict "name" "central-ca" "configMap" (dict "name" "kured-central-ca"))) }}
+{{- $_ := set $computed "volumeMounts" (list (dict "name" "central-ca" "mountPath" "/etc/kured-ca" "readOnly" true)) }}
+{{- end }}
+{{- $_ := set $computed "extraEnvVars" $env }}
+{{- $_ := set $computed "dsAnnotations" (dict "secret.reloader.stakater.com/reload" "kured-notify") }}
+{{- end }}
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
 ---
@@ -59,3 +76,47 @@ spec:
     namespace: {{ .Values.destination.namespace | quote }}
   syncPolicy:
     {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- if $n.enabled }}
+---
+# The notify wiring from infra/kured/resources: the ExternalSecret that builds
+# KURED_NOTIFY_URL and the CA ConfigMap, next to kured. Before kured (-11): the
+# pods need the Secret to start.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-notify" $appName | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-11"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: {{ .Values.catalog.repoURL | quote }}
+    targetRevision: {{ .Values.catalog.targetRevision | quote }}
+    path: infra/kured/resources
+    helm:
+      releaseName: kured-resources
+      valuesObject:
+        namespace: {{ .Values.destination.namespace | quote }}
+        cluster: {{ required "cluster is required with notify.enabled" .Values.cluster | quote }}
+        notify:
+          enabled: true
+          url: {{ required "notify.url is required with notify.enabled" $n.url | quote }}
+          secretName: kured-notify
+          secretStore:
+            {{- toYaml $n.secretStore | nindent 12 }}
+          remoteKey: {{ $n.remoteKey | quote }}
+          property: {{ $n.property | quote }}
+          severity: {{ $n.severity | default "info" | quote }}
+        centralCa: {{ $n.centralCa | default "" | quote }}
+        caConfigMapName: kured-central-ca
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}
+{{- end }}

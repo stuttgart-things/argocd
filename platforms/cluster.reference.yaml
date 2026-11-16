@@ -79,6 +79,11 @@ spec:
     # a time with drain, weekdays 04:00-06:00 UTC. OPT-IN -- absent or 'false'
     # means off, unlike every other component here.
     base-platform/kured: 'false'        # → appset-kured
+    # kured's drain/reboot/uncordon messages to the central homerun2 (system
+    # kured). Needs the central omni-pitcher's URL/CA/token annotations -- the
+    # K8sGPT reporter's (observability-platform.stuttgart-things.com/k8sgpt-*)
+    # or base-platform.stuttgart-things.com/kured-notify-{url,ca,secret-key}.
+    base-platform/kured-notify: 'false' # → appset-kured (notify)
 
     # ---- profile: cicd-platform (vSphere CI/CD stack) ----
     cicd-platform: 'true'               # umbrella

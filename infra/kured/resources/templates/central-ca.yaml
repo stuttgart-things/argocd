@@ -1,0 +1,13 @@
+{{- if and .Values.notify.enabled .Values.centralCa }}
+---
+# The CA behind the central omni-pitcher, mounted into kured as SSL_CERT_DIR
+# (infra/kured/install). Public certificate, no key.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.caConfigMapName | quote }}
+  namespace: {{ .Values.namespace | quote }}
+data:
+  ca.crt: |
+{{ .Values.centralCa | trim | indent 4 }}
+{{- end }}
