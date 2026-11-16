@@ -3,33 +3,89 @@
   "title": "kured resources chart",
   "type": "object",
   "additionalProperties": false,
-  "required": ["namespace", "notify"],
+  "required": [
+    "namespace",
+    "notify"
+  ],
   "properties": {
-    "namespace": { "type": "string", "minLength": 1 },
-    "cluster": { "type": "string", "description": "Cluster name in author, title and tags. Required with notify.enabled." },
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cluster": {
+      "type": "string",
+      "description": "Cluster name in author, title and tags. Required with notify.enabled."
+    },
     "notify": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "properties": {
-        "enabled": { "type": "boolean" },
-        "url": { "type": "string", "description": "omni-pitcher /pitch URL (https:// or http://)." },
-        "secretName": { "type": "string", "minLength": 1 },
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string",
+          "description": "omni-pitcher /pitch URL (https:// or http://)."
+        },
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        },
         "secretStore": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "kind": { "type": "string", "enum": ["ClusterSecretStore", "SecretStore"] },
-            "name": { "type": "string", "minLength": 1 }
+            "kind": {
+              "type": "string",
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
-        "remoteKey": { "type": "string", "minLength": 1 },
-        "property": { "type": "string", "minLength": 1 },
-        "refreshInterval": { "type": "string" },
-        "severity": { "type": "string", "enum": ["info", "success", "warning", "error", "critical"] }
+        "remoteKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property": {
+          "type": "string",
+          "minLength": 1
+        },
+        "refreshInterval": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "success",
+            "warning",
+            "error",
+            "critical"
+          ]
+        }
       }
     },
-    "centralCa": { "type": "string", "description": "PEM of the CA behind the central omni-pitcher; empty = not rendered." },
-    "caConfigMapName": { "type": "string", "minLength": 1 }
+    "centralCa": {
+      "type": "string",
+      "description": "PEM of the CA behind the central omni-pitcher; empty = not rendered."
+    },
+    "caConfigMapName": {
+      "type": "string",
+      "minLength": 1
+    }
   }
 }
