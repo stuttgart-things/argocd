@@ -62,7 +62,22 @@
       "additionalProperties": false,
       "properties": {
         "enabled":     { "type": "boolean" },
-        "adminSecret": { "type": "string", "description": "Secret with admin-user/admin-password. Empty = upstream default credentials." }
+        "adminSecret": { "type": "string", "description": "Secret with admin-user/admin-password. Empty = upstream default credentials." },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer":      { "type": "string", "pattern": "^(https?://.+)?$", "description": "ZITADEL issuer URL. Empty = OIDC login off." },
+            "name":        { "type": "string", "minLength": 1 },
+            "secretName":  { "type": "string", "minLength": 1 },
+            "caConfigMap": { "type": "string", "description": "CA bundle ConfigMap for the issuer's TLS. Empty = system roots." },
+            "caKey":       { "type": "string" },
+            "adminRole":   { "type": "string", "minLength": 1 },
+            "viewerRole":  { "type": "string", "minLength": 1 }
+          },
+          "if": { "properties": { "issuer": { "minLength": 1 } }, "required": ["issuer"] },
+          "then": { "required": ["name", "secretName", "adminRole", "viewerRole"] }
+        }
       },
       "required": ["enabled"]
     },
@@ -109,7 +124,10 @@
         "grafanaAdminUserProperty":     { "type": "string", "minLength": 1 },
         "grafanaAdminPasswordProperty": { "type": "string", "minLength": 1 },
         "webhookTokenProperty":         { "type": "string", "minLength": 1 },
-        "webhookRemoteKey":             { "type": "string" }
+        "webhookRemoteKey":             { "type": "string" },
+        "grafanaOidcClientIdProperty":     { "type": "string", "minLength": 1 },
+        "grafanaOidcClientSecretProperty": { "type": "string", "minLength": 1 },
+        "grafanaOidcRemoteKey":            { "type": "string" }
       },
       "required": ["enabled"],
       "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },

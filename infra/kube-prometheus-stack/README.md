@@ -28,16 +28,17 @@ Installs `kube-prometheus-stack` `.Values.chartVersion` into `.Values.destinatio
 - **`clusterName`** set → every series and alert carries `cluster: <name>`
 - **Control-plane scrape jobs off** (`controlPlane.*`). On k3s and RKE2 the controller manager, scheduler and etcd are not reachable as separate targets, and Cilium's kube-proxy replacement leaves no kube-proxy. Their default ServiceMonitors would only raise permanent `TargetDown` alerts. kubelet, cAdvisor and kube-apiserver are scraped regardless
 - **Alertmanager:** one replica, no PVC (silences do not survive a restart). With `alertmanager.webhook.enabled`, `warning` and `critical` alerts go to the webhook with `send_resolved: true`; `info` and the always-firing `Watchdog` go to a `null` receiver. Critical inhibits warning/info, warning inhibits info, per namespace and alert name
-- **Grafana:** bundled dashboards, dashboard folders by the ConfigMap annotation `grafana_folder` (sidecar `folderAnnotation`; without it → General), no PVC (dashboards are provisioned from ConfigMaps on every start; edits in the UI do not persist), no chart Ingress. `grafana.adminSecret` set → admin credentials from that Secret; `httpRoute.enabled` → `root_url` is the route's hostname
+- **Grafana:** bundled dashboards, dashboard folders by the ConfigMap annotation `grafana_folder` (sidecar `folderAnnotation`; without it → General), no PVC (dashboards are provisioned from ConfigMaps on every start; edits in the UI do not persist), no chart Ingress. `grafana.adminSecret` set → admin credentials from that Secret; `httpRoute.enabled` → `root_url` is the route's hostname; `grafana.oidc.issuer` set → login via ZITADEL (see below)
 
 ### `<name>-secrets` Application (opt-in, `externalSecrets.enabled: true`)
 
-Two `ExternalSecret`s from one entry (`externalSecrets.remoteKey`) in an existing (Cluster)SecretStore:
+Up to three `ExternalSecret`s from one entry (`externalSecrets.remoteKey`) in an existing (Cluster)SecretStore:
 
 | Target Secret | Keys | From property |
 |---|---|---|
 | `grafana.adminSecret` | `admin-user`, `admin-password` | `grafanaAdminUserProperty`, `grafanaAdminPasswordProperty` |
-| `alertmanager.webhook.tokenSecret` | `token` | `webhookTokenProperty` |
+| `alertmanager.webhook.tokenSecret` | `token` | `webhookTokenProperty` (entry `webhookRemoteKey`, empty = `remoteKey`) |
+| `grafana.oidc.secretName` | `GF_AUTH_GENERIC_OAUTH_CLIENT_ID`, `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET` | `grafanaOidcClientIdProperty`, `grafanaOidcClientSecretProperty` (entry `grafanaOidcRemoteKey`, empty = `remoteKey`) |
 
 Each is rendered only when its consumer is on. Sync-wave -5 puts them ahead of the stack.
 
@@ -54,6 +55,16 @@ Alertmanager ─▶ omni-pitcher /pitch/grafana ─▶ Redis stream "alerts" ─
 ```
 
 The Bearer token is mounted from `tokenSecret` (`alertmanagerSpec.secrets`) and referenced as `credentials_file`, and the CA bundle is mounted from `caConfigMap` (`alertmanagerSpec.configMaps`) and referenced as `ca_file`. Neither value is ever part of the Alertmanager config Secret, the rendered Application, or Git. On a cluster outside the pitcher's own, the URL is its public HTTPS address, which chains to the internal CA — hence `cluster-trust-bundle`.
+
+## Grafana login via ZITADEL (OIDC)
+
+Off by default. `grafana.oidc.issuer` set (e.g. `https://zitadel.platform.sthings.lab`) → Grafana gets a "Sign in with `grafana.oidc.name`" button (generic OAuth, PKCE, `auto_login: false`), next to the local admin — never instead of it. Same settings as the flux-run clusters:
+
+- Client ID and secret come as env (`envFromSecret`) from `grafana.oidc.secretName`, keys `GF_AUTH_GENERIC_OAUTH_CLIENT_ID` / `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET`; with `externalSecrets.enabled` the secrets Application creates it from `grafanaOidcClientIdProperty` / `grafanaOidcClientSecretProperty`
+- Endpoints derived from the issuer: `/oauth/v2/authorize`, `/oauth/v2/token`, `/oidc/v1/userinfo`
+- Role from the ZITADEL project-roles claim: `grafana.oidc.adminRole` → Admin, `grafana.oidc.viewerRole` → Viewer, neither → login refused (`role_attribute_strict`)
+- `grafana.oidc.caConfigMap` set → mounted at `/etc/grafana/oidc-ca` and used as `tls_client_ca` (ZITADEL behind the internal CA); empty = system roots
+- Redirect URI to register in ZITADEL: `https://<httpRoute.hostname>/login/generic_oauth`
 
 ## Consumer usage
 
@@ -122,6 +133,11 @@ On clusters registered through clusterbook, use the `observability-platform` lab
 | `controlPlane.{kubeControllerManager,kubeScheduler,kubeEtcd,kubeProxy}` | `false` | Control-plane scrape jobs |
 | `grafana.enabled` | `true` | Grafana subchart |
 | `grafana.adminSecret` | `""` | Secret with `admin-user`/`admin-password`; empty = upstream default credentials |
+| `grafana.oidc.issuer` | `""` | ZITADEL issuer URL; empty = OIDC login off |
+| `grafana.oidc.name` | `ZITADEL` | Login button label |
+| `grafana.oidc.secretName` | `kube-prometheus-stack-grafana-oidc` | Secret with `GF_AUTH_GENERIC_OAUTH_CLIENT_ID`/`_SECRET` |
+| `grafana.oidc.caConfigMap` / `caKey` | `cluster-trust-bundle` / `trust-bundle.pem` | CA bundle for the issuer's TLS; empty = system roots |
+| `grafana.oidc.adminRole` / `viewerRole` | `grafana-admin` / `grafana-readonly` | ZITADEL project roles → Grafana Admin / Viewer |
 | `alertmanager.enabled` | `true` | Alertmanager |
 | `alertmanager.webhook.enabled` / `url` | `false` / `""` | Webhook receiver for warning and critical |
 | `alertmanager.webhook.tokenSecret` | `kube-prometheus-stack-alertmanager-webhook` | Secret with key `token` (Bearer) |
@@ -129,7 +145,8 @@ On clusters registered through clusterbook, use the `observability-platform` lab
 | `externalSecrets.enabled` | `false` | Render the secrets Application |
 | `externalSecrets.secretStore.kind` / `name` | `ClusterSecretStore` / `""` | Store to read from |
 | `externalSecrets.remoteKey` | `""` | Entry name, flat (no `/data/`) |
-| `externalSecrets.*Property` | `grafana-admin-user`, `grafana-admin-password`, `alertmanager-webhook-token` | Property names in that entry |
+| `externalSecrets.*Property` | `grafana-admin-user`, `grafana-admin-password`, `alertmanager-webhook-token`, `grafana-oidc-client-id`, `grafana-oidc-client-secret` | Property names in that entry |
+| `externalSecrets.webhookRemoteKey` / `grafanaOidcRemoteKey` | `""` | Entry the webhook token / Grafana OIDC client is read from; empty = `remoteKey` |
 | `httpRoute.enabled` | `false` | Render the Grafana HTTPRoute Application |
 | `httpRoute.hostname` / `gateway` | `grafana.example.com` / `cilium-gateway` in `default` | Route target |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |

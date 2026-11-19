@@ -52,6 +52,25 @@ grafana:
   # default credentials (admin / prom-operator) — set this on anything
   # reachable. `externalSecrets` below can create it.
   adminSecret: ""
+  # Login via ZITADEL (generic OAuth), next to the local admin. Users need one
+  # of the two project roles below; no role = no login.
+  oidc:
+    # ZITADEL issuer, e.g. https://zitadel.platform.sthings.lab. Empty = off
+    # (local admin only).
+    issuer: ""
+    # Label on the login button.
+    name: ZITADEL
+    # Secret with GF_AUTH_GENERIC_OAUTH_CLIENT_ID and
+    # GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET, loaded as env. `externalSecrets`
+    # below can create it.
+    secretName: kube-prometheus-stack-grafana-oidc
+    # ConfigMap holding the CA bundle ZITADEL's certificate chains to.
+    # Empty = the system roots.
+    caConfigMap: cluster-trust-bundle
+    caKey: trust-bundle.pem
+    # ZITADEL project roles mapped to Grafana Admin and Viewer.
+    adminRole: grafana-admin
+    viewerRole: grafana-readonly
 
 alertmanager:
   enabled: true
@@ -70,7 +89,7 @@ alertmanager:
     caConfigMap: cluster-trust-bundle
     caKey: trust-bundle.pem
 
-# ExternalSecrets for the two Secrets above, from one entry in an existing
+# ExternalSecrets for the Secrets above, from one entry in an existing
 # (Cluster)SecretStore. Rendered as its own Application at sync-wave -5, so the
 # Secrets exist before Grafana and Alertmanager start.
 externalSecrets:
@@ -86,6 +105,12 @@ externalSecrets:
   # Entry the webhook token is read from; empty = remoteKey. Point it at the
   # shared entry holding the omni-pitcher AUTH_TOKEN — see the secrets chart.
   webhookRemoteKey: ""
+  # Grafana's OIDC client (grafana.oidc.secretName), rendered when
+  # grafana.oidc.issuer is set.
+  grafanaOidcClientIdProperty: grafana-oidc-client-id
+  grafanaOidcClientSecretProperty: grafana-oidc-client-secret
+  # Entry the OIDC client is read from; empty = remoteKey.
+  grafanaOidcRemoteKey: ""
 
 # Gateway API HTTPRoute for Grafana (opt-in). Also sets Grafana's root_url.
 httpRoute:
