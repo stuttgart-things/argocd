@@ -89,6 +89,13 @@
 {{- $_ := set $grafana "persistence" (dict "enabled" false) }}
 {{- $_ := set $grafana "ingress" (dict "enabled" false) }}
 {{- $_ := set $grafana "resources" (dict "requests" (dict "cpu" "20m" "memory" "128Mi") "limits" (dict "memory" "768Mi")) }}
+{{- /* Dashboard folders: the sidecar puts a dashboard ConfigMap into the folder
+     named by its annotation `grafana_folder` (e.g. "Crossplane", "Lab");
+     ConfigMaps without it stay in General. Same setting as the flux-run
+     clusters in stuttgart-things/harvester. */}}
+{{- $_ := set $grafana "sidecar" (dict "dashboards" (dict
+      "folderAnnotation" "grafana_folder"
+      "provider" (dict "foldersFromFilesStructure" true))) }}
 {{- if .Values.grafana.adminSecret }}
 {{- $_ := set $grafana "admin" (dict "existingSecret" .Values.grafana.adminSecret "userKey" "admin-user" "passwordKey" "admin-password") }}
 {{- end }}
