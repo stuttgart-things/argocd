@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: argocd
 resources:
   - appset-kube-prometheus-stack.yaml
+  - appset-fluent-bit.yaml
   - appset-clusterscope.yaml
   - appset-prometheus-pve-exporter.yaml
   - appset-k8sgpt.yaml
