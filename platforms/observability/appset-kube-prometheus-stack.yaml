@@ -44,7 +44,7 @@ spec:
       source:
         repoURL: https://github.com/stuttgart-things/argocd.git
         # renovate: datasource=github-tags depName=stuttgart-things/argocd
-        targetRevision: v0.116.0
+        targetRevision: v0.118.0
         path: infra/kube-prometheus-stack/install
         helm:
           # Fixed, not derived. Argo passes the Application name to `helm
@@ -69,7 +69,7 @@ spec:
             catalog:
               repoURL: https://github.com/stuttgart-things/argocd.git
               # renovate: datasource=github-tags depName=stuttgart-things/argocd
-              targetRevision: v0.116.0
+              targetRevision: v0.118.0
             destination:
               server: '{{ .server }}'
               namespace: monitoring
@@ -86,6 +86,11 @@ spec:
             grafana:
               enabled: true
               adminSecret: kube-prometheus-stack-grafana-admin
+              # Login via ZITADEL (#854): on when the cluster has the
+              # annotation grafana-oidc-issuer. Client id/secret through the
+              # ExternalSecret below (grafana-oidc-client-id/-secret).
+              oidc:
+                issuer: '{{ default "" (index .metadata.annotations "observability-platform.stuttgart-things.com/grafana-oidc-issuer") }}'
             alertmanager:
               enabled: true
               webhook:
@@ -103,6 +108,9 @@ spec:
               # would hold nothing or a generated value and 401 every alert.
               # Unset keeps reading remoteKey: homerun2-test1 is unchanged.
               webhookRemoteKey: '{{ default "" (index .metadata.annotations "observability-platform.stuttgart-things.com/alert-webhook-secret-key") }}'
+              # Entry with the Grafana OIDC client; unset = remoteKey. For a
+              # cluster whose own entry is generated (app-dev-hv).
+              grafanaOidcRemoteKey: '{{ default "" (index .metadata.annotations "observability-platform.stuttgart-things.com/grafana-oidc-secret-key") }}'
             httpRoute:
               enabled: true
               hostname: 'grafana.{{ index .metadata.annotations "clusterbook.stuttgart-things.com/fqdn" | trimPrefix "*." }}'
