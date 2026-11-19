@@ -99,8 +99,48 @@
 {{- if .Values.grafana.adminSecret }}
 {{- $_ := set $grafana "admin" (dict "existingSecret" .Values.grafana.adminSecret "userKey" "admin-user" "passwordKey" "admin-password") }}
 {{- end }}
+{{- $ini := dict }}
 {{- if .Values.httpRoute.enabled }}
-{{- $_ := set $grafana "grafana.ini" (dict "server" (dict "root_url" (printf "https://%s" .Values.httpRoute.hostname))) }}
+{{- $_ := set $ini "server" (dict "root_url" (printf "https://%s" .Values.httpRoute.hostname)) }}
+{{- end }}
+{{- /* Login via ZITADEL (generic OAuth), next to the local admin — never
+     instead of it. Client ID and secret come as env from oidc.secretName;
+     roles from the project-roles claim, no matching role = no login
+     (role_attribute_strict). Same settings as the flux-run clusters. */}}
+{{- $oidc := .Values.grafana.oidc | default dict }}
+{{- if $oidc.issuer }}
+{{- $issuer := trimSuffix "/" $oidc.issuer }}
+{{- $rolesClaim := printf `keys("urn:zitadel:iam:org:project:roles" || %s)` "`{}`" }}
+{{- $oauth := dict
+      "enabled" true
+      "name" $oidc.name
+      "allow_sign_up" true
+      "auto_login" false
+      "scopes" "openid profile email"
+      "auth_url" (printf "%s/oauth/v2/authorize" $issuer)
+      "token_url" (printf "%s/oauth/v2/token" $issuer)
+      "api_url" (printf "%s/oidc/v1/userinfo" $issuer)
+      "auth_style" "InHeader"
+      "use_pkce" true
+      "login_attribute_path" "preferred_username"
+      "name_attribute_path" "name"
+      "email_attribute_path" "email"
+      "role_attribute_path" (printf "contains(%s, '%s') && 'Admin' || contains(%s, '%s') && 'Viewer'" $rolesClaim $oidc.adminRole $rolesClaim $oidc.viewerRole)
+      "role_attribute_strict" true
+}}
+{{- $_ := set $grafana "envFromSecret" $oidc.secretName }}
+{{- if $oidc.caConfigMap }}
+{{- $_ := set $grafana "extraConfigmapMounts" (list (dict
+      "name" "oidc-ca"
+      "mountPath" "/etc/grafana/oidc-ca"
+      "configMap" $oidc.caConfigMap
+      "readOnly" true)) }}
+{{- $_ := set $oauth "tls_client_ca" (printf "/etc/grafana/oidc-ca/%s" $oidc.caKey) }}
+{{- end }}
+{{- $_ := set $ini "auth.generic_oauth" $oauth }}
+{{- end }}
+{{- if $ini }}
+{{- $_ := set $grafana "grafana.ini" $ini }}
 {{- end }}
 {{- end }}
 
