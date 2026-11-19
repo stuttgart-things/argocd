@@ -1,0 +1,108 @@
+{{- if not .Values.clusterName }}
+{{- fail "clusterName is required: it becomes the `cluster` label on every log stream" }}
+{{- end }}
+{{- if not .Values.loki.host }}
+{{- fail "loki.host is required, e.g. loki.platform.sthings.lab" }}
+{{- end }}
+{{- $destKey := .Values.destination.server | default .Values.destination.name }}
+{{- $defaultName := printf "fluent-bit-%s" (sha1sum $destKey | trunc 8) }}
+{{- $appName := .Values.applicationName | default $defaultName }}
+{{- $tls := .Values.loki.tls }}
+{{- $caPath := printf "/etc/ssl/custom/%s" .Values.trustBundle.key }}
+{{/*
+The [INPUT]/[FILTER]/[OUTPUT] sections are byte-for-byte those of
+stuttgart-things/flux infra/fluent-bit (+ components/remote for TLS), so a
+stream from an Argo CD cluster carries the same labels as one from a Flux
+cluster: job=fluent-bit, cluster, namespace_name, pod_name, container_name.
+The `$kubernetes['...']` record accessors are fluent-bit syntax, not Helm.
+*/}}
+{{- $output := list
+      "[OUTPUT]"
+      "    Name loki"
+      "    Match kube.*"
+      (printf "    Host %s" .Values.loki.host)
+      (printf "    Port %d" (int .Values.loki.port))
+}}
+{{- if $tls }}
+{{- $output = concat $output (list
+      "    tls on"
+      "    tls.verify on"
+      (printf "    tls.ca_file %s" $caPath)
+) }}
+{{- end }}
+{{- if .Values.loki.tenantId }}
+{{- $output = append $output (printf "    tenant_id %s" .Values.loki.tenantId) }}
+{{- end }}
+{{- $output = concat $output (list
+      (printf "    labels job=fluent-bit, cluster=%s" .Values.clusterName)
+      "    label_keys $kubernetes['namespace_name'],$kubernetes['pod_name'],$kubernetes['container_name']"
+      "    remove_keys kubernetes, stream"
+      "    line_format json"
+      "    Retry_Limit 10"
+) }}
+{{- $inputs := list
+      "[INPUT]"
+      "    Name tail"
+      "    Path /var/log/containers/*.log"
+      "    Exclude_Path /var/log/containers/fluent-bit-*.log"
+      "    multiline.parser docker, cri"
+      "    Tag kube.*"
+      "    Mem_Buf_Limit 10MB"
+      "    Skip_Long_Lines On"
+      "    DB /var/log/fluent-bit-kube.db"
+}}
+{{- $filters := list
+      "[FILTER]"
+      "    Name kubernetes"
+      "    Match kube.*"
+      "    Merge_Log On"
+      "    Keep_Log Off"
+      "    K8S-Logging.Parser On"
+      "    K8S-Logging.Exclude On"
+}}
+{{- $computed := dict
+      "kind" "DaemonSet"
+      "testFramework" (dict "enabled" false)
+      "tolerations" (list (dict "operator" "Exists"))
+      "resources" (.Values.resources | default dict)
+      "config" (dict
+        "inputs"  (printf "%s\n" (join "\n" $inputs))
+        "filters" (printf "%s\n" (join "\n" $filters))
+        "outputs" (printf "%s\n" (join "\n" $output))
+      )
+}}
+{{- if $tls }}
+{{- $_ := set $computed "extraVolumes" (list (dict "name" "trust-bundle" "configMap" (dict "name" .Values.trustBundle.configMap "optional" true))) }}
+{{- $_ := set $computed "extraVolumeMounts" (list (dict "name" "trust-bundle" "mountPath" "/etc/ssl/custom" "readOnly" true)) }}
+{{- end }}
+{{- $merged := mergeOverwrite $computed (deepCopy (.Values.extraValues | default dict)) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $appName | quote }}
+  namespace: argocd
+  annotations:
+    # Nothing depends on fluent-bit, and it depends on nothing at apply time
+    # (the trust bundle is mounted optional). -10 keeps it with the other
+    # infra components.
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: {{ .Values.project | quote }}
+  source:
+    repoURL: https://fluent.github.io/helm-charts
+    chart: fluent-bit
+    targetRevision: {{ .Values.chartVersion | quote }}
+    helm:
+      releaseName: fluent-bit
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    {{- if .Values.destination.name }}
+    name: {{ .Values.destination.name | quote }}
+    {{- else }}
+    server: {{ .Values.destination.server | quote }}
+    {{- end }}
+    namespace: {{ .Values.destination.namespace | quote }}
+  syncPolicy:
+    {{- toYaml .Values.syncPolicy | nindent 4 }}

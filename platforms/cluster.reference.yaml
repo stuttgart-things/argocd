@@ -181,6 +181,8 @@ spec:
     # gate (operator: Exists) — present this label only once the ClusterSecretStore
     # named in the secret-store annotation exists and can read the entry:
     observability-platform.stuttgart-things.com/secrets-config: 'true'
+    # fluent-bit -> Loki, opt-IN (no default Loki); needs the loki-host annotation:
+    observability-platform/fluent-bit: 'false'           # → appset-fluent-bit [ann: loki-host, loki-tenant]
     # clusterscope lab visualizer -- opt-IN: one per lab, needs a git repo.
     observability-platform/clusterscope: 'false'          # → appset-clusterscope [ann: fqdn, clusterscope-git-repo]
     observability-platform/clusterscope-blackbox-probes: 'false'  # ScrapeConfig over /api/targets; needs clusterscope-live + blackbox exporter

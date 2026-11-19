@@ -13,6 +13,7 @@ Catalog entries rendered:
 | ApplicationSet | Wave | Catalog path | Workload namespace | Notes |
 |---|---|---|---|---|
 | `kube-prometheus-stack-observability` | 5 | `infra/kube-prometheus-stack/install` | `monitoring` | The whole stack: Prometheus Operator + CRDs, Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics, default rules. Grafana behind the cluster's gateway, Grafana admin and webhook token from a ClusterSecretStore, warning/critical alerts to a webhook |
+| `fluent-bit-observability` | -10 | `infra/fluent-bit/install` | `logging` | fluent-bit DaemonSet: every container log to a (central) Loki over HTTPS, verified against `cluster-trust-bundle`. Same streams and labels as stuttgart-things/flux `infra/fluent-bit` (`job=fluent-bit`, `cluster=<name>`, `namespace_name`, `pod_name`, `container_name`). **Opt-in**, see below |
 | `clusterscope-observability` | 6 | `apps/clusterscope/install` | `clusterscope` (+ ScrapeConfig in `monitoring`) | **Opt-in** (`observability-platform/clusterscope: 'true'`). Lab visualizer over a git-synced cluster repo; live mode reads the lab's other clusters via kubeconfigs from Vault. UI behind the cluster's gateway. Optional ScrapeConfig blackbox-probing every endpoint it lists (label `…/clusterscope-blackbox-probes`, needs kube-prometheus-stack + `infra/blackbox-exporter`) |
 | `k8sgpt-observability` | 6 | `apps/k8sgpt/install` | `k8sgpt-operator-system` | **Opt-in** (`observability-platform/k8sgpt: 'true'`). K8sGPT **without AI**: operator (chart `k8sgpt-operator`), then a K8sGPT CR (every 5m, analyzers without ConfigMap) → one `Result` CR per finding. With `…/k8sgpt-reporter: 'true'` also a k8s-pitcher (suffixed `-k8sgpt`) pitching findings and an hourly snapshot as system `k8sgpt-<cluster>` to the central omni-pitcher, which routes them to the archive stream `k8sgpt` (#828) |
 | `prometheus-pve-exporter-observability` | 10 | `infra/prometheus-pve-exporter/install` | `monitoring` | Proxmox VE exporter + PodMonitor + Grafana dashboard. **Opt-in** (`observability-platform/prometheus-pve-exporter: 'true'`), shares kps's opt-out. Needs `…/pve-exporter-target`; PVE token from the store (`…/pve-exporter-secret-store`, default `…/secret-store`) or a hand-made Secret |
@@ -71,6 +72,19 @@ The entry the store reads needs three properties: `grafana-admin-user`, `grafana
 
 Every alert carries `cluster: <name>` as an external label, so a shared channel shows where it came from.
 
+## fluent-bit (opt-in)
+
+Independent of kube-prometheus-stack and its secrets gate: a cluster can ship logs without running the metrics stack (and the other way round). Opt-in, because there is no default Loki to push to.
+
+| On the cluster | Kind | Effect |
+|---|---|---|
+| `observability-platform: 'true'` | label | umbrella |
+| `observability-platform/fluent-bit: 'true'` | label | in; absent or anything else = out |
+| `observability-platform.stuttgart-things.com/loki-host` | annotation **(user, req)** | Loki gateway host, HTTPS on 443, e.g. `loki.platform.sthings.lab`. Missing = the parent Application fails to render with a message naming it |
+| `observability-platform.stuttgart-things.com/loki-tenant` | annotation (user) | `X-Scope-OrgID`; leave unset for a single-tenant Loki (`auth_enabled: false`) |
+
+The certificate is verified against `cluster-trust-bundle` from `network-platform/trust-manager-bundle`, which must contain the root the Loki Gateway's certificate chains to (the Vault/OpenBao PKI root is included on clusters with a `vault-pki*` issuer). Without it fluent-bit runs and every push fails TLS -- `kubectl -n logging logs ds/fluent-bit | grep -i tls`.
+
 ## Opt-out and teardown
 
-Set `observability-platform/kube-prometheus-stack: 'false'` (or remove the umbrella label). The generated Application is deleted with prune; the PVC of the Prometheus StatefulSet stays, as PVCs of StatefulSets do.
+Set `observability-platform/kube-prometheus-stack: 'false'` / remove `observability-platform/fluent-bit` (or remove the umbrella label for both). The generated Application is deleted with prune; the PVC of the Prometheus StatefulSet stays, as PVCs of StatefulSets do.

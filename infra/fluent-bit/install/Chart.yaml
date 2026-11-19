@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: fluent-bit-install
+description: App-of-apps chart packaging the upstream fluent/fluent-bit Helm chart as a DaemonSet that ships every container log of a cluster to a (usually central) Loki
+type: application
+version: 0.1.0
+appVersion: "5.1.3"
