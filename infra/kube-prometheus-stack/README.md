@@ -28,7 +28,7 @@ Installs `kube-prometheus-stack` `.Values.chartVersion` into `.Values.destinatio
 - **`clusterName`** set → every series and alert carries `cluster: <name>`
 - **Control-plane scrape jobs off** (`controlPlane.*`). On k3s and RKE2 the controller manager, scheduler and etcd are not reachable as separate targets, and Cilium's kube-proxy replacement leaves no kube-proxy. Their default ServiceMonitors would only raise permanent `TargetDown` alerts. kubelet, cAdvisor and kube-apiserver are scraped regardless
 - **Alertmanager:** one replica, no PVC (silences do not survive a restart). With `alertmanager.webhook.enabled`, `warning` and `critical` alerts go to the webhook with `send_resolved: true`; `info` and the always-firing `Watchdog` go to a `null` receiver. Critical inhibits warning/info, warning inhibits info, per namespace and alert name
-- **Grafana:** bundled dashboards, no PVC (dashboards are provisioned from ConfigMaps on every start; edits in the UI do not persist), no chart Ingress. `grafana.adminSecret` set → admin credentials from that Secret; `httpRoute.enabled` → `root_url` is the route's hostname
+- **Grafana:** bundled dashboards, dashboard folders by the ConfigMap annotation `grafana_folder` (sidecar `folderAnnotation`; without it → General), no PVC (dashboards are provisioned from ConfigMaps on every start; edits in the UI do not persist), no chart Ingress. `grafana.adminSecret` set → admin credentials from that Secret; `httpRoute.enabled` → `root_url` is the route's hostname
 
 ### `<name>-secrets` Application (opt-in, `externalSecrets.enabled: true`)
 
