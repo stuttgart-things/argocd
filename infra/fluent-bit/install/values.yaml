@@ -1,0 +1,77 @@
+---
+# ArgoCD AppProject the rendered Application belongs to.
+project: default
+
+# Optional explicit name for the rendered Application. Default: a name derived
+# from the destination, so two clusters never collide in `argocd`.
+# applicationName: fluent-bit-<cluster>
+
+# Where the rendered Application deploys -- the WORKLOAD cluster. fluent-bit is
+# a DaemonSet that tails /var/log/containers on the node it runs on; pointed at
+# the management cluster it ships the management cluster's logs.
+destination:
+  server: https://kubernetes.default.svc
+  namespace: logging
+
+# Upstream fluent-bit chart (https://fluent.github.io/helm-charts). Held at the
+# version stuttgart-things/flux runs in infra/fluent-bit (FLUENT_BIT_VERSION),
+# so the Flux and the Argo CD fleet ship logs with one fluent-bit.
+# renovate: datasource=helm depName=fluent-bit registryUrl=https://fluent.github.io/helm-charts
+chartVersion: 0.58.3
+
+# REQUIRED. Value of the `cluster` label on every stream. The Grafana dashboards
+# on platform filter on it; keep it the Argo CD cluster name.
+clusterName: ""
+
+loki:
+  # REQUIRED. Loki gateway host. For the lab's central Loki that is its route
+  # on platform: loki.platform.sthings.lab (HTTPS, 443).
+  host: ""
+  port: 443
+  # HTTPS with certificate verification against trustBundle below. false only
+  # for a Loki in the same cluster (loki-gateway.<ns>.svc, port 80).
+  tls: true
+  # X-Scope-OrgID. Empty = none, which is what a Loki with auth_enabled: false
+  # (the lab's) expects. Set it only for a multi-tenant Loki.
+  tenantId: ""
+
+# CA bundle the Loki certificate is verified against (loki.tls: true only).
+# Default: the ConfigMap trust-manager writes into EVERY namespace on clusters
+# running network-platform/trust-manager-bundle -- with the cluster's Vault/
+# OpenBao PKI root included wherever the cert-manager-vault-pki issuer (or a
+# vault-pki* wildcard issuer) is in use, which is the root that signs the
+# lab's Gateway certificates.
+#
+# Mounted OPTIONAL: without it the pod starts, and every push fails TLS
+# verification -- that is the log line to look for.
+trustBundle:
+  configMap: cluster-trust-bundle
+  key: trust-bundle.pem
+
+# Resource requests/limits for the DaemonSet. Same as the Flux variant.
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+# Deep-merged on top of the computed values passed to the upstream chart. Use
+# for anything not exposed above (nodeSelector, image overrides, extra
+# filters, ...). `config` keys given here replace the computed ones whole.
+extraValues: {}
+
+# Sync policy applied to the rendered Application.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

@@ -1,0 +1,102 @@
+---
+# fluent-bit -> a (central) Loki, as part of the observability platform.
+#
+# The Argo CD counterpart of what Flux clusters get from stuttgart-things/flux
+# infra/fluent-bit + components/remote (harvester#753, homerun2-dev ships its
+# logs to platform's Loki that way): one DaemonSet per cluster, every container
+# log, labels job=fluent-bit / cluster=<name> / namespace_name / pod_name /
+# container_name -- the same streams, so one Grafana query covers both fleets.
+#
+# OPT-IN, unlike kube-prometheus-stack beside it: there is no sensible default
+# Loki to push to, so a cluster needs the label AND the loki-host annotation.
+# Not a secrets gate -- the lab's Loki takes unauthenticated pushes over HTTPS
+# (auth_enabled: false), so nothing has to exist in a store first.
+#
+# TLS: verified against `cluster-trust-bundle`, the ConfigMap
+# network-platform/trust-manager-bundle writes into every namespace (with the
+# Vault/OpenBao PKI root on clusters using a vault-pki* issuer). A cluster
+# without that bundle starts fluent-bit fine and fails every push on TLS --
+# see infra/fluent-bit/install/README.md.
+#
+# Per cluster (ClusterbookCluster / RancherCluster / ClusterStack argocd labels):
+#   observability-platform: 'true'                                    umbrella
+#   observability-platform/fluent-bit: 'true'                         this AppSet
+#   observability-platform.stuttgart-things.com/loki-host: <host>     annotation, required
+#   observability-platform.stuttgart-things.com/loki-tenant: <id>     annotation, optional
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: fluent-bit-observability
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  # Deliberately no `preserveResourcesOnDeletion`: this AppSet generates an
+  # app-of-apps parent, so what the flag preserves are child *Applications*,
+  # not workloads -- and those orphans then block their AppProject (#324).
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            observability-platform: "true"
+          matchExpressions:
+            # Matched on the VALUE: absent or anything but "true" keeps it off.
+            - key: observability-platform/fluent-bit
+              operator: In
+              values: ["true"]
+  template:
+    metadata:
+      name: 'fluent-bit-observability-{{ .name }}'
+      annotations:
+        argocd.argoproj.io/sync-wave: "-10"
+    spec:
+      project: '{{ .name }}'
+      # The parent renders an Application CRD, which must land in the argocd ns
+      # on the management cluster. The child targets the remote cluster via
+      # valuesObject.destination.server below.
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      source:
+        repoURL: https://github.com/stuttgart-things/argocd.git
+        # renovate: datasource=github-tags depName=stuttgart-things/argocd
+        targetRevision: v0.115.0
+        path: infra/fluent-bit/install
+        helm:
+          releaseName: 'fluent-bit-{{ .name }}'
+          valuesObject:
+            # MUST differ from this template's own metadata.name above, or the
+            # inner Application is the same object as the parent: the parent
+            # server-side-applies the child spec over itself, the ApplicationSet
+            # controller puts its own back a moment later, and nothing ever
+            # deploys -- while both report "successfully synced".
+            applicationName: 'fluent-bit-{{ .name }}'
+            project: '{{ .name }}'
+            destination:
+              server: '{{ .server }}'
+              namespace: logging
+            clusterName: '{{ .name }}'
+            loki:
+              # Empty fails the chart render with a message naming the value --
+              # louder than an Application that deploys and pushes nowhere.
+              host: '{{ default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/loki-host") }}'
+              port: 443
+              tls: true
+              tenantId: '{{ default "" (index (default (dict) .metadata.annotations) "observability-platform.stuttgart-things.com/loki-tenant") }}'
+            # chartVersion, trustBundle and resources stay at the chart's
+            # defaults (infra/fluent-bit/install/values.yaml), which Renovate
+            # keeps in step with the version stuttgart-things/flux runs.
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m

@@ -1,0 +1,10 @@
+---
+# CI fixture for `dagger call helm kubeconform` / helm template rendering.
+# Provides fake-but-schema-valid values for the two values the template
+# refuses to render without (clusterName, loki.host) -- at deploy time the
+# fluent-bit-observability ApplicationSet supplies them. Not used at deploy time.
+clusterName: ci-fixture
+loki:
+  host: loki.example.com
+  port: 443
+  tls: true
