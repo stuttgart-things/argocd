@@ -59,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         chart: ${{ fromJson(needs.discover.outputs.charts) }}
-    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-helm-verify.yaml@main
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-helm-verify.yaml@15bb803fd72658fda50120f8a566d5594061e6ee # v1.2.0
     with:
       chart-path: ${{ matrix.chart }}
       # GitHub-hosted, not the template's default `dagger-labda`. Both jobs
@@ -70,7 +70,7 @@ jobs:
     secrets: inherit
 
   validate-schemas:
-    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-validate-json-schema.yaml@main
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-validate-json-schema.yaml@15bb803fd72658fda50120f8a566d5594061e6ee # v1.2.0
     with:
       # Same reason as `verify` above.
       runs-on: ubuntu-latest
@@ -86,7 +86,7 @@ jobs:
         run: python3 hack/check-renovate-comments.py
 
   verify-catalog:
-    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-argocd-verify-catalog.yaml@main
+    uses: stuttgart-things/github-workflow-templates/.github/workflows/call-argocd-verify-catalog.yaml@15bb803fd72658fda50120f8a566d5594061e6ee # v1.2.0
     with:
       src: .
     secrets: inherit
