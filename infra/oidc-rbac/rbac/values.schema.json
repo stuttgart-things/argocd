@@ -5,6 +5,11 @@
   "additionalProperties": false,
   "required": ["groupPrefix", "roles", "clusterReader"],
   "properties": {
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
     "groupPrefix": {
       "type": "string",
       "description": "Prefix the kube-apiserver adds to every OIDC group (claimMappings.groups.prefix)."
