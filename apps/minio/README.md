@@ -215,6 +215,9 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `certs.issuer.name` / `kind` | `cluster-ca` / `ClusterIssuer` | cert-manager issuer reference |
 | `httpRoute.enabled` | `true` | Render the HTTPRoutes sub-Application |
 | `httpRoute.gateway.name` / `namespace` | `cilium-gateway` / `default` | Gateway API `Gateway` reference |
+| `oidc.issuer` | `""` | ZITADEL issuer; set = console login via OIDC (see below) |
+| `oidc.secretName` / `claim` / `scopes` / `displayName` | `minio-oidc-zitadel` / `minio_policy` / `openid,profile,email` / `ZITADEL` | Client Secret (`client-id`, `client-secret`), policy claim, scopes, button label |
+| `oidc.caConfigMap` / `caKey` | `cluster-trust-bundle` / `trust-bundle.pem` | Issuer CA, used as MinIO's root store (`SSL_CERT_FILE`) |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the certs + httpRoute child Applications fetch their sub-charts |
 | `syncPolicy` | automated + retry | Applied to all three rendered Applications |
@@ -226,6 +229,21 @@ Defaults ship `auth.rootUser` / `auth.rootPassword` as empty placeholders — **
 1. **External Secrets / Vault** — an operator writes a Secret named e.g. `minio-auth` into the namespace with keys `root-user` + `root-password`; set `auth.existingSecret: minio-auth`. The chart reads credentials from the Secret and ignores the inline fields.
 2. **ArgoCD Vault Plugin** — wrap the consumer `Application` with a Vault-plugin CMP so `auth.rootPassword` is templated from `<path:vault/data/minio#root-password>` at sync time.
 3. **SOPS-encrypted overlay** — commit an encrypted values file in the consumer repo and decrypt in a pre-render hook.
+
+## Console login via ZITADEL (`oidc.*`)
+
+Set `oidc.issuer` and the console offers a ZITADEL login next to the root user (port of flux's `minio-oidc`, stuttgart-things#5023):
+
+```yaml
+oidc:
+  issuer: https://zitadel.example
+```
+
+- `MINIO_IDENTITY_OPENID_*`: discovery URL from the issuer; client ID and secret from the Secret `oidc.secretName` (keys `client-id`, `client-secret`) in the MinIO namespace. The ZITADEL client is a confidential web app with the redirect URI `https://<console.hostname>/oauth_callback` (`MINIO_BROWSER_REDIRECT_URL` is the console's URL)
+- **policies from the claim `oidc.claim`** (default `minio_policy`), a string or list of MinIO policy names. ZITADEL sends roles as a map, so the stuttgart-things zitadel-config roots add this list with an action: `minio-admin` → `consoleAdmin`, `minio-readwrite` → `readwrite`, `minio-readonly` → `readonly`. `readonly` reads **every** bucket
+- the issuer's CA: `oidc.caConfigMap` becomes MinIO's root store via `SSL_CERT_FILE`, so it must carry the public roots too (trust-manager `useDefaultCAs`)
+
+Console login only: S3 clients keep using access keys.
 
 ## OCI Helm source
 

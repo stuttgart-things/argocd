@@ -74,6 +74,29 @@ httpRoute:
     name: cilium-gateway
     namespace: default
 
+# Console login via ZITADEL (OIDC), next to the root user. Port of flux's
+# minio-oidc component. MinIO maps a claim to its policies; the claim must be a
+# string or a list of policy names (consoleAdmin, readwrite, readonly, ...).
+# stuttgart-things' zitadel-config roots put such a list into minio_policy
+# with an action. The redirect URI is https://<console.hostname>/oauth_callback.
+oidc:
+  # ZITADEL issuer, e.g. https://zitadel.platform.sthings.lab. Empty = off.
+  issuer: ""
+  # Secret in destination.namespace with keys client-id and client-secret
+  # (confidential web client).
+  secretName: minio-oidc-zitadel
+  # Claim with the user's MinIO policies.
+  claim: minio_policy
+  # Comma separated.
+  scopes: openid,profile,email
+  # Label of the console's login button.
+  displayName: ZITADEL
+  # ConfigMap with the issuer's CA. It becomes MinIO's root store
+  # (SSL_CERT_FILE), so it must carry the public roots too (trust-manager's
+  # useDefaultCAs).
+  caConfigMap: cluster-trust-bundle
+  caKey: trust-bundle.pem
+
 # Deep-merged on top of the computed valuesObject passed to the upstream MinIO chart.
 # Use for any upstream key not exposed as a first-class value above.
 extraValues: {}

@@ -115,6 +115,50 @@
       "if": { "properties": { "enabled": { "const": true } } },
       "then": { "required": ["gateway"] }
     },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Console login via ZITADEL (OIDC). issuer empty = off.",
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "pattern": "^(https://.+)?$"
+        },
+        "secretName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "string",
+          "minLength": 1
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "caConfigMap": {
+          "type": "string",
+          "minLength": 1
+        },
+        "caKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "issuer",
+        "secretName",
+        "claim",
+        "scopes",
+        "displayName",
+        "caConfigMap",
+        "caKey"
+      ]
+    },
     "extraValues": {
       "type": "object",
       "additionalProperties": true
