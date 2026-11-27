@@ -44,6 +44,29 @@ webhooksServer:
   tls:
     selfSignedCert: true
 
+# Login via OIDC (ZITADEL) next to the local admin, as flux's kargo-oidc
+# (stuttgart-things#4859). Kargo runs the authorization code flow with PKCE
+# in the browser: a PUBLIC client (ZITADEL: user agent app, auth method none),
+# so there is no client secret.
+oidc:
+  # e.g. https://zitadel.infra.example, no trailing slash. Empty = off.
+  issuer: ""
+  # ZITADEL client ID (digits only -- keep it quoted).
+  clientId: ""
+  # ID token claim the role mapping reads: a LIST of role keys. Kargo, like
+  # Argo CD, cannot read ZITADEL's roles map; the zitadel-config roots add
+  # argocd_roles with an action for the argocd project.
+  rolesClaim: argocd_roles
+  # Role keys mapped to Kargo admin / viewer (read-only, no Secrets).
+  adminRole: argocd-admin
+  viewerRole: argocd-reader
+  # Sent next to openid profile email.
+  additionalScopes:
+    - urn:zitadel:iam:org:projects:roles
+  # CA bundle ConfigMap for the issuer (the chart's cabundle init container
+  # splits a multi-cert bundle itself). Empty = system roots.
+  caConfigMap: cluster-trust-bundle
+
 # kargo-admin from Vault through External Secrets (../secrets). OFF while
 # clusterSecretStoreName is empty -- then kargo-admin is the hand-made Secret
 # ../README.md describes. A string, not an `enabled` flag, because an

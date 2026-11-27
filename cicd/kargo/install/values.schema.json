@@ -87,6 +87,25 @@
       },
       "required": ["tls"]
     },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OIDC login (public client, PKCE) next to the local admin. Empty issuer = off.",
+      "properties": {
+        "issuer": { "type": "string", "pattern": "^(https://[^\\s]*[^/\\s])?$", "description": "OIDC issuer URL without trailing slash. Empty = off." },
+        "clientId": { "type": "string" },
+        "rolesClaim": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "description": "ID token claim holding a LIST of role keys." },
+        "adminRole": { "type": "string", "minLength": 1 },
+        "viewerRole": { "type": "string", "minLength": 1 },
+        "additionalScopes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "caConfigMap": { "type": "string", "description": "CA bundle ConfigMap for the issuer. Empty = system roots." }
+      },
+      "if": { "properties": { "issuer": { "minLength": 1 } }, "required": ["issuer"] },
+      "then": {
+        "required": ["clientId", "rolesClaim", "adminRole", "viewerRole"],
+        "properties": { "clientId": { "minLength": 1 } }
+      }
+    },
     "secrets": {
       "type": "object",
       "additionalProperties": false,
