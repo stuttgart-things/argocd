@@ -18,6 +18,25 @@
 {{- $_ := set $computed "persistence" (dict "enabled" true "storageClass" .Values.storageClass "size" .Values.storageSize) }}
 {{- $_ := set $computed "resources" .Values.resources }}
 
+{{- /* Console login via ZITADEL (opt-in), as flux's minio-oidc. Client ID and
+       secret from the Secret, never inline: ZITADEL's IDs are digits only. */}}
+{{- $oidc := .Values.oidc | default dict }}
+{{- if $oidc.issuer }}
+  {{- $env := list
+        (dict "name" "MINIO_IDENTITY_OPENID_CONFIG_URL" "value" (printf "%s/.well-known/openid-configuration" (trimSuffix "/" $oidc.issuer)))
+        (dict "name" "MINIO_IDENTITY_OPENID_CLIENT_ID" "valueFrom" (dict "secretKeyRef" (dict "name" $oidc.secretName "key" "client-id")))
+        (dict "name" "MINIO_IDENTITY_OPENID_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $oidc.secretName "key" "client-secret")))
+        (dict "name" "MINIO_IDENTITY_OPENID_CLAIM_NAME" "value" $oidc.claim)
+        (dict "name" "MINIO_IDENTITY_OPENID_CLAIM_USERINFO" "value" "on")
+        (dict "name" "MINIO_IDENTITY_OPENID_SCOPES" "value" $oidc.scopes)
+        (dict "name" "MINIO_IDENTITY_OPENID_DISPLAY_NAME" "value" $oidc.displayName)
+        (dict "name" "MINIO_BROWSER_REDIRECT_URL" "value" (printf "https://%s" .Values.console.hostname))
+        (dict "name" "SSL_CERT_FILE" "value" (printf "/etc/ssl/oidc-ca/%s" $oidc.caKey)) }}
+  {{- $_ := set $computed "extraEnvVars" $env }}
+  {{- $_ := set $computed "extraVolumes" (list (dict "name" "oidc-ca" "configMap" (dict "name" $oidc.caConfigMap))) }}
+  {{- $_ := set $computed "extraVolumeMounts" (list (dict "name" "oidc-ca" "mountPath" "/etc/ssl/oidc-ca" "readOnly" true)) }}
+{{- end }}
+
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
 {{- $defaultName := printf "minio-%s" (sha1sum .Values.destination.server | trunc 8) }}
