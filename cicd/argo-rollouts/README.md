@@ -129,6 +129,10 @@ Per-entry fields (all required):
 | `hostnames` | DNS hostnames the route answers to (min 1) |
 | `rules` | Raw `spec.rules` list — passed to the Gateway API webhook for validation |
 
+## Dashboard behind a login
+
+The dashboard has no login of its own and can promote, abort and restart rollouts (`dashboard.readonly: false`). To put a ZITADEL login in front, do **not** route it through `httproutes/`. Add it as an instance of [`infra/oauth2-proxy`](../../infra/oauth2-proxy/#argo-rollouts-dashboard) instead; the proxy's HTTPRoute takes the hostname. That is the same setup as flux's `argo-rollouts-dashboard-oauth2-proxy` component.
+
 ## Fleet — one `ApplicationSet` per piece
 
 Label clusters with `install/argo-rollouts: "true"` for the controller, and separately `install/argo-rollouts-httproutes: "true"` where you want routes shipped.
