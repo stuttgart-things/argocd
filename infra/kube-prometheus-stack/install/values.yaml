@@ -68,9 +68,16 @@ grafana:
     # Empty = the system roots.
     caConfigMap: cluster-trust-bundle
     caKey: trust-bundle.pem
-    # ZITADEL project roles mapped to Grafana Admin and Viewer.
+    # ZITADEL project roles mapped to Grafana Admin, Editor and Viewer.
+    # editorRole "" = no Editor mapping. The LabUL/LabDA clients in the own
+    # ZITADEL project `grafana` (stuttgart-things#4697) use grafana-viewer.
     adminRole: grafana-admin
+    editorRole: grafana-editor
     viewerRole: grafana-readonly
+    # Space separated. A client in its own ZITADEL project adds
+    # urn:zitadel:iam:org:project:id:<id>:aud urn:zitadel:iam:org:projects:roles
+    # so that project's roles reach the token.
+    scopes: openid profile email
 
 alertmanager:
   enabled: true

@@ -62,7 +62,8 @@ Off by default. `grafana.oidc.issuer` set (e.g. `https://zitadel.platform.sthing
 
 - Client ID and secret come as env (`envFromSecret`) from `grafana.oidc.secretName`, keys `GF_AUTH_GENERIC_OAUTH_CLIENT_ID` / `GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET`; with `externalSecrets.enabled` the secrets Application creates it from `grafanaOidcClientIdProperty` / `grafanaOidcClientSecretProperty`
 - Endpoints derived from the issuer: `/oauth/v2/authorize`, `/oauth/v2/token`, `/oidc/v1/userinfo`
-- Role from the ZITADEL project-roles claim: `grafana.oidc.adminRole` → Admin, `grafana.oidc.viewerRole` → Viewer, neither → login refused (`role_attribute_strict`)
+- Role from the ZITADEL project-roles claim: `grafana.oidc.adminRole` → Admin, `grafana.oidc.editorRole` → Editor (empty = no Editor mapping), `grafana.oidc.viewerRole` → Viewer, none → login refused (`role_attribute_strict`)
+- `grafana.oidc.scopes`: default `openid profile email`. A client in its own ZITADEL project, like the LabUL/LabDA `grafana` project (stuttgart-things#4697, roles `grafana-admin`/`-editor`/`-viewer`), adds `urn:zitadel:iam:org:project:id:<id>:aud urn:zitadel:iam:org:projects:roles`
 - `grafana.oidc.caConfigMap` set → mounted at `/etc/grafana/oidc-ca` and used as `tls_client_ca` (ZITADEL behind the internal CA); empty = system roots
 - Redirect URI to register in ZITADEL: `https://<httpRoute.hostname>/login/generic_oauth`
 
@@ -137,7 +138,8 @@ On clusters registered through clusterbook, use the `observability-platform` lab
 | `grafana.oidc.name` | `ZITADEL` | Login button label |
 | `grafana.oidc.secretName` | `kube-prometheus-stack-grafana-oidc` | Secret with `GF_AUTH_GENERIC_OAUTH_CLIENT_ID`/`_SECRET` |
 | `grafana.oidc.caConfigMap` / `caKey` | `cluster-trust-bundle` / `trust-bundle.pem` | CA bundle for the issuer's TLS; empty = system roots |
-| `grafana.oidc.adminRole` / `viewerRole` | `grafana-admin` / `grafana-readonly` | ZITADEL project roles → Grafana Admin / Viewer |
+| `grafana.oidc.adminRole` / `editorRole` / `viewerRole` | `grafana-admin` / `grafana-editor` / `grafana-readonly` | ZITADEL project roles → Grafana Admin / Editor / Viewer; `editorRole: ""` = no Editor mapping |
+| `grafana.oidc.scopes` | `openid profile email` | Space-separated OAuth scopes |
 | `alertmanager.enabled` | `true` | Alertmanager |
 | `alertmanager.webhook.enabled` / `url` | `false` / `""` | Webhook receiver for warning and critical |
 | `alertmanager.webhook.tokenSecret` | `kube-prometheus-stack-alertmanager-webhook` | Secret with key `token` (Bearer) |
