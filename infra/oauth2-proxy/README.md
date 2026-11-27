@@ -86,6 +86,18 @@ instances:
 
 The proxy needs the Secret `secretName` in `longhorn-system` (with `externalSecrets.enabled` it gets one), and the ZITADEL client needs the redirect URI `https://longhorn.<cluster>.<zone>/oauth2/callback`.
 
+### Argo Rollouts dashboard
+
+No route for the dashboard in `cicd/argo-rollouts/httproutes`; instead:
+
+```yaml
+instances:
+  - name: argo-rollouts-dashboard-oauth2-proxy
+    namespace: argo-rollouts
+    hostname: argo-rollouts.<cluster>.<zone>
+    upstream: http://argo-rollouts-dashboard.argo-rollouts.svc.cluster.local:3100
+```
+
 ## Values
 
 | Value | Default | |
