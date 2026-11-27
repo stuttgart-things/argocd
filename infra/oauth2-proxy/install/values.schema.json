@@ -1,0 +1,225 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "oauth2-proxy install",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "catalog",
+    "project",
+    "destination",
+    "chartVersion",
+    "issuer",
+    "secretName",
+    "cookieDomain",
+    "cookieName",
+    "scope",
+    "caConfigMap",
+    "caKey",
+    "gateway",
+    "instances",
+    "externalSecrets",
+    "syncPolicy"
+  ],
+  "properties": {
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repoURL": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetRevision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "repoURL",
+        "targetRevision"
+      ]
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ArgoCD AppProject for the rendered Applications."
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "type": "string",
+          "format": "uri"
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Namespace for an instance that names none."
+        }
+      },
+      "required": [
+        "server",
+        "namespace"
+      ]
+    },
+    "chartVersion": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Upstream oauth2-proxy Helm chart version."
+    },
+    "issuer": {
+      "type": "string",
+      "description": "ZITADEL issuer as in its discovery document. Required when instances is not empty.",
+      "pattern": "^(https://.+)?$"
+    },
+    "secretName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Secret with keys client-id, client-secret and cookie-secret in every instance namespace."
+    },
+    "cookieDomain": {
+      "type": "string",
+      "description": "Cookie domain with leading dot; every instance hostname must be under it. Required when instances is not empty.",
+      "pattern": "^(\\..+)?$"
+    },
+    "cookieName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Space separated OIDC scopes."
+    },
+    "caConfigMap": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ConfigMap with the CA bundle the issuer chains to."
+    },
+    "caKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "name",
+        "namespace"
+      ]
+    },
+    "instances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 53,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "description": "Release, Service and HTTPRoute name."
+          },
+          "namespace": {
+            "type": "string",
+            "description": "Empty = destination.namespace."
+          },
+          "hostname": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Host the proxy's HTTPRoute takes; must be under cookieDomain."
+          },
+          "upstream": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^https?://",
+            "description": "URL of the protected app, e.g. http://<svc>.<ns>.svc.cluster.local:<port>."
+          }
+        },
+        "required": [
+          "name",
+          "hostname",
+          "upstream"
+        ]
+      }
+    },
+    "externalSecrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "secretStore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ]
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ]
+        },
+        "remoteKey": {
+          "type": "string",
+          "not": {
+            "pattern": "/data/"
+          },
+          "description": "Entry name under the store's mount, flat."
+        },
+        "clientIdProperty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clientSecretProperty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cookieSecretProperty": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "enabled",
+        "secretStore",
+        "remoteKey",
+        "clientIdProperty",
+        "clientSecretProperty",
+        "cookieSecretProperty"
+      ]
+    },
+    "extraValues": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Deep-merged on top of the computed valuesObject of every instance."
+    },
+    "syncPolicy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "ArgoCD sync policy applied to all rendered Applications."
+    }
+  }
+}

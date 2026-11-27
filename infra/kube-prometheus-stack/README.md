@@ -44,7 +44,7 @@ Each is rendered only when its consumer is on. Sync-wave -5 puts them ahead of t
 
 ### `<name>-httproute` Application (opt-in, `httpRoute.enabled: true`)
 
-One `HTTPRoute` for Grafana (`kube-prometheus-stack-grafana:80`) on `httpRoute.gateway`. Prometheus and Alertmanager are not routed.
+One `HTTPRoute` for Grafana (`kube-prometheus-stack-grafana:80`) on `httpRoute.gateway`. Prometheus and Alertmanager are not routed here: they have no login of their own, so route them through [`infra/oauth2-proxy`](../oauth2-proxy/) (its README has the example).
 
 ## The webhook, and why its secret is a file
 
