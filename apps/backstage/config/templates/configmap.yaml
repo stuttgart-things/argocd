@@ -74,6 +74,27 @@ data:
             signIn:
               resolvers:
                 - resolver: usernameMatchingUserEntityName
+        {{- if .Values.oidc.enabled }}
+        # ZITADEL (sthings-backstage#203): read only with AUTH_OIDC_ENABLED=true.
+        # Project roles decide the group: backstage-platform -> platform-team,
+        # backstage-developer -> guests, none -> refused. IDs quoted: digits
+        # only, a float through env.
+        oidc:
+          development:
+            metadataUrl: ${ZITADEL_ISSUER}
+            clientId: {{ .Values.oidc.clientId | quote }}
+            clientSecret: ${ZITADEL_CLIENT_SECRET}
+            prompt: auto
+            # offline_access: without it ZITADEL issues no refresh token and
+            # every reload signs the user out.
+            additionalScopes:
+              - offline_access
+            signIn:
+              resolvers:
+                - resolver: zitadelProjectRoles
+                  projectId: {{ .Values.oidc.projectId | quote }}
+                  dangerouslyAllowSignInWithoutUserInCatalog: true
+        {{- end }}
     scaffolder: {}
     claimMachinery:
       apiUrl: ${CLAIM_MACHINERY_API_URL:-https://claim-api.example.com}

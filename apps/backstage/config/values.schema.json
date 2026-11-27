@@ -16,6 +16,18 @@
       "type": "string",
       "minLength": 1
     },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "clientId": { "type": "string", "pattern": "^[0-9]*$" },
+        "projectId": { "type": "string", "pattern": "^[0-9]*$" }
+      },
+      "required": ["enabled"],
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": { "required": ["clientId"], "properties": { "clientId": { "minLength": 1 } } }
+    },
     "destination": {
       "type": "object",
       "additionalProperties": true,

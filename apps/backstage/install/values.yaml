@@ -49,6 +49,31 @@ appConfig:
 # below provisions it inline only when secretsApp.enabled: true (dev only).
 secretName: backstage-secrets       # pragma: allowlist secret
 
+# Sign-in (sthings-backstage image >= v1.23.0). Same switches as flux's
+# BACKSTAGE_AUTH_GUEST_ENABLED / BACKSTAGE_AUTH_OIDC_ENABLED.
+auth:
+  # false: no guest auth module and no guest button (image >= v1.22.0).
+  # Guest counts as a developer -- turn it off where templates matter.
+  guestEnabled: true
+  # ZITADEL sign-in (OIDC, resolver zitadelProjectRoles): project roles
+  # backstage-platform -> platform-team, backstage-developer -> guests, none
+  # -> refused. Needs ZITADEL_ISSUER and ZITADEL_CLIENT_SECRET in secretName,
+  # and Backstage must trust ZITADEL's CA (trustBundle below).
+  oidc:
+    enabled: false
+    # Client ID and project ID go into app-config as quoted literals: ZITADEL
+    # IDs are digits only and arrive as a float through env.
+    clientId: ""
+    # Only this project's roles count; empty = the client's own project.
+    projectId: ""
+
+# Trust a private CA (Vault PKI) for outgoing HTTPS, e.g. to ZITADEL:
+# mounts the ConfigMap and sets NODE_EXTRA_CA_CERTS (Node ADDS it to its
+# built-in roots). Empty configMap = off. Needs trust-manager's bundle.
+trustBundle:
+  configMap: ""
+  key: trust-bundle.pem
+
 # config sub-Application (opt-in, sync-wave -10). Renders the
 # backstage-app-config ConfigMap with the Backstage-side `app-config.extra.yaml`.
 config:
