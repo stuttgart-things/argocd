@@ -208,7 +208,7 @@ annotations:
 (and drops its `storage-platform/longhorn: "false"`).
 
 > [!WARNING]
-> **The Longhorn UI has no authentication.** Anyone who can reach `longhorn.<fqdn>` can delete volumes, snapshots, backups and disks. The route is therefore opt-in and only acceptable on the lab-internal clusterbook gateway — the same reasoning [`platforms/tabletennis`](../tabletennis/) gives for zaehlwerk. Follow-up before exposing it anywhere else: OIDC via oauth2-proxy in front of `longhorn-frontend` (the upstream chart takes `httproute.filters`). Without the label, `kubectl -n longhorn-system port-forward svc/longhorn-frontend 8080:80` works too.
+> **The Longhorn UI has no authentication.** Anyone who can reach `longhorn.<fqdn>` can delete volumes, snapshots, backups and disks. The route is therefore opt-in and only acceptable on the lab-internal clusterbook gateway — the same reasoning [`platforms/tabletennis`](../tabletennis/) gives for zaehlwerk. For a ZITADEL login in front, leave the label off and add `longhorn-frontend` as an instance of [`infra/oauth2-proxy`](../../infra/oauth2-proxy/#longhorn) instead: the proxy's HTTPRoute takes `longhorn.<fqdn>`. Without the label, `kubectl -n longhorn-system port-forward svc/longhorn-frontend 8080:80` works too.
 
 ### Pod footprint
 
