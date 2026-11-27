@@ -1,0 +1,29 @@
+---
+# What the lab-wide ZITADEL roles may do on this cluster
+# (stuttgart-things/stuttgart-things#4879, #5023). Same objects and names as
+# flux's oidc-rbac component, so a cluster can move between the two repos.
+#
+# The kube-apiserver's AuthenticationConfiguration (written by the cluster
+# build) maps a ZITADEL ID token of the lab's `kubernetes` project to
+#   username  <groupPrefix><email>
+#   groups    <groupPrefix><role key>
+# Nothing else grants an OIDC user anything. Certificates and ServiceAccount
+# tokens are untouched: the admin-cert kubeconfig stays the break-glass login.
+
+# Prefix the apiserver puts in front of every group (claimMappings.groups.prefix).
+groupPrefix: "zitadel:"
+
+# ZITADEL role keys (without prefix) bound cluster-wide. Empty = no binding.
+roles:
+  # -> cluster-admin
+  admin: k8s-admin
+  # -> edit: create/change most namespaced objects, read Secrets, no RBAC.
+  edit: k8s-edit
+  # -> view: read most namespaced objects, no Secrets, no changes.
+  view: k8s-view
+
+# view and edit cover namespaced objects only: without this, `kubectl get
+# namespaces` / `get nodes` fail for both roles. Grants read-only access to
+# namespaces, nodes, storage, CRDs and classes (no Secrets) to edit and view.
+clusterReader:
+  enabled: true
