@@ -16,7 +16,7 @@ applicationName: ""
 cascadingDelete: false
 
 # renovate: datasource=helm depName=argo-events registryUrl=https://argoproj.github.io/argo-helm
-chartVersion: 2.4.27
+chartVersion: 2.4.28
 
 # Deep-merged over the computed upstream values (controller resources,
 # configs.jetstream versions, createAggregateRoles, ...). The admission
