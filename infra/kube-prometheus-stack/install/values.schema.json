@@ -73,10 +73,12 @@
             "caConfigMap": { "type": "string", "description": "CA bundle ConfigMap for the issuer's TLS. Empty = system roots." },
             "caKey":       { "type": "string" },
             "adminRole":   { "type": "string", "minLength": 1 },
-            "viewerRole":  { "type": "string", "minLength": 1 }
+            "editorRole":  { "type": "string", "description": "ZITADEL project role -> Grafana Editor. Empty = no Editor mapping." },
+            "viewerRole":  { "type": "string", "minLength": 1 },
+            "scopes":      { "type": "string", "minLength": 1, "description": "Space-separated OAuth scopes." }
           },
           "if": { "properties": { "issuer": { "minLength": 1 } }, "required": ["issuer"] },
-          "then": { "required": ["name", "secretName", "adminRole", "viewerRole"] }
+          "then": { "required": ["name", "secretName", "adminRole", "viewerRole", "scopes"] }
         }
       },
       "required": ["enabled"]
