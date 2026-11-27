@@ -9,6 +9,25 @@
     "garbageCollector" (dict "logLevel" .Values.garbageCollector.logLevel)
     "webhooksServer"   (dict "tls" (dict "selfSignedCert" .Values.webhooksServer.tls.selfSignedCert))
 }}
+{{- /* OIDC login (opt-in), as flux's kargo-oidc component. */}}
+{{- $oidc := .Values.oidc | default dict }}
+{{- if $oidc.issuer }}
+  {{- $claim := $oidc.rolesClaim }}
+  {{- $o := dict
+        "enabled" true
+        "issuerURL" (trimSuffix "/" $oidc.issuer)
+        "clientID" (toString $oidc.clientId)
+        "usernameClaim" "email"
+        "admins" (dict "claims" (dict $claim (list $oidc.adminRole)))
+        "viewers" (dict "claims" (dict $claim (list $oidc.viewerRole))) }}
+  {{- if $oidc.additionalScopes }}
+    {{- $_ := set $o "additionalScopes" $oidc.additionalScopes }}
+  {{- end }}
+  {{- $_ := set $computed.api "oidc" $o }}
+  {{- if $oidc.caConfigMap }}
+    {{- $_ := set $computed.api "cabundle" (dict "configMapName" $oidc.caConfigMap) }}
+  {{- end }}
+{{- end }}
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
 {{- $defaultName := printf "kargo-%s" (sha1sum .Values.destination.server | trunc 8) }}

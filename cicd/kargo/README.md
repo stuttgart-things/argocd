@@ -109,6 +109,12 @@ See `install/values.yaml` / `install/values.schema.json` for the full contract.
 | `api.tls.enabled` | `false` | TLS terminates at the Gateway / Ingress, not the API Service |
 | `api.ingress.enabled` | `false` | Chart Ingress disabled in favor of `httproute/` |
 | `api.adminAccount.*` | empty placeholders | See *Credentials* above |
+| `oidc.issuer` | `""` | OIDC issuer (ZITADEL), no trailing slash; empty = local admin only. See *OIDC login* below |
+| `oidc.clientId` | `""` | Public client ID (keep quoted, digits only) |
+| `oidc.rolesClaim` | `argocd_roles` | ID token claim with a LIST of role keys |
+| `oidc.adminRole` / `viewerRole` | `argocd-admin` / `argocd-reader` | Role keys mapped to Kargo admin / viewer |
+| `oidc.additionalScopes` | `[urn:zitadel:iam:org:projects:roles]` | Sent next to `openid profile email` |
+| `oidc.caConfigMap` | `cluster-trust-bundle` | CA bundle for the issuer (`api.cabundle`); empty = system roots |
 | `secrets.clusterSecretStoreName` | `""` | Non-empty renders the sibling Application `<name>-secrets` from [`secrets/`](#secrets). A string rather than an `enabled` flag, because an ApplicationSet templates only strings |
 | `secrets.vaultSecretName` | `""` | Vault entry with `password` + `tokenSigningKey`; required once a store is named |
 | `secrets.secretName` | `kargo-admin` | Must match the upstream chart's `api.secret.name` |
@@ -117,6 +123,26 @@ See `install/values.yaml` / `install/values.schema.json` for the full contract.
 | `webhooksServer.tls.selfSignedCert` | `true` | Webhook TLS bootstraps via its own self-signed cert |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
 | `syncPolicy` | automated + retry | Applied to the rendered child Application |
+
+### OIDC login
+
+Off by default. `oidc.issuer` set → the Kargo UI offers a ZITADEL login next
+to the local admin, the same option as flux's `kargo-oidc` component
+(stuttgart-things#4859):
+
+```yaml
+oidc:
+  issuer: https://zitadel.infra.example
+  clientId: "123456789012345678"   # keep quoted (digits only)
+```
+
+Kargo runs the authorization code flow with PKCE in the browser, so the
+ZITADEL app is a **public** client (user agent, auth method none): no client
+secret. Roles come from `oidc.rolesClaim`, a LIST claim (ZITADEL's own roles
+claim is a map Kargo cannot read; the zitadel-config roots add `argocd_roles`
+with an action). `adminRole` → Kargo admin, `viewerRole` → read-only viewer;
+the chart writes the mapping onto its `kargo-admin` / `kargo-viewer`
+ServiceAccounts (`rbac.kargo.akuity.io/claims`).
 
 ## secrets/
 
