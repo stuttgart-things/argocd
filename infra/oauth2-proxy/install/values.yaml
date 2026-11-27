@@ -1,0 +1,89 @@
+---
+# oauth2-proxy in front of apps without a login of their own
+# (stuttgart-things/stuttgart-things#5023). One instance per protected app,
+# all of them sharing ONE ZITADEL client and ONE cookie, so one login opens
+# every protected app of the cluster. Port of stuttgart-things/flux
+# infra/oauth2-proxy.
+
+# Reference back to this catalog repo — used by the secrets Application.
+catalog:
+  repoURL: https://github.com/stuttgart-things/argocd.git
+  targetRevision: HEAD
+
+# ArgoCD AppProject all rendered Applications belong to.
+project: default
+
+destination:
+  server: https://kubernetes.default.svc
+  # Namespace for an instance that names none.
+  namespace: oauth2-proxy
+
+# Upstream oauth2-proxy Helm chart version.
+# renovate: datasource=helm depName=oauth2-proxy registryUrl=https://oauth2-proxy.github.io/manifests
+chartVersion: 10.7.4
+
+# ZITADEL issuer, exactly as in its discovery document, e.g.
+# https://zitadel.infra.sthings-vsphere.labul.sva.de. Required as soon as
+# `instances` is not empty.
+issuer: ""
+
+# Secret with keys client-id, client-secret and cookie-secret, in the
+# namespace of every instance. `externalSecrets` below can create it.
+secretName: oauth2-proxy
+
+# Domain the session cookie is set for, with the leading dot, e.g.
+# .platform.sthings-vsphere.labul.sva.de. Every instance's hostname must be
+# under it. Required as soon as `instances` is not empty.
+cookieDomain: ""
+cookieName: _oauth2_proxy
+
+# Space separated.
+scope: openid profile email
+
+# ConfigMap holding the CA bundle the issuer's certificate chains to.
+caConfigMap: cluster-trust-bundle
+caKey: trust-bundle.pem
+
+# Gateway every instance's HTTPRoute attaches to.
+gateway:
+  name: cilium-gateway
+  namespace: default
+
+# One entry per protected app. The proxy's HTTPRoute takes the hostname, so an
+# app that already routes it must drop its own route.
+#   - name: prometheus-oauth2-proxy        # release, Service and route name
+#     namespace: monitoring                # "" = destination.namespace
+#     hostname: prometheus.example.com
+#     upstream: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+instances: []
+
+# ExternalSecrets for `secretName`, one per instance namespace, from one entry
+# in an existing (Cluster)SecretStore. Rendered as its own Application at
+# sync-wave -5, so the Secrets exist before the proxies start.
+externalSecrets:
+  enabled: false
+  secretStore:
+    kind: ClusterSecretStore
+    name: ""
+  # Entry name under the store's mount, flat — never a path with /data/ in it.
+  remoteKey: ""
+  clientIdProperty: oauth2-proxy-client-id
+  clientSecretProperty: oauth2-proxy-client-secret
+  cookieSecretProperty: oauth2-proxy-cookie-secret
+
+# Deep-merged on top of the computed valuesObject of EVERY instance.
+extraValues: {}
+
+# Sync policy applied to all rendered Applications.
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true
+  syncOptions:
+    - CreateNamespace=true
+  retry:
+    limit: 5
+    backoff:
+      duration: 10s
+      factor: 2
+      maxDuration: 3m

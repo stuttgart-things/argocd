@@ -1,0 +1,7 @@
+---
+apiVersion: v2
+name: oauth2-proxy-install
+description: App-of-apps chart packaging oauth2-proxy — one instance per app without a login of its own, OIDC (ZITADEL) in front of it, with its Gateway API HTTPRoute and optional ExternalSecrets for the shared client.
+type: application
+version: 0.1.0
+appVersion: "7.15.6"

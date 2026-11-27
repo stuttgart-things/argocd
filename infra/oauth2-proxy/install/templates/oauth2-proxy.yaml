@@ -1,0 +1,71 @@
+{{- /* One Application per instance, all on the upstream chart. Login rules
+       as in flux infra/oauth2-proxy: who may log in is decided by ZITADEL
+       (project role check on the shared client), not here — oauth2-proxy's
+       groups claim must be a list, ZITADEL's roles claim is a map. */}}
+{{- $suffix := sha1sum .Values.destination.server | trunc 8 }}
+{{- if .Values.instances }}
+{{- if not .Values.issuer }}{{ fail "issuer is required when instances is not empty" }}{{ end }}
+{{- if not .Values.cookieDomain }}{{ fail "cookieDomain is required when instances is not empty" }}{{ end }}
+{{- end }}
+{{- range .Values.instances }}
+{{- $ns := .namespace | default $.Values.destination.namespace }}
+{{- $computed := dict
+      "config" (dict
+        "existingSecret" $.Values.secretName
+        "emailDomains" (list "*")
+        "upstreams" (list .upstream))
+      "extraArgs" (dict
+        "provider" "oidc"
+        "oidc-issuer-url" $.Values.issuer
+        "provider-ca-file" (printf "/etc/oauth2-proxy/ca/%s" $.Values.caKey)
+        "scope" $.Values.scope
+        "code-challenge-method" "S256"
+        "redirect-url" (printf "https://%s/oauth2/callback" .hostname)
+        "cookie-domain" $.Values.cookieDomain
+        "whitelist-domain" $.Values.cookieDomain
+        "cookie-name" $.Values.cookieName
+        "cookie-secure" "true"
+        "skip-provider-button" "true"
+        "reverse-proxy" "true")
+      "extraVolumes" (list (dict "name" "oidc-ca" "configMap" (dict "name" $.Values.caConfigMap)))
+      "extraVolumeMounts" (list (dict "name" "oidc-ca" "mountPath" "/etc/oauth2-proxy/ca" "readOnly" true))
+      "resources" (dict "requests" (dict "cpu" "5m" "memory" "24Mi") "limits" (dict "memory" "64Mi"))
+      "gatewayApi" (dict
+        "enabled" true
+        "gatewayRef" (dict
+          "name" $.Values.gateway.name
+          "namespace" $.Values.gateway.namespace
+          "group" "gateway.networking.k8s.io"
+          "kind" "Gateway")
+        "hostnames" (list .hostname)
+        "rules" (list (dict
+          "matches" (list (dict "path" (dict "type" "PathPrefix" "value" "/")))
+          "backendRefs" (list (dict "name" .name "port" 80 "group" "" "kind" "Service" "weight" 1)))))
+}}
+{{- /* Fields the API server defaults (group/kind/weight) are spelled out:
+       left implicit, Argo reports the route OutOfSync forever. */}}
+{{- $merged := mergeOverwrite $computed (deepCopy ($.Values.extraValues | default dict)) }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" .name $suffix | quote }}
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: {{ $.Values.project | quote }}
+  source:
+    repoURL: https://oauth2-proxy.github.io/manifests
+    chart: oauth2-proxy
+    targetRevision: {{ $.Values.chartVersion | quote }}
+    helm:
+      releaseName: {{ .name | quote }}
+      valuesObject:
+        {{- toYaml $merged | nindent 8 }}
+  destination:
+    server: {{ $.Values.destination.server | quote }}
+    namespace: {{ $ns | quote }}
+  syncPolicy:
+    {{- toYaml $.Values.syncPolicy | nindent 4 }}
+{{- end }}

@@ -21,7 +21,7 @@ Every catalog entry is a self-contained Kustomize base producing one or more `Ap
 Version columns show what the child `Application` currently pins. `—` in the Version column means the sub-entry ships plain manifests (no upstream chart). Each row links to its per-entry README.
 
 <details>
-<summary><b><code>infra/</code> — platform infrastructure</b> (8 entries)</summary>
+<summary><b><code>infra/</code> — platform infrastructure</b> (9 entries)</summary>
 
 | Entry | Sub-entries | Version | Purpose |
 |---|---|---|---|
@@ -32,6 +32,7 @@ Version columns show what the child `Application` currently pins. `—` in the V
 | [`kyverno`](./infra/kyverno/) | `install` | `3.8.0` | Kyverno admission controller (policy engine) — `ClusterPolicy` / `Policy` / `PolicyException` CRDs. Controller only; policies are cluster-specific |
 | [`longhorn`](./infra/longhorn/) | `install` | `1.11.2` | Longhorn distributed block storage; GitOps-friendly defaults (`preUpgradeChecker.jobEnabled: false`, `defaultClassReplicaCount: 1` for single-node-safe install) |
 | [`nfs-csi`](./infra/nfs-csi/) | `chart` / `storageclasses` | `v4.13.1` + — | kubernetes-csi NFS driver + opinionated `StorageClass` set |
+| [`oauth2-proxy`](./infra/oauth2-proxy/) | `install` / `secrets` | `10.7.4` + — | OIDC (ZITADEL) login in front of apps without one: one proxy per app, one shared client and cookie per cluster, HTTPRoute per host, optional ExternalSecrets |
 | [`openebs`](./infra/openebs/) | — (single) | `4.4.0` | OpenEBS (local-PV + replicated volumes) with Loki/Alloy disabled |
 | [`prometheus-pve-exporter`](./infra/prometheus-pve-exporter/) | `install` / `exporter` | `3.10.1` | Proxmox VE metrics exporter + PodMonitor + Grafana dashboard for kube-prometheus-stack; PVE token via ESO or a hand-made Secret |
 | [`trust-manager`](./infra/trust-manager/) | `install` / `bundle` | `0.22.0` + — | trust-manager chart (app-of-apps), values-driven `Bundle`s — empty by default; consumers declare which Bundles their cluster needs |
