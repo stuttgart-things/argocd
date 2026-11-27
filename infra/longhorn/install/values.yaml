@@ -67,8 +67,9 @@ preUpgradeChecker:
 #
 # WARNING: the Longhorn UI has NO authentication. Anyone who reaches the
 # hostname can delete volumes, backups and disks. Only attach it to a
-# lab-internal gateway; put OIDC (oauth2-proxy) in front before exposing it
-# anywhere else.
+# lab-internal gateway. For a login in front, leave this off and add
+# longhorn-frontend as an instance of infra/oauth2-proxy (its README has the
+# entry): the proxy's HTTPRoute then takes the hostname.
 httpRoute:
   # Boolean, or the string "true"/"false".
   enabled: false

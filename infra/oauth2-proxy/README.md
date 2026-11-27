@@ -48,7 +48,9 @@ All proxies of a cluster share ONE confidential ZITADEL client (web app, code fl
 
 Why one proxy per app and not one Gateway-level auth for all: the Gateway API `ExternalAuth` filter needs Cilium >= 1.20 and the experimental Gateway API CRDs.
 
-## Example: Prometheus and Alertmanager of kube-prometheus-stack
+## Examples
+
+### Prometheus and Alertmanager of kube-prometheus-stack
 
 ```yaml
 issuer: https://zitadel.infra.sthings-vsphere.labul.sva.de
@@ -69,6 +71,20 @@ externalSecrets:
     name: vault-cluster
   remoteKey: oauth2-proxy
 ```
+
+### Longhorn
+
+The Longhorn UI has no authentication. Keep the Longhorn chart's own route off (`httpRoute.enabled: false`, or no `storage-platform/longhorn-ui-route` label in `platforms/storage`) and add:
+
+```yaml
+instances:
+  - name: longhorn-oauth2-proxy
+    namespace: longhorn-system
+    hostname: longhorn.<cluster>.<zone>
+    upstream: http://longhorn-frontend.longhorn-system.svc.cluster.local:80
+```
+
+The proxy needs the Secret `secretName` in `longhorn-system` (with `externalSecrets.enabled` it gets one), and the ZITADEL client needs the redirect URI `https://longhorn.<cluster>.<zone>/oauth2/callback`.
 
 ## Values
 
