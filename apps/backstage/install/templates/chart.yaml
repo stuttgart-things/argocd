@@ -14,6 +14,21 @@
         "valueFrom" (dict "secretKeyRef" (dict "name" $secretRef "key" .))
   ) }}
 {{- end }}
+{{- /* Sign-in switches, as flux's BACKSTAGE_AUTH_*_ENABLED. */}}
+{{- $extraEnvVars = append $extraEnvVars (dict "name" "AUTH_GUEST_ENABLED" "value" (toString .Values.auth.guestEnabled)) }}
+{{- if .Values.auth.oidc.enabled }}
+  {{- $extraEnvVars = append $extraEnvVars (dict "name" "AUTH_OIDC_ENABLED" "value" "true") }}
+  {{- range (list "ZITADEL_ISSUER" "ZITADEL_CLIENT_SECRET") }}
+    {{- $extraEnvVars = append $extraEnvVars (dict
+          "name" .
+          "valueFrom" (dict "secretKeyRef" (dict "name" $secretRef "key" .))
+    ) }}
+  {{- end }}
+{{- end }}
+{{- $tb := .Values.trustBundle }}
+{{- if $tb.configMap }}
+  {{- $extraEnvVars = append $extraEnvVars (dict "name" "NODE_EXTRA_CA_CERTS" "value" (printf "/etc/ssl/custom/%s" $tb.key)) }}
+{{- end }}
 {{- $backstage := dict
       "replicas" .Values.replicas
       "image" (dict
@@ -28,6 +43,10 @@
         (dict "filename" "app-config.catalog.yaml" "configMapRef" .Values.appConfig.catalogConfigMap)
       )
 }}
+{{- if $tb.configMap }}
+  {{- $_ := set $backstage "extraVolumes" (list (dict "name" "trust-bundle" "configMap" (dict "name" $tb.configMap))) }}
+  {{- $_ := set $backstage "extraVolumeMounts" (list (dict "name" "trust-bundle" "mountPath" "/etc/ssl/custom" "readOnly" true)) }}
+{{- end }}
 {{- $computed := dict
       "global"     (dict "storageClass" .Values.storageClass)
       "ingress"    (dict "enabled" false)

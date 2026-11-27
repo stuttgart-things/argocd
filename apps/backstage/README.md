@@ -129,27 +129,49 @@ spec:
 
 ## Internal CA trust (Vault PKI / private CA)
 
-If Backstage needs to call internal services over HTTPS with certificates issued by a private CA, mount the trust-manager `cluster-trust-bundle` and set `NODE_EXTRA_CA_CERTS`. Pass the override via `extraValues`:
+If Backstage calls internal services over HTTPS with certificates issued by a
+private CA (e.g. ZITADEL behind the Vault PKI), set `trustBundle.configMap`:
 
 ```yaml
-extraValues:
-  backstage:
-    extraVolumes:
-      - name: trust-bundle
-        configMap:
-          name: cluster-trust-bundle
-          optional: true
-    extraVolumeMounts:
-      - name: trust-bundle
-        mountPath: /etc/ssl/custom/trust-bundle.pem
-        subPath: trust-bundle.pem
-        readOnly: true
-    extraEnvVars:
-      - name: NODE_EXTRA_CA_CERTS
-        value: /etc/ssl/custom/trust-bundle.pem
+trustBundle:
+  configMap: cluster-trust-bundle   # trust-manager's Bundle target
+  key: trust-bundle.pem
 ```
 
-This requires `infra/trust-manager/install` + a `Bundle` populating `cluster-trust-bundle` on the workload cluster.
+The ConfigMap is mounted at `/etc/ssl/custom` and `NODE_EXTRA_CA_CERTS` points
+at the key; Node **adds** it to its built-in roots once at start. Requires
+`infra/trust-manager/install` + a `Bundle` populating the ConfigMap.
+
+Do not set `extraEnvVars` through `extraValues` for this: `extraValues` is
+merged with `mergeOverwrite`, which replaces lists, so it would drop every
+env var this chart computes (`APP_TITLE`, `GITHUB_TOKEN`, ...).
+
+## Sign-in: guest and ZITADEL (OIDC)
+
+Same switches as flux's `BACKSTAGE_AUTH_GUEST_ENABLED` /
+`BACKSTAGE_AUTH_OIDC_ENABLED` (sthings-backstage image >= `v1.23.0`):
+
+```yaml
+auth:
+  guestEnabled: false        # no guest button; guest counts as a developer
+  oidc:
+    enabled: true
+    clientId: "123456789012345678"   # keep quoted (digits only)
+    projectId: ""                    # empty = the client's own project
+trustBundle:
+  configMap: cluster-trust-bundle    # ZITADEL's CA
+```
+
+- `auth.oidc.enabled` sets `AUTH_OIDC_ENABLED=true`, which loads the OIDC
+  module, and the `backstage-config` sub-App renders the provider block
+  (`auth.providers.oidc.development`, resolver `zitadelProjectRoles`,
+  `offline_access` for refresh tokens).
+- Client ID and project ID are written into app-config as quoted literals.
+  Through env, a digits-only ZITADEL ID arrives as a float.
+- `secretName` must carry `ZITADEL_ISSUER` and `ZITADEL_CLIENT_SECRET`.
+- ZITADEL project roles decide the group: `backstage-platform` →
+  platform-team, `backstage-developer` → guests, none → refused.
+- Redirect URI of the client: `https://<httpRoute.hostname>/api/auth/oidc/handler/frame`.
 
 ## Values reference
 
@@ -169,6 +191,10 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `appConfig.catalogConfigMap` | `backstage-catalog-config` | ConfigMap holding catalog locations (must be provisioned out-of-band) |
 | `secretName` | `backstage-secrets` | Secret carrying all `extraEnvVars` (provisioned by `secrets/` sub-App when `secretsApp.enabled: true`) |
 | `config.enabled` | `true` | Render the `backstage-config` sub-App |
+| `auth.guestEnabled` | `true` | `AUTH_GUEST_ENABLED`; `false` = no guest sign-in |
+| `auth.oidc.enabled` | `false` | ZITADEL sign-in (see above); needs `ZITADEL_ISSUER` / `ZITADEL_CLIENT_SECRET` in `secretName` |
+| `auth.oidc.clientId` / `projectId` | `""` | ZITADEL IDs, quoted literals in app-config |
+| `trustBundle.configMap` / `key` | `""` / `trust-bundle.pem` | Private CA for `NODE_EXTRA_CA_CERTS`; empty = off |
 | `secretsApp.enabled` | `false` | Render the `backstage-secrets` sub-App (DEV ONLY) |
 | `httpRoute.enabled` | `true` | Render the HTTPRoute + ReferenceGrant sub-App |
 | `httpRoute.hostname` | `backstage.example.com` | FQDN on the HTTPRoute |

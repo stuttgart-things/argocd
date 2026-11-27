@@ -4,6 +4,10 @@
 {{- $configValues := dict
       "namespace"     .Values.destination.namespace
       "configMapName" .Values.appConfig.extraConfigMap
+      "oidc"          (dict
+        "enabled"   .Values.auth.oidc.enabled
+        "clientId"  (toString .Values.auth.oidc.clientId)
+        "projectId" (toString .Values.auth.oidc.projectId))
 }}
 ---
 apiVersion: argoproj.io/v1alpha1

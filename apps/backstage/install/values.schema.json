@@ -62,6 +62,35 @@
       "required": ["extraConfigMap", "catalogConfigMap"]
     },
     "secretName": { "type": "string", "minLength": 1 },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "guestEnabled": { "type": "boolean", "description": "false = no guest sign-in (image >= v1.22.0)." },
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "description": "ZITADEL sign-in (image >= v1.23.0)." },
+            "clientId": { "type": "string", "pattern": "^[0-9]*$", "description": "ZITADEL client ID (digits)." },
+            "projectId": { "type": "string", "pattern": "^[0-9]*$", "description": "ZITADEL project whose roles count; empty = the client's own." }
+          },
+          "required": ["enabled"],
+          "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+          "then": { "required": ["clientId"], "properties": { "clientId": { "minLength": 1 } } }
+        }
+      },
+      "required": ["guestEnabled", "oidc"]
+    },
+    "trustBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "configMap": { "type": "string", "description": "CA bundle ConfigMap mounted for NODE_EXTRA_CA_CERTS. Empty = off." },
+        "key": { "type": "string", "minLength": 1 }
+      },
+      "required": ["configMap", "key"]
+    },
     "config": {
       "type": "object",
       "additionalProperties": false,

@@ -1,3 +1,10 @@
 ---
 namespace: portal
 configMapName: backstage-app-config
+# ZITADEL sign-in provider block (auth.providers.oidc). Inert unless the
+# Deployment sets AUTH_OIDC_ENABLED=true (install: auth.oidc.enabled), which
+# loads the module. clientId / projectId are written as quoted literals.
+oidc:
+  enabled: false
+  clientId: ""
+  projectId: ""
