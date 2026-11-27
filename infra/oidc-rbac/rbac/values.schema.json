@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "oidc-rbac chart",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["groupPrefix", "roles", "clusterReader"],
+  "properties": {
+    "destination": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Inert pass-through. Present so verify-catalog's probe values do not fail strict additionalProperties:false validation; the chart itself does not consume this field."
+    },
+    "groupPrefix": {
+      "type": "string",
+      "description": "Prefix the kube-apiserver adds to every OIDC group (claimMappings.groups.prefix)."
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ZITADEL role keys (without prefix) bound to cluster-admin / edit / view. Empty = no binding.",
+      "properties": {
+        "admin": { "type": "string" },
+        "edit": { "type": "string" },
+        "view": { "type": "string" }
+      },
+      "required": ["admin", "edit", "view"]
+    },
+    "clusterReader": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Read-only on cluster-scoped objects (namespaces, nodes, storage, CRDs, classes) for edit and view."
+        }
+      },
+      "required": ["enabled"]
+    }
+  }
+}

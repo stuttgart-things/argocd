@@ -1,0 +1,6 @@
+apiVersion: v2
+name: oidc-rbac
+description: RBAC for OIDC (ZITADEL) logins - binds the lab-wide roles k8s-admin / k8s-edit / k8s-view to cluster-admin / edit / view
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

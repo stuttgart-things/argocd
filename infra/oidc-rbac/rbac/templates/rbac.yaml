@@ -1,0 +1,76 @@
+{{- $p := .Values.groupPrefix }}
+{{- $bindings := list
+      (dict "key" "admin" "role" .Values.roles.admin "clusterRole" "cluster-admin")
+      (dict "key" "edit" "role" .Values.roles.edit "clusterRole" "edit")
+      (dict "key" "view" "role" .Values.roles.view "clusterRole" "view") }}
+{{- range $bindings }}
+{{- if .role }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "oidc-k8s-%s" .key }}
+  labels:
+    app.kubernetes.io/name: oidc-rbac
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .clusterRole }}
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: {{ printf "%s%s" $p .role | quote }}
+{{- end }}
+{{- end }}
+{{- $readers := list }}
+{{- range (list .Values.roles.edit .Values.roles.view) }}
+{{- if . }}{{ $readers = append $readers (printf "%s%s" $p .) }}{{ end }}
+{{- end }}
+{{- if and .Values.clusterReader.enabled $readers }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: oidc-cluster-reader
+  labels:
+    app.kubernetes.io/name: oidc-rbac
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "nodes", "persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "csidrivers", "csinodes", "volumeattachments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingressclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["gatewayclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: oidc-k8s-cluster-reader
+  labels:
+    app.kubernetes.io/name: oidc-rbac
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: oidc-cluster-reader
+subjects:
+{{- range $readers }}
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: {{ . | quote }}
+{{- end }}
+{{- end }}
