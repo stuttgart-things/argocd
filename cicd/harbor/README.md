@@ -42,3 +42,33 @@ them verifies the same password), the token key pair by cert-manager.
 
 The internal database keeps the chart's default password: it is reachable only
 inside the namespace's ClusterIP Service.
+
+## Login via ZITADEL (`oidc.*`)
+
+Port of flux's `harbor-oidc` (stuttgart-things#5023). Harbor takes OIDC from its configuration, which the core reads from `CONFIG_OVERWRITE_JSON` at every start. Both values name Secrets the cluster supplies in the Harbor namespace, so the client secret never enters the Application:
+
+| Value | Secret key | |
+|---|---|---|
+| `oidc.overridesSecret` | `overrides.json` | `auth_mode: oidc_auth` and the `oidc_*` settings → `core.extraEnvVars` `CONFIG_OVERWRITE_JSON` |
+| `oidc.caBundleSecret` | `ca.crt` | the issuer's CA → `caBundleSecretName` (trust store of core, jobservice, registry, trivy), e.g. a trust-manager `Bundle` with a Secret target |
+
+```json
+{
+  "auth_mode": "oidc_auth",
+  "oidc_name": "ZITADEL",
+  "oidc_endpoint": "https://zitadel.example",
+  "oidc_client_id": "<client id>",
+  "oidc_client_secret": "<client secret>",
+  "oidc_scope": "openid,profile,email,offline_access",
+  "oidc_verify_cert": true,
+  "oidc_auto_onboard": true,
+  "oidc_user_claim": "preferred_username",
+  "oidc_groups_claim": "harbor_groups",
+  "oidc_admin_group": "harbor-admin"
+}
+```
+
+- the groups claim must be a **list**; ZITADEL's roles claim is a map, so the stuttgart-things zitadel-config roots add `harbor_groups` with an action (`harbor-admin` → system admin, `harbor-user` → login only)
+- `offline_access` and a refresh token grant on the client keep the CLI secret (`docker login`) valid past the ID token's lifetime
+- redirect URI: `https://<hostname>/c/oidc/callback`
+- switching `auth_mode` works only while Harbor has **no local users** besides `admin`; the admin stays as emergency access

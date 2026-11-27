@@ -113,6 +113,23 @@
         }
       }
     },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Login via ZITADEL (OIDC): Secrets with overrides.json and ca.crt. Empty = off.",
+      "properties": {
+        "overridesSecret": {
+          "type": "string"
+        },
+        "caBundleSecret": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "overridesSecret",
+        "caBundleSecret"
+      ]
+    },
     "syncPolicy": {
       "type": "object",
       "additionalProperties": true

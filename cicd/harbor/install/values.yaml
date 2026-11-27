@@ -56,6 +56,18 @@ secrets:
   vaultSecretName: harbor
   refreshInterval: 1h
 
+# Login via ZITADEL (OIDC) instead of Harbor's own user database
+# (stuttgart-things#5023), as flux's harbor-oidc. Harbor takes OIDC from its
+# configuration: the core reads CONFIG_OVERWRITE_JSON at every start. Both
+# Secrets are the cluster's, in destination.namespace. Switching auth_mode
+# works only while Harbor has no local users besides admin.
+oidc:
+  # Secret with key overrides.json: auth_mode oidc_auth + the oidc_* settings,
+  # client secret included (see the README). Empty = off.
+  overridesSecret: ""
+  # Secret with key ca.crt: the issuer's CA, added to the trust store of core,
+  # jobservice, registry and trivy (caBundleSecretName). Empty = system roots.
+  caBundleSecret: ""
 syncPolicy:
   automated:
     prune: true
