@@ -8,6 +8,32 @@
   {{- $hr := dict "enabled" true "parentRefs" (list $ref) "hostnames" (list .Values.httpRoute.hostname) }}
   {{- $_ := set $computed "httpRoute" $hr }}
 {{- end }}
+{{- /* OIDC login (opt-in), as flux's headlamp-oidc component. Client ID,
+     issuer, scopes and callback as env; the client secret from an existing
+     Secret; the issuer's CA mounted as a file. */}}
+{{- $oidc := .Values.oidc | default dict }}
+{{- if $oidc.issuer }}
+  {{- $callback := $oidc.callbackUrl }}
+  {{- if not $callback }}
+    {{- if not (and .Values.httpRoute.enabled .Values.httpRoute.hostname) }}
+      {{- fail "oidc.callbackUrl is required when httpRoute is disabled" }}
+    {{- end }}
+    {{- $callback = printf "https://%s/oidc-callback" .Values.httpRoute.hostname }}
+  {{- end }}
+  {{- $env := list
+        (dict "name" "OIDC_CLIENT_ID" "value" (toString $oidc.clientId))
+        (dict "name" "OIDC_ISSUER_URL" "value" (trimSuffix "/" $oidc.issuer))
+        (dict "name" "OIDC_SCOPES" "value" $oidc.scopes)
+        (dict "name" "OIDC_CALLBACK_URL" "value" $callback)
+        (dict "name" "HEADLAMP_CONFIG_OIDC_CLIENT_SECRET" "valueFrom" (dict "secretKeyRef" (dict "name" $oidc.clientSecret.name "key" $oidc.clientSecret.key))) }}
+  {{- if $oidc.caConfigMap }}
+    {{- $env = append $env (dict "name" "HEADLAMP_CONFIG_OIDC_CA_FILE" "value" (printf "/etc/headlamp/oidc-ca/%s" $oidc.caKey)) }}
+    {{- $_ := set $computed "volumes" (list (dict "name" "oidc-ca" "configMap" (dict "name" $oidc.caConfigMap))) }}
+    {{- $_ := set $computed "volumeMounts" (list (dict "name" "oidc-ca" "mountPath" "/etc/headlamp/oidc-ca" "readOnly" true)) }}
+  {{- end }}
+  {{- $_ := set $computed "env" $env }}
+  {{- $_ := set $computed.config "oidc" (dict "secret" (dict "create" false)) }}
+{{- end }}
 {{- $extra := .Values.extraValues | default dict }}
 {{- $merged := mergeOverwrite $computed (deepCopy $extra) }}
 {{- $defaultName := printf "headlamp-%s" (sha1sum .Values.destination.server | trunc 8) }}

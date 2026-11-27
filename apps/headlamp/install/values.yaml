@@ -34,6 +34,32 @@ plugins:
 # Use for any upstream Headlamp value not exposed as a first-class key above.
 extraValues: {}
 
+# Login via OIDC (ZITADEL) instead of the ServiceAccount token. Headlamp hands
+# the user's ID token to the kube-apiserver, so the apiserver must accept the
+# issuer with clientId as audience (--authentication-config) and RBAC must
+# bind what it maps (e.g. infra/oidc-rbac) -- otherwise the login works and
+# every request after it is 401. Same option as flux's headlamp-oidc.
+oidc:
+  # e.g. https://zitadel.infra.example, no trailing slash. Empty = off.
+  issuer: ""
+  # ZITADEL client ID (digits only -- keep it quoted). Also the apiserver's
+  # audience.
+  clientId: ""
+  # Comma separated; Headlamp adds openid. ZITADEL: add
+  # urn:zitadel:iam:org:projects:roles to get the project roles as groups.
+  scopes: profile,email
+  # Empty = https://<httpRoute.hostname>/oidc-callback. Must be a redirect URI
+  # of the client.
+  callbackUrl: ""
+  # Existing Secret (SOPS / ESO) in the destination namespace with the client
+  # secret.
+  clientSecret:
+    name: headlamp-oidc
+    key: client-secret
+  # CA bundle the issuer's certificate chains to. Empty = system roots.
+  caConfigMap: cluster-trust-bundle
+  caKey: trust-bundle.pem
+
 # Opt-in ClusterRoleBinding granting cluster-admin to the headlamp ServiceAccount.
 rbac:
   enabled: false

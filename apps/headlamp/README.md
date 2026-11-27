@@ -140,8 +140,37 @@ See `install/values.yaml` for defaults and `install/values.schema.json` for the 
 | `plugins` | `[prometheus 0.8.2]` | Plugins pre-loaded by pluginsManager; `[]` disables it |
 | `extraValues` | `{}` | Deep-merged on top of the computed upstream `valuesObject` |
 | `rbac.enabled` | `false` | Install the cluster-admin ClusterRoleBinding |
+| `oidc.issuer` | `""` | OIDC issuer (ZITADEL), no trailing slash; empty = token login |
+| `oidc.clientId` | `""` | OIDC client ID, also the kube-apiserver audience (keep quoted) |
+| `oidc.scopes` | `profile,email` | Comma separated, `openid` is added by Headlamp |
+| `oidc.callbackUrl` | `""` | Empty = `https://<httpRoute.hostname>/oidc-callback` |
+| `oidc.clientSecret.name` / `key` | `headlamp-oidc` / `client-secret` | Existing Secret with the client secret (SOPS / ESO) |
+| `oidc.caConfigMap` / `caKey` | `cluster-trust-bundle` / `trust-bundle.pem` | CA bundle for the issuer; empty = system roots |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the rbac Application fetches manifests from |
 | `syncPolicy` | automated + retry | Applied to both rendered Applications |
+
+## OIDC login (ZITADEL)
+
+Off by default. `oidc.issuer` set → Headlamp logs in through the OIDC provider
+instead of a pasted ServiceAccount token, the same option as flux's
+`headlamp-oidc` component:
+
+```yaml
+oidc:
+  issuer: https://zitadel.infra.example
+  clientId: "123456789012345678"   # keep quoted (digits only)
+  # ZITADEL: the project roles into the ID token
+  scopes: profile,email,urn:zitadel:iam:org:projects:roles
+```
+
+Headlamp passes the user's ID token straight to the kube-apiserver. So the
+apiserver must accept the issuer with `clientId` as audience
+(`--authentication-config`) and RBAC must bind what it maps (e.g. the
+lab-wide `zitadel:k8s-*` roles) -- otherwise the login works and every
+request after it is 401. The client secret never goes through values: it
+comes from the existing Secret `oidc.clientSecret`. A missing Secret or CA
+ConfigMap keeps the pod in `ContainerCreating`. The callback
+(`/oidc-callback`) must be a redirect URI of the client.
 
 ## Login token
 
