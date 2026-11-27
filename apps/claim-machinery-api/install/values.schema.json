@@ -63,6 +63,29 @@
         }
       }
     },
+    "orderAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Order authentication via OIDC (AUTH_* env). Empty oidc.issuer = off.",
+      "properties": {
+        "oidc": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer": { "type": "string", "pattern": "^(https://.+)?$" },
+            "audience": { "type": "string", "pattern": "^[^\\s]*$", "description": "Comma list of accepted aud values." },
+            "useTrustBundle": { "type": "boolean" }
+          },
+          "required": ["issuer", "audience", "useTrustBundle"],
+          "if": { "properties": { "issuer": { "minLength": 1 } }, "required": ["issuer"] },
+          "then": { "properties": { "audience": { "minLength": 1 } } }
+        },
+        "orderRoles": { "type": "string" },
+        "adminRoles": { "type": "string" },
+        "trustForwardedUser": { "type": "boolean" }
+      },
+      "required": ["oidc", "orderRoles", "adminRoles", "trustForwardedUser"]
+    },
     "auth": {
       "type": "object",
       "additionalProperties": false,

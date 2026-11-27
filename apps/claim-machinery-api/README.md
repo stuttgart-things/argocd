@@ -93,6 +93,11 @@ spec:
 | `image.repository` / `tag` | `ghcr.io/stuttgart-things/claim-machinery-api` / `v0.21.1` | Container image |
 | `config.templateProfilePath` | `""` | `TEMPLATE_PROFILE_PATH` env on the API |
 | `config.homerun.enabled` / `url` | `false` / `""` | `ENABLE_HOMERUN` + `HOMERUN_URL` |
+| `orderAuth.oidc.issuer` | `""` | `AUTH_OIDC_ISSUER`; empty = ordering stays open (see *Order authentication*) |
+| `orderAuth.oidc.audience` | `""` | `AUTH_OIDC_AUDIENCE`, comma list (ZITADEL project/client IDs, keep quoted) |
+| `orderAuth.oidc.useTrustBundle` | `true` | `AUTH_OIDC_CA_FILE` = `<trustBundle.sslCertDir>/<trustBundle.key>` |
+| `orderAuth.orderRoles` / `adminRoles` | `""` | `AUTH_ORDER_ROLES` / `AUTH_ADMIN_ROLES` (comma lists) |
+| `orderAuth.trustForwardedUser` | `false` | `AUTH_TRUST_FORWARDED_USER` (identity forwarded by sthings-portal) |
 | `auth.secretName` / `secretKey` | `claim-machinery-auth` / `HOMERUN_AUTH_TOKEN` | Where the Deployment looks for the token |
 | `trustBundle.configMapName` / `key` / `sslCertDir` | `cluster-trust-bundle` / `trust-bundle.pem` / `/etc/ssl/custom` | trust-manager bundle mount |
 | `httpRoute.enabled` | `true` | Render the Gateway API sub-App |
@@ -100,6 +105,28 @@ spec:
 | `authSecret.enabled` / `homerunAuthToken` | `false` / `""` | Inline-Secret sub-App (dev only) |
 | `catalog.repoURL` / `targetRevision` | this repo / `HEAD` | Where the httpRoute + auth Applications fetch manifests from |
 | `syncPolicy` | automated + retry | Applied to all rendered Applications |
+
+## Order authentication
+
+Off by default. With `orderAuth.oidc.issuer` set, ordering needs a JWT of
+that issuer (the lab ZITADEL); see the claim-machinery-api README "Order
+authentication". The same `AUTH_*` keys as flux's `claim-machinery-order`
+ConfigMap, here written into the `claim-machinery-api` ConfigMap the
+Deployment already loads (`envFrom`):
+
+```yaml
+orderAuth:
+  oidc:
+    issuer: https://zitadel.infra.example
+    audience: "123456789012345678"   # quoted: digits only
+  adminRoles: backstage-platform
+  trustForwardedUser: true           # UI order behind sthings-portal
+```
+
+The CA comes from the trust bundle the chart already mounts
+(`useTrustBundle`). The base has no Reloader: after changing these values on
+a running cluster, `kubectl -n claim-machinery rollout restart
+deploy/claim-machinery-api`.
 
 ## Related
 

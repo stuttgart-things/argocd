@@ -31,6 +31,30 @@ config:
     enabled: false
     url: ""
 
+# Order authentication (claim-machinery-api README "Order authentication",
+# stuttgart-things#4380): ordering needs a JWT of the OIDC issuer (ZITADEL).
+# OFF while oidc.issuer is empty -- ordering stays open. Same AUTH_* keys flux
+# reads from its ConfigMap claim-machinery-order; here they go into the
+# claim-machinery-api ConfigMap the Deployment already loads (envFrom).
+orderAuth:
+  oidc:
+    # e.g. https://zitadel.infra.example. Empty = off.
+    issuer: ""
+    # Accepted `aud` values, comma list (ZITADEL project ID and/or client
+    # IDs, digits only -- keep quoted). Required with the issuer.
+    audience: ""
+    # true: AUTH_OIDC_CA_FILE = the trust bundle mounted below
+    # (<trustBundle.sslCertDir>/<trustBundle.key>), for a ZITADEL behind the
+    # Vault PKI.
+    useTrustBundle: true
+  # Roles of which the orderer needs one (comma list); empty = any valid token.
+  orderRoles: ""
+  # Roles that may name any owner and order every template (comma list).
+  adminRoles: ""
+  # true: accept the identity sthings-portal forwards (X-Forwarded-User /
+  # X-Forwarded-Groups) for the web UI's Order.
+  trustForwardedUser: false
+
 # HOMERUN_AUTH_TOKEN injection. The Secret is referenced via secretKeyRef on the
 # Deployment regardless; with `optional: true` so the pod still starts when missing.
 # Set authSecret.enabled to true to provision the Secret via the auth-secret sub-App.

@@ -30,6 +30,18 @@
         "HOMERUN_URL"           .Values.config.homerun.url
       )
 }}
+{{- $oa := .Values.orderAuth }}
+{{- if $oa.oidc.issuer }}
+  {{- $d := $cmPatch.data }}
+  {{- $_ := set $d "AUTH_OIDC_ISSUER" $oa.oidc.issuer }}
+  {{- $_ := set $d "AUTH_OIDC_AUDIENCE" (toString $oa.oidc.audience) }}
+  {{- if $oa.oidc.useTrustBundle }}
+    {{- $_ := set $d "AUTH_OIDC_CA_FILE" (printf "%s/%s" $sslCertDir $bundleKey) }}
+  {{- end }}
+  {{- $_ := set $d "AUTH_ORDER_ROLES" $oa.orderRoles }}
+  {{- $_ := set $d "AUTH_ADMIN_ROLES" $oa.adminRoles }}
+  {{- $_ := set $d "AUTH_TRUST_FORWARDED_USER" (ternary "true" "false" $oa.trustForwardedUser) }}
+{{- end }}
 {{- $authPatch := dict
       "apiVersion" "apps/v1"
       "kind" "Deployment"
