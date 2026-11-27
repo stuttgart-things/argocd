@@ -77,6 +77,33 @@
       "description": "Deep-merged on top of the computed valuesObject passed to the upstream chart.",
       "additionalProperties": true
     },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OIDC login instead of the ServiceAccount token. Empty issuer = off.",
+      "properties": {
+        "issuer": { "type": "string", "pattern": "^(https://[^\\s]*[^/\\s])?$", "description": "OIDC issuer URL without trailing slash. Empty = OIDC login off." },
+        "clientId": { "type": "string", "description": "OIDC client ID; also the kube-apiserver audience." },
+        "scopes": { "type": "string", "minLength": 1, "description": "Comma-separated scopes; openid is added by Headlamp." },
+        "callbackUrl": { "type": "string", "pattern": "^(https?://.+)?$", "description": "Empty = https://<httpRoute.hostname>/oidc-callback." },
+        "clientSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "key": { "type": "string", "minLength": 1 }
+          },
+          "required": ["name", "key"]
+        },
+        "caConfigMap": { "type": "string", "description": "CA bundle ConfigMap for the issuer. Empty = system roots." },
+        "caKey": { "type": "string" }
+      },
+      "if": { "properties": { "issuer": { "minLength": 1 } }, "required": ["issuer"] },
+      "then": {
+        "required": ["clientId", "scopes", "clientSecret"],
+        "properties": { "clientId": { "minLength": 1 } }
+      }
+    },
     "rbac": {
       "type": "object",
       "additionalProperties": false,
