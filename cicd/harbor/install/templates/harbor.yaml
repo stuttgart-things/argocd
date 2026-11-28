@@ -35,6 +35,15 @@
           "redis" (dict "storageClass" $sc "size" $s.redis)
           "trivy" (dict "storageClass" $sc "size" $s.trivy)))
 }}
+{{- /* OIDC (opt-in), as flux's harbor-oidc: the whole configuration comes
+       from a Secret, so the client secret never enters the Application. */}}
+{{- $oidc := .Values.oidc | default dict }}
+{{- if $oidc.overridesSecret }}
+{{- $_ := set $values.core "extraEnvVars" (list (dict "name" "CONFIG_OVERWRITE_JSON" "valueFrom" (dict "secretKeyRef" (dict "name" $oidc.overridesSecret "key" "overrides.json")))) }}
+{{- end }}
+{{- if $oidc.caBundleSecret }}
+{{- $_ := set $values "caBundleSecretName" $oidc.caBundleSecret }}
+{{- end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
